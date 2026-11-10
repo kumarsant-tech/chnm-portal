@@ -56,8 +56,19 @@ export function bearer(req) {
   return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
 }
 
-export function issueAdminToken(env) {
-  return signPayload({ r: "admin", exp: Date.now() + 12 * HOUR }, env);
+export function issueAdminToken(env, authVersion = 0) {
+  return signPayload({ r: "admin", av: authVersion, exp: Date.now() + 12 * HOUR }, env);
+}
+
+export async function adminAuthVersion(store) {
+  return Number(await getJson(store, K.adminAuthVersion())) || 0;
+}
+
+export async function bumpAdminAuthVersion(store) {
+  if (typeof store.increment !== "function") {
+    throw new Error("Storage provider does not support atomic counters");
+  }
+  return store.increment(K.adminAuthVersion());
 }
 
 export function issueStudentToken(studentId, env) {
@@ -72,9 +83,40 @@ export function hasAdminPassword(env) {
   return Boolean(configValue(env, "ADMIN_PASSWORD"));
 }
 
-export function checkAdminPassword(password, env) {
+export async function hasAdminCredential(env, store) {
+  return Boolean(await getJson(store, K.adminPasswordOverride())) || hasAdminPassword(env);
+}
+
+export async function checkAdminPassword(password, env, store) {
+  const override = await getJson(store, K.adminPasswordOverride());
+  if (override) return checkPassword(password, override);
   const configured = configValue(env, "ADMIN_PASSWORD");
   return Boolean(configured) && safeEqual(password || "", configured);
+}
+
+export function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256");
+  return `pbkdf2v2$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+}
+
+export function checkPassword(password, stored) {
+  try {
+    const [kind, salt, hash] = String(stored || "").split("$");
+    const iterations = kind === "pbkdf2v2" ? 120000 : kind === "pbkdf2" ? 60000 : 0;
+    if (!iterations || !salt || !hash) return false;
+    const expected = Buffer.from(hash, "base64url");
+    const actual = crypto.pbkdf2Sync(
+      String(password || ""),
+      Buffer.from(salt, "base64url"),
+      iterations,
+      32,
+      "sha256"
+    );
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
 }
 
 export function hashPin(pin) {
@@ -101,15 +143,18 @@ export function checkPin(pin, stored) {
   }
 }
 
-export async function requireAdmin(req, env) {
+export async function requireAdmin(req, store, env) {
   const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "admin") {
     throw new HttpError("एडमिन लॉगिन आवश्यक है", 401);
   }
+  if (Number(payload.av ?? 0) !== (await adminAuthVersion(store))) {
+    throw new HttpError("एडमिन सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
+  }
   return payload;
 }
 
-export async function requireStudent(req, store, env) {
+export async function requireStudent(req, store, env, allowPasswordChange = false) {
   const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "student" || !payload.sid) {
     throw new HttpError("छात्र लॉगिन आवश्यक है", 401);
@@ -118,6 +163,9 @@ export async function requireStudent(req, store, env) {
   if (!student) throw new HttpError("छात्र रिकॉर्ड नहीं मिला", 401);
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय कर दिया गया है", 403);
+  }
+  if (!allowPasswordChange && (student.mustChangePassword || !student.passwordHash)) {
+    throw new HttpError("पहले अपना नया पासवर्ड सेट करें", 428, { passwordChangeRequired: true });
   }
   return student;
 }

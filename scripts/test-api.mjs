@@ -1,5 +1,7 @@
 // End-to-end API test against memory or a local SQLite-backed D1 binding.
 // Run: node scripts/test-api.mjs [--d1]
+import crypto from "node:crypto";
+
 const testD1 = process.argv.includes("--d1");
 process.env.USE_MEMORY_STORE = testD1 ? "0" : "1";
 process.env.ADMIN_PASSWORD = "test-admin-pass";
@@ -64,16 +66,42 @@ function check(name, condition, extra = "") {
 }
 
 async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
+  const setupRegistration = action === "register" && payload.skipSetup !== true;
+  const requestPayload = { ...payload };
+  delete requestPayload.skipSetup;
+  if (action === "register" && requestPayload.dateOfBirth === undefined) {
+    requestPayload.dateOfBirth = "2000-01-01";
+  }
   const headers = { "content-type": "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
   const req = new Request("http://localhost/api", {
     method: "POST",
     headers,
-    body: JSON.stringify({ action, ...payload }),
+    body: JSON.stringify({ action, ...requestPayload }),
   });
   const res = await api(req, { ip, env: apiEnv });
   const type = res.headers.get("content-type") || "";
   const data = type.includes("json") ? await res.json() : await res.text();
+  if (setupRegistration && res.status === 200) {
+    const login = await call(
+      "student_login",
+      { identifier: data.loginId, password: "01012000" },
+      "",
+      ip
+    );
+    if (login.status === 200 && login.data.requiresPasswordChange) {
+      const changed = await call(
+        "student_password_change",
+        { currentPassword: "01012000", newPassword: "student-strong-password" },
+        login.data.token,
+        ip
+      );
+      if (changed.status === 200) {
+        data.token = login.data.token;
+        data.student = changed.data.student;
+      }
+    }
+  }
   return { status: res.status, data, headers: res.headers };
 }
 
@@ -339,6 +367,24 @@ console.log("\n3. Student registration, login, exam attempt");
 let studentToken;
 let resultId;
 {
+  const missingDob = await call(
+    "register",
+    { name: "Missing DOB", mobile: "9876500098", consent: true, dateOfBirth: "", skipSetup: true }
+  );
+  check("registration requires a date of birth", missingDob.status === 400);
+  const missingLoginId = await call(
+    "register",
+    { name: "Missing login ID", mobile: "", citsNumber: "", dateOfBirth: "2000-01-01", consent: true, skipSetup: true }
+  );
+  check("registration requires either CITS or mobile", missingLoginId.status === 400);
+  const citsOnly = await call(
+    "register",
+    { name: "CITS Only Student", mobile: "", citsNumber: "CITS-NOMOBILE", dateOfBirth: "2000-01-01", consent: true },
+    "",
+    "10.0.1.30"
+  );
+  check("CITS-only registration is supported", citsOnly.status === 200 && citsOnly.data.loginId === "CITS-NOMOBILE");
+
   const concurrentRegistrations = await Promise.all(
     Array.from({ length: 8 }, (_, index) =>
       call(
@@ -378,26 +424,71 @@ let resultId;
   const registration = await call("register", {
     name: "Test Student",
     fatherName: "Test Father",
+    citsNumber: "CITS-TEST-1",
     mobile: "9876500001",
     email: "student@example.com",
+    dateOfBirth: "2000-01-01",
     tradeId: "chnm",
     batch: "2026",
     photo: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
     consent: true,
+    skipSetup: true,
   });
   check("self registration ok", registration.status === 200, JSON.stringify(registration.data));
+  check("unconfigured registration email is explicitly reported", registration.data.notification?.reason === "not_configured");
   const studentId = registration.data.student?.id;
   check("registration id starts with CHNM", /^CHNM\d+$/.test(studentId || ""), studentId);
-  studentToken = registration.data.token;
+  check("CITS number becomes the login ID", registration.data.loginId === "CITS-TEST-1");
+  check("registration does not expose a session token", !registration.data.token);
+  const savedStudent = await getJson(store, `students/${studentId}`);
+  check("date of birth is not retained in the student record", !Object.hasOwn(savedStudent, "dateOfBirth"));
+  check("temporary password is stored only as a salted hash", Boolean(savedStudent.passwordHash) && !savedStudent.passwordHash.includes("01012000"));
+  const duplicateCits = await call(
+    "register",
+    {
+      name: "Duplicate CITS",
+      citsNumber: "CITS-TEST-1",
+      mobile: "9876500087",
+      dateOfBirth: "2001-02-03",
+      consent: true,
+      skipSetup: true,
+    }
+  );
+  check("duplicate CITS login IDs are rejected", duplicateCits.status === 409);
 
-  const login = await call("student_login", { id: studentId, mobile: "9876500001" });
-  check("student login ok", login.status === 200 && login.data.token);
-  const wrongMobile = await call("student_login", { id: studentId, mobile: "9876500002" });
-  check("student login wrong mobile rejected", wrongMobile.status === 401);
+  const wrongDob = await call("student_login", { identifier: "CITS-TEST-1", password: "02012000" });
+  check("incorrect temporary DOB is rejected", wrongDob.status === 401);
+  const login = await call("student_login", { identifier: "CITS-TEST-1", password: "01012000" });
+  check("CITS login succeeds with DOB and requires password change", login.status === 200 && login.data.token && login.data.requiresPasswordChange);
+  studentToken = login.data.token;
+  check("dashboard is blocked until password change", (await call("student_dashboard", {}, studentToken)).status === 428);
+  const wrongCurrent = await call(
+    "student_password_change",
+    { currentPassword: "wrong", newPassword: "student-strong-password" },
+    studentToken
+  );
+  check("password change verifies the temporary password", wrongCurrent.status === 401);
+  const changedPassword = await call(
+    "student_password_change",
+    { currentPassword: "01012000", newPassword: "student-strong-password" },
+    studentToken
+  );
+  check("first-login password change succeeds", changedPassword.status === 200 && !changedPassword.data.student.passwordChangeRequired);
+  const mobileLogin = await call(
+    "student_login",
+    { identifier: "9876500001", password: "student-strong-password" }
+  );
+  check("mobile number is also accepted as a login alias", mobileLogin.status === 200 && mobileLogin.data.token);
 
   const dash = await call("student_dashboard", {}, studentToken);
   check("dashboard 200", dash.status === 200, JSON.stringify(dash.data).slice(0, 200));
   check("published exam visible", dash.data.exams?.some((exam) => exam.id === examId));
+  const studentAdminView = await call("admin_student_get", { studentId }, globalThis.adminToken);
+  check(
+    "admin student detail never returns a credential hash",
+    !JSON.stringify(studentAdminView.data).includes("passwordHash") &&
+      !JSON.stringify(studentAdminView.data).includes("pinHash")
+  );
   check("student cannot call admin API", (await call("admin_overview", {}, studentToken)).status === 401);
 
   const draft = await call(
@@ -745,7 +836,13 @@ console.log("\n7. Legacy data import");
   check("legacy import idempotent", again.data.report.results.existing === 1, JSON.stringify(again.data.report));
 
   const login = await call("student_login", { id: "FIG-99999", mobile: "9876599999" });
-  check("legacy student login", login.status === 200);
+  check("legacy student login requires password setup", login.status === 200 && login.data.requiresPasswordChange);
+  const legacyPassword = await call(
+    "student_password_change",
+    { currentPassword: "", newPassword: "legacy-strong-password" },
+    login.data.token
+  );
+  check("legacy account can set its first password", legacyPassword.status === 200);
   const dash = await call("student_dashboard", {}, login.data.token);
   const legacyResult = dash.data.results?.find((result) => result.resultId === "RES-LEGACY-FIG-99999");
   check("legacy result visible", Boolean(legacyResult), JSON.stringify(dash.data.results));
@@ -758,10 +855,19 @@ console.log("\n8. Admin stats, export, safety guards");
   check("stats 200", stats.status === 200 && stats.data.overall.count >= 2, JSON.stringify(stats.data.overall));
   const overview = await call("admin_overview", {}, globalThis.adminToken);
   check("overview 200", overview.status === 200 && overview.data.summary.students >= 3);
-  check("overview hides nothing critical", !JSON.stringify(overview.data).includes("pinHash"));
+  check(
+    "admin overview hides credential hashes",
+    !JSON.stringify(overview.data).includes("pinHash") &&
+      !JSON.stringify(overview.data).includes("passwordHash")
+  );
 
   const exportRes = await call("admin_export", {}, globalThis.adminToken);
   check("data export download", exportRes.status === 200 && exportRes.headers.get("content-disposition")?.includes("chnm-data"));
+  check(
+    "student credential hashes are excluded from backup export",
+    !JSON.stringify(exportRes.data.students).includes("passwordHash") &&
+      !JSON.stringify(exportRes.data.students).includes("pinHash")
+  );
 
   const delStudent = await call("admin_student_delete", { studentId: "FIG-99999", confirm: "FIG-99999" }, globalThis.adminToken);
   check("student delete with results blocked", delStudent.status === 409, delStudent.status);
@@ -1054,7 +1160,7 @@ console.log("\n10. परीक्षा के English निर्देश (i
 
   const settings = await call(
     "admin_settings_save",
-    { settings: { siteName: "Future Instructor", collegeName: "CHNM", defaultInstructionsEn: "Global English instructions." } },
+    { settings: { siteName: "Future Instructor", groupName: "Future Instructor Group · CITS", defaultInstructionsEn: "Global English instructions." } },
     admin
   );
   check(
@@ -1062,12 +1168,113 @@ console.log("\n10. परीक्षा के English निर्देश (i
     settings.status === 200 && settings.data.settings?.defaultInstructionsEn === "Global English instructions.",
     JSON.stringify(settings.data.settings?.defaultInstructionsEn)
   );
+  check(
+    "group name saved by admin settings",
+    settings.status === 200 && settings.data.settings?.groupName === "Future Instructor Group · CITS",
+    JSON.stringify(settings.data.settings?.groupName)
+  );
   const boot = await call("bootstrap");
   check(
     "bootstrap exposes defaultInstructionsEn to the exam UI",
     boot.data.settings?.defaultInstructionsEn === "Global English instructions.",
     JSON.stringify(boot.data.settings?.defaultInstructionsEn)
   );
+  check(
+    "bootstrap exposes the configured group name",
+    boot.data.settings?.groupName === "Future Instructor Group · CITS",
+    JSON.stringify(boot.data.settings?.groupName)
+  );
+}
+
+console.log("\n11. Registration email and admin password recovery");
+{
+  const savedEnv = apiEnv;
+  const savedFetch = globalThis.fetch;
+  const sentEmails = [];
+  apiEnv = {
+    ...(apiEnv || {}),
+    ADMIN_EMAIL: "admin@example.com",
+    RESEND_API_KEY: "test-resend-key",
+    EMAIL_FROM: "CHNM Portal <noreply@example.com>",
+    PUBLIC_BASE_URL: "https://portal.example",
+  };
+  globalThis.fetch = async (url, options) => {
+    sentEmails.push({ url, body: JSON.parse(options.body) });
+    return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
+  };
+  try {
+    const registration = await call(
+      "register",
+      {
+        name: "Email Student",
+        mobile: "9876500088",
+        email: "student@example.com",
+        dateOfBirth: "1999-05-04",
+        consent: true,
+        skipSetup: true,
+      },
+      "",
+      "10.0.10.1"
+    );
+    check("registration confirmation email uses Resend", registration.status === 200 && registration.data.notification?.sent);
+    check("student email contains configured group name", sentEmails[0]?.body.text.includes("Future Instructor Group · CITS"));
+    check("student confirmation does not disclose DOB", !sentEmails[0]?.body.text.includes("04051999"));
+    check("registration API explicitly reports email availability", registration.data.notification?.message.includes("ईमेल भेज"));
+
+    const forgot = await call("admin_forgot_password", { email: "attacker@example.com" }, "", "10.0.10.2");
+    check("forgot password returns a non-enumerating success", forgot.status === 200 && !forgot.data.message.includes("attacker@example.com"));
+    check("reset email recipient is fixed to ADMIN_EMAIL", sentEmails[1]?.body.to?.[0] === "admin@example.com");
+    const resetMatch = sentEmails[1]?.body.text.match(/reset=([A-Za-z0-9_-]+)/);
+    const resetToken = resetMatch?.[1] || "";
+    check("reset email contains a one-time link", Boolean(resetToken));
+    const expiredToken = crypto.randomBytes(32).toString("base64url");
+    const expiredHash = crypto.createHash("sha256").update(expiredToken).digest("hex");
+    await putJson(store, `auth/admin-password-reset/${expiredHash}`, { expiresAt: Date.now() - 1 });
+    const expiredReset = await call(
+      "admin_reset_password",
+      { token: expiredToken, newPassword: "admin-expired-password-2026" },
+      "",
+      "10.0.10.8"
+    );
+    check("expired admin reset links are rejected", expiredReset.status === 400);
+    const resetPassword = await call(
+      "admin_reset_password",
+      { token: resetToken, newPassword: "admin-reset-password-2026" },
+      "",
+      "10.0.10.3"
+    );
+    check("admin reset link changes the password", resetPassword.status === 200, JSON.stringify(resetPassword.data));
+    check("password reset invalidates existing admin sessions", (await call("admin_overview", {}, globalThis.adminToken)).status === 401);
+    const reusedToken = await call(
+      "admin_reset_password",
+      { token: resetToken, newPassword: "admin-other-password-2026" },
+      "",
+      "10.0.10.4"
+    );
+    check("admin reset link is single-use", reusedToken.status === 400);
+    const oldAdmin = await call("admin_login", { password: "test-admin-pass" }, "", "10.0.10.5");
+    const newAdmin = await call("admin_login", { password: "admin-reset-password-2026" }, "", "10.0.10.6");
+    check("reset password override replaces the initial secret", oldAdmin.status === 401 && newAdmin.status === 200);
+    const changedAdmin = await call(
+      "admin_password_change",
+      {
+        currentPassword: "admin-reset-password-2026",
+        newPassword: "admin-changed-password-2026",
+      },
+      newAdmin.data.token
+    );
+    check("authenticated admin can change password", changedAdmin.status === 200);
+    const finalAdminLogin = await call(
+      "admin_login",
+      { password: "admin-changed-password-2026" },
+      "",
+      "10.0.10.7"
+    );
+    check("changed admin password is active", finalAdminLogin.status === 200);
+  } finally {
+    globalThis.fetch = savedFetch;
+    apiEnv = savedEnv;
+  }
 }
 
 if (testD1) {

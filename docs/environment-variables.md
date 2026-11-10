@@ -6,10 +6,16 @@ Production में secrets Cloudflare Dashboard → **Workers & Pages → chnm
 
 | नाम | विवरण |
 |---|---|
-| `ADMIN_PASSWORD` | एडमिन लॉगिन पासवर्ड; लंबा, अनूठा और कम-से-कम 12–16 अक्षरों का रखें। |
+| `ADMIN_PASSWORD` | शुरुआती एडमिन लॉगिन पासवर्ड; कम-से-कम 12 अक्षरों का रखें। पासवर्ड बदलने/रीसेट करने के बाद D1 में salted hash वाला override प्राथमिक होगा। |
 | `ADMIN_SECRET` | Admin और student tokens के HMAC signing के लिए कम-से-कम 32 random bytes का अलग secret। इसे स्थिर रखें; बदलने पर सभी मौजूदा tokens अमान्य हो जाएंगे। |
+| `ADMIN_EMAIL` | एडमिन पासवर्ड रिकवरी के लिए सत्यापित निजी ईमेल पता। |
+| `RESEND_API_KEY` | छात्र रजिस्ट्रेशन और एडमिन रिकवरी ईमेल भेजने की Resend API key। |
+| `EMAIL_FROM` | Resend में सत्यापित sender, जैसे `CHNM Portal <noreply@example.com>`। |
+| `PUBLIC_BASE_URL` | साइट का भरोसेमंद HTTPS origin, जैसे `https://chnm-portal.kumarsant1947.workers.dev`; रिकवरी लिंक इसी से बनता है। |
 
-दोनों secrets Cloudflare Worker में **secret** के रूप में सेट होने चाहिए। कोई bundled/default admin password या token-signing key नहीं है; configuration में से कोई भी अनुपस्थित होने पर admin login/token जारी करना विफल होगा।
+Secret values Cloudflare Worker में **secret** के रूप में सेट करें। `ADMIN_PASSWORD` और `ADMIN_SECRET` अनिवार्य हैं जब तक D1 में एडमिन पासवर्ड override सेट न हो; `ADMIN_SECRET` हमेशा token signing के लिए आवश्यक है। पासवर्ड बदलने या recovery link से reset करने पर नया salted password hash D1 में save होता है, `ADMIN_SECRET` नहीं बदलता और पुराने admin sessions तुरंत अमान्य हो जाते हैं। Recovery email के लिए `ADMIN_EMAIL`, `RESEND_API_KEY`, `EMAIL_FROM` और `PUBLIC_BASE_URL` सभी आवश्यक हैं। ईमेल configuration न होने पर recovery request स्पष्ट configuration error देती है; कोई arbitrary recipient स्वीकार नहीं होता।
+
+Self-registration में छात्र की जन्मतिथि केवल अस्थायी पासवर्ड (`DDMMYYYY`) बनाने के लिए इस्तेमाल होती है और रिकॉर्ड/API/log में सहेजी या लौटाई नहीं जाती। पहले login के बाद परीक्षा सुविधाएँ तब तक बंद रहती हैं जब तक छात्र कम-से-कम 10 अक्षरों का नया पासवर्ड न बना ले। Resend configure न होने पर registration पूरा होता है, पर UI बताता है कि ईमेल नहीं भेजा गया।
 
 ## स्थानीय विकास
 

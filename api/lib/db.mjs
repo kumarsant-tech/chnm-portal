@@ -41,8 +41,22 @@ function memoryStore() {
       MEMORY.set(key, next);
       return next.value;
     },
+    async increment(key) {
+      const next = (Number(MEMORY.get(key)) || 0) + 1;
+      MEMORY.set(key, String(next));
+      return next;
+    },
     async delete(key) {
       MEMORY.delete(key);
+    },
+    async consumeResetToken(key, now) {
+      const value = MEMORY.get(key);
+      if (!value || Number(value.expiresAt) <= now) {
+        MEMORY.delete(key);
+        return null;
+      }
+      MEMORY.delete(key);
+      return clone(value);
     },
     async list({ prefix = "" } = {}) {
       return {
@@ -117,8 +131,39 @@ function d1Store(database) {
       }
       return Number(row.value);
     },
+    async increment(key) {
+      const row = await database
+        .prepare(
+          "INSERT INTO app_kv (key, value) VALUES (?, '1') " +
+            "ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(app_kv.value AS INTEGER) + 1 AS TEXT), " +
+            "updated_at = CURRENT_TIMESTAMP RETURNING CAST(value AS INTEGER) AS value"
+        )
+        .bind(String(key))
+        .first();
+      if (!row || !Number.isSafeInteger(Number(row.value))) {
+        throw new Error("D1 counter could not be incremented");
+      }
+      return Number(row.value);
+    },
     async delete(key) {
       await database.prepare("DELETE FROM app_kv WHERE key = ?").bind(String(key)).run();
+    },
+    async consumeResetToken(key, now) {
+      const row = await database
+        .prepare(
+          "DELETE FROM app_kv WHERE key = ? AND CAST(json_extract(value, '$.expiresAt') AS INTEGER) > ? RETURNING value"
+        )
+        .bind(String(key), now)
+        .first();
+      if (!row) {
+        await database
+          .prepare(
+            "DELETE FROM app_kv WHERE key = ? AND CAST(json_extract(value, '$.expiresAt') AS INTEGER) <= ?"
+          )
+          .bind(String(key), now)
+          .run();
+      }
+      return row ? JSON.parse(row.value) : null;
     },
     async list({ prefix = "" } = {}) {
       const { results } = await database
@@ -169,6 +214,10 @@ export const K = {
   studentResultIndex: (studentId, attemptId) => `idx/student-results/${studentId}/${attemptId}`,
   examResultIndex: (examId, attemptId) => `idx/exam-results/${examId}/${attemptId}`,
   rateLimit: (scope, id) => `rl/${scope}/${id}`,
+  adminPasswordOverride: () => "auth/admin-password-override",
+  adminAuthVersion: () => "auth/admin-auth-version",
+  adminPasswordReset: (tokenHash) => `auth/admin-password-reset/${tokenHash}`,
+  studentCitsIndex: (cits) => `idx/cits/${cits}`,
   audit: (id) => `audit/${id}`,
   registrationSeq: () => "meta/registration-seq",
   notice: (id) => `notices/${id}`,

@@ -290,8 +290,23 @@
     hide($("#loadingView"), true);
     hide($("#dashboardView"), true);
     hide($("#authView"), false);
+    hide($(".auth-tabs"), false);
     $("#userSlot").hidden = true;
     setAuthTab(tab || "login");
+  }
+
+  function showPasswordChange() {
+    hide($("#loadingView"), true);
+    hide($("#dashboardView"), true);
+    hide($("#authView"), false);
+    hide($(".auth-tabs"), true);
+    hide($("#loginForm"), true);
+    hide($("#registerForm"), true);
+    hide($("#registerSuccess"), true);
+    hide($("#passwordChangePanel"), false);
+    $("#authTitle").textContent = "नया पासवर्ड सेट करें";
+    $("#authSub").textContent = "अपना खाता सुरक्षित करने के लिए नया पासवर्ड बनाएं।";
+    setHeaderUser(UI.studentData());
   }
 
   function setNotice(target, message, tone) {
@@ -313,6 +328,7 @@
     });
     hide($("#loginForm"), tab !== "login");
     hide($("#registerForm"), tab !== "register");
+    hide($("#passwordChangePanel"), true);
     hide($("#registerSuccess"), true);
     $("#authTitle").textContent = tab === "register" ? "नया रजिस्ट्रेशन" : "छात्र लॉगिन";
     $("#authSub").textContent =
@@ -386,6 +402,13 @@
   }
 
   async function handleAuthFailure(error) {
+    if (error && error.status === 428) {
+      const student = UI.studentData() || {};
+      student.passwordChangeRequired = true;
+      UI.setStudentSession(UI.studentToken(), student);
+      showPasswordChange();
+      return true;
+    }
     if (error && error.status === 401) {
       UI.clearStudentSession();
       showAuth("login");
@@ -1102,26 +1125,30 @@
       setError("#loginError", "");
       const id = $("#loginId").value.trim().toUpperCase();
       const mobile = $("#loginMobile").value.replace(/\D/g, "").slice(0, 10);
-      const pin = $("#loginPin").value.trim();
-      if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(id)) {
-        setError("#loginError", "रजिस्ट्रेशन ID सही दर्ज करें (जैसे CHNM12)।");
-        return;
-      }
-      if (!/^[6-9]\d{9}$/.test(mobile)) {
-        setError("#loginError", "10 अंकों का सही मोबाइल नंबर दर्ज करें।");
+      const password = $("#loginPassword").value;
+      if (!/^[A-Za-z0-9][A-Za-z0-9_/-]{1,39}$/.test(id)) {
+        setError("#loginError", "CITS नंबर या पंजीकृत मोबाइल सही दर्ज करें।");
         return;
       }
       const button = $("#loginBtn");
       await UI.withBusy(button, async () => {
         try {
-          const data = await UI.call("student_login", { id: id, mobile: mobile, pin: pin });
+          const data = await UI.call("student_login", {
+            identifier: id,
+            mobile: mobile,
+            password: password,
+          });
           UI.setStudentSession(data.token, data.student);
-          $("#loginPin").value = "";
-          await loadDashboard(false);
-          UI.toast("लॉगिन सफल", "good");
+          $("#loginPassword").value = "";
+          if (data.requiresPasswordChange) {
+            showPasswordChange();
+          } else {
+            await loadDashboard(false);
+            UI.toast("लॉगिन सफल", "good");
+          }
         } catch (error) {
           if (error.status === 401) {
-            setError("#loginError", error.message || "ID या मोबाइल सही नहीं है।");
+            setError("#loginError", error.message || "लॉगिन ID या पासवर्ड सही नहीं है।");
           } else if (error.status === 403) {
             setError("#loginError", error.message);
           } else {
@@ -1130,6 +1157,41 @@
         }
       }, "लॉगिन हो रहा है…");
     });
+
+    const changeForm = $("#passwordChangePanel");
+    if (changeForm) {
+      changeForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setError("#passwordChangeError", "");
+        const currentPassword = $("#changeCurrentPassword").value;
+        const newPassword = $("#changeNewPassword").value;
+        if (newPassword.length < 10) {
+          setError("#passwordChangeError", "नया पासवर्ड कम-से-कम 10 अक्षरों का रखें।");
+          return;
+        }
+        if (newPassword !== $("#changeConfirmPassword").value) {
+          setError("#passwordChangeError", "दोनों नए पासवर्ड एक जैसे नहीं हैं।");
+          return;
+        }
+        await UI.withBusy($("#passwordChangeBtn"), async () => {
+          try {
+            const data = await UI.call(
+              "student_password_change",
+              { currentPassword, newPassword },
+              UI.studentToken()
+            );
+            UI.setStudentSession(UI.studentToken(), data.student);
+            $("#changeCurrentPassword").value = "";
+            $("#changeNewPassword").value = "";
+            $("#changeConfirmPassword").value = "";
+            await loadDashboard(false);
+            UI.toast("नया पासवर्ड सुरक्षित हो गया", "good");
+          } catch (error) {
+            setError("#passwordChangeError", error.message || "पासवर्ड बदला नहीं जा सका।");
+          }
+        }, "पासवर्ड सुरक्षित हो रहा है…");
+      });
+    }
   }
 
   function wireRegistration() {
@@ -1165,14 +1227,19 @@
       }
       const name = $("#regName").value.trim();
       const fatherName = $("#regFather").value.trim();
+      const citsNumber = $("#regCits").value.trim().toUpperCase();
       const mobile = $("#regMobile").value.replace(/\D/g, "").slice(0, 10);
+      const dateOfBirth = $("#regDob").value;
       const email = $("#regEmail").value.trim();
       const tradeId = $("#regTrade").value;
       const batch = $("#regBatch").value.trim();
       const consent = $("#regConsent").checked;
       if (name.length < 2) return setError("#regError", "पूरा नाम दर्ज करें।");
-      if (!/^[6-9]\d{9}$/.test(mobile)) return setError("#regError", "10 अंकों का सही मोबाइल नंबर दर्ज करें।");
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError("#regError", "सही ईमेल दर्ज करें।");
+      if (citsNumber && !/^[A-Z0-9/-]{2,30}$/.test(citsNumber)) return setError("#regError", "सही CITS नंबर दर्ज करें।");
+      if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return setError("#regError", "10 अंकों का सही मोबाइल नंबर दर्ज करें।");
+      if (!mobile && !citsNumber) return setError("#regError", "CITS नंबर या मोबाइल नंबर में से एक दर्ज करें।");
+      if (!dateOfBirth) return setError("#regError", "जन्मतिथि दर्ज करें।");
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError("#regError", "सही ईमेल दर्ज करें।");
       if (!tradeId) return setError("#regError", "अपना ट्रेड चुनें।");
       if (!state.photo) return setError("#regError", "अपनी फोटो चुनें (JPG / PNG / WebP)।");
       if (!consent) return setError("#regError", "रजिस्ट्रेशन के लिए सहमति पर टिक करें।");
@@ -1183,24 +1250,26 @@
           const data = await UI.call("register", {
             name: name,
             fatherName: fatherName,
+            citsNumber: citsNumber,
             mobile: mobile,
+            dateOfBirth: dateOfBirth,
             email: email,
             tradeId: tradeId,
             batch: batch,
             photo: state.photo,
             consent: true,
           });
-          UI.setStudentSession(data.token, data.student);
-          $("#regIdValue").textContent = data.student.id;
+          $("#regLoginValue").textContent = data.loginId;
+          $("#registerEmailNotice").textContent = data.notification?.message || "रजिस्ट्रेशन पूरा हो गया।";
           hide($("#registerForm"), true);
           hide($("#registerSuccess"), false);
           $$("[data-auth-tab]").forEach((tab) => {
             tab.disabled = true;
           });
           $("#authTitle").textContent = "रजिस्ट्रेशन सफल";
-          $("#authSub").textContent = "अपना रजिस्ट्रेशन ID सुरक्षित रखें।";
+          $("#authSub").textContent = "अपना लॉगिन ID सुरक्षित रखें।";
           setNotice("#authNotice", "", "");
-          UI.toast("रजिस्ट्रेशन सफल — ID सुरक्षित रखें", "good");
+          UI.toast("रजिस्ट्रेशन सफल — लॉगिन ID सुरक्षित रखें", "good");
         } catch (error) {
           setError("#regError", error.message || "रजिस्ट्रेशन नहीं हो सका।");
         }
@@ -1211,27 +1280,11 @@
     if (copy) {
       copy.addEventListener("click", async () => {
         try {
-          await UI.copyText($("#regIdValue").textContent);
+          await UI.copyText($("#regLoginValue").textContent);
           UI.toast("ID कॉपी हो गया", "good");
         } catch {
           UI.toast("कॉपी नहीं हो सका", "bad");
         }
-      });
-    }
-    const open = $("#openDashboardBtn");
-    if (open) {
-      open.addEventListener("click", () => {
-        if (registerOnly) {
-          location.href = "index.html";
-          return;
-        }
-        $$("[data-auth-tab]").forEach((tab) => {
-          tab.disabled = false;
-          tab.setAttribute("aria-selected", "false");
-        });
-        hide($("#authView"), true);
-        hide($("#dashboardView"), false);
-        loadDashboard(false);
       });
     }
   }
@@ -1303,6 +1356,10 @@
       state.boot = await UI.bootstrap();
       state.trades = state.boot.trades || [];
       state.registrationOpen = state.boot.settings.registrationOpen !== false;
+      const groupFooter = $("#portalGroupFooter");
+      if (groupFooter && state.boot.settings.groupName) {
+        groupFooter.textContent = state.boot.settings.groupName + " · CHNM / CITS परीक्षा पोर्टल";
+      }
       fillTrades();
       if (!state.registrationOpen) {
         const tab = $('[data-auth-tab="register"]');
@@ -1315,7 +1372,8 @@
 
     const token = UI.studentToken();
     if (token && !registerOnly) {
-      await loadDashboard(false);
+      if (UI.studentData()?.passwordChangeRequired) showPasswordChange();
+      else await loadDashboard(false);
       return;
     }
     if (registerOnly && token) {

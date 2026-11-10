@@ -35,22 +35,21 @@
       <div class="auth-aside">
         <div>
           <span class="pill dark">STUDENT REGISTRATION</span>
-          <h1 style="margin-top:14px">एक बार रजिस्ट्रेशन,<br>फिर हर परीक्षा आसान।</h1>
-          <p>सही नाम, मोबाइल और ट्रेड भरें। रजिस्ट्रेशन के बाद मिलने वाला CHNM ID (जैसे CHNM12) आपकी पहचान है — उसे सुरक्षित रखें।</p>
+          <h1 style="margin-top:14px">छात्र रजिस्ट्रेशन</h1>
+          <p>ज़रूरी जानकारी भरें। CITS नंबर न होने पर मोबाइल लॉगिन ID बनेगा।</p>
           <div class="auth-features">
-            <div class="auth-feature"><span>फो</span><div><b>साफ फोटो</b><small>परीक्षा के दौरान पहचान के लिए।</small></div></div>
-            <div class="auth-feature"><span>मो</span><div><b>सक्रिय मोबाइल</b><small>लॉगिन के लिए वही नंबर दें।</small></div></div>
-            <div class="auth-feature"><span>ट्रे</span><div><b>सही ट्रेड</b><small>आपको केवल अपने ट्रेड की परीक्षाएँ दिखेंगी।</small></div></div>
+            <div class="auth-feature"><span>1</span><div><b>सही जानकारी</b><small>CITS नंबर या मोबाइल दर्ज करें।</small></div></div>
+            <div class="auth-feature"><span>2</span><div><b>पहला पासवर्ड</b><small>जन्मतिथि से लॉगिन के बाद नया पासवर्ड बनाएं।</small></div></div>
           </div>
         </div>
-        <p class="tiny" style="color:#a9c0d0;margin-top:32px">एक मोबाइल नंबर से एक ही रजिस्ट्रेशन संभव है।</p>
+        <p class="tiny" style="color:#a9c0d0;margin-top:32px">CITS नंबर और मोबाइल पहले से पंजीकृत नहीं होने चाहिए।</p>
       </div>
 
       <div class="auth-main">
         <div class="auth-card panel">
           <div id="authNotice"></div>
           <h2 id="authTitle">नया रजिस्ट्रेशन</h2>
-          <p class="muted small" id="authSub">सभी जानकारी ध्यान से भरें। रजिस्ट्रेशन के बाद ID सुरक्षित रखें।</p>
+          <p class="muted small" id="authSub">लॉगिन ID और पहली बार का पासवर्ड याद रखें।</p>
 
           <form id="registerForm" class="stack" style="margin-top:18px" novalidate>
             <div class="photo-pick">
@@ -64,11 +63,14 @@
             <div class="form-grid">
               <label class="field full"><span>पूरा नाम *</span><input class="input" id="regName" maxlength="60" autocomplete="name" required></label>
               <label class="field"><span>पिता का नाम</span><input class="input" id="regFather" maxlength="60" autocomplete="off"></label>
-              <label class="field"><span>मोबाइल नंबर *</span><input class="input" id="regMobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंक" autocomplete="tel" required></label>
-              <label class="field"><span>ईमेल *</span><input class="input" id="regEmail" type="email" maxlength="80" autocomplete="email" required></label>
+              <label class="field"><span>CITS नंबर</span><input class="input" id="regCits" maxlength="30" placeholder="यदि उपलब्ध हो"></label>
+              <label class="field"><span>मोबाइल नंबर</span><input class="input" id="regMobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंक" autocomplete="tel"></label>
+              <label class="field"><span>जन्मतिथि *</span><input class="input" id="regDob" type="date" autocomplete="bday" required><small>इसी से पहला अस्थायी पासवर्ड बनेगा।</small></label>
+              <label class="field"><span>ईमेल</span><input class="input" id="regEmail" type="email" maxlength="100" autocomplete="email" placeholder="पुष्टिकरण ईमेल के लिए"></label>
               <label class="field"><span>ट्रेड *</span><select class="select" id="regTrade" required><option value="">ट्रेड चुनें</option></select></label>
               <label class="field"><span>बैच / सत्र</span><input class="input" id="regBatch" maxlength="40" value="2026-27" placeholder="जैसे 2026-27"></label>
             </div>
+            <p class="tiny muted">CITS नंबर या मोबाइल नंबर में से एक देना आवश्यक है।</p>
             <label class="check"><input type="checkbox" id="regConsent"> मैं पुष्टि करता/करती हूँ कि दी गई जानकारी सही है और परीक्षा नियमों का पालन करूँगा/करूँगी।</label>
             <p class="notice bad" id="regError" hidden></p>
             <button class="btn btn-lg btn-block" id="registerBtn" type="submit">रजिस्ट्रेशन करें</button>
@@ -78,12 +80,13 @@
           <div id="registerSuccess" class="stack" hidden>
             <div class="notice good"><strong>रजिस्ट्रेशन पूरा हो गया</strong><br>आपका रजिस्ट्रेशन ID नीचे है। इसे स्क्रीनशॉट या नोट में सुरक्षित रखें।</div>
             <div class="reg-id-box">
-              <span class="small muted">रजिस्ट्रेशन ID</span>
-              <b id="regIdValue">CHNM12</b>
+              <span class="small muted">लॉगिन ID</span>
+              <b id="regLoginValue">9876543210</b>
               <div class="row"><button type="button" class="btn btn-soft btn-sm" id="copyRegId">ID कॉपी करें</button></div>
             </div>
-            <div class="notice info"><strong>सूचनाएँ पोर्टल पर मिलेंगी</strong><br>परीक्षा, परिणाम और जरूरी सूचना आपके डैशबोर्ड पर सीधे दिखती है। सभी पंजीकृत छात्रों के लिए समूह चैट भी यहीं है।<br><a class="btn btn-sm btn-soft" style="margin-top:8px" href="index.html">डैशबोर्ड खोलें</a></div>
-            <button type="button" class="btn btn-lg btn-block" id="openDashboardBtn">डैशबोर्ड खोलें</button>
+            <div class="notice info" id="registerEmailNotice"></div>
+            <p class="small muted">लॉगिन में इस ID और अपनी जन्मतिथि DDMMYYYY दर्ज करें। फिर नया पासवर्ड सेट करें।</p>
+            <a class="btn btn-lg btn-block" href="index.html">लॉगिन करें</a>
           </div>
         </div>
       </div>
@@ -92,7 +95,7 @@
 
   <footer class="site-foot">
     <div class="row-between">
-      <span>Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span>
+      <span id="portalGroupFooter">Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span>
       <span class="row"><a href="../index.html">मुख्य पोर्टल</a><a href="admin.html">एडमिन</a></span>
     </div>
   </footer>

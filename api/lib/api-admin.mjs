@@ -26,14 +26,18 @@ import {
 } from "./validate.mjs";
 import {
   issueAdminToken,
-  hasAdminPassword,
+  hasAdminCredential,
   checkAdminPassword,
+  hashPassword,
+  adminAuthVersion,
+  bumpAdminAuthVersion,
   clearRateLimit,
   rateLimit,
   audit,
   recentAudit,
   hashPin,
 } from "./auth.mjs";
+import { sendEmail } from "./email.mjs";
 import {
   examSummary,
   resultDetail,
@@ -247,19 +251,126 @@ function paged(items, body, defaultSize = 25) {
 export async function handleAdminLogin({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "admin-login", ip, 8, ADMIN_LOGIN_WINDOW);
-  if (!hasAdminPassword(env)) {
+  if (!(await hasAdminCredential(env, store))) {
     throw new HttpError(
-      "Cloudflare Worker secrets में ADMIN_PASSWORD सेट नहीं है।",
+      "ADMIN_PASSWORD secret या पहले से सेट किया गया एडमिन पासवर्ड आवश्यक है।",
       500
     );
   }
   const body = await readJson(req);
-  if (!checkAdminPassword(body.password, env)) {
+  if (!(await checkAdminPassword(body.password, env, store))) {
     throw new HttpError("गलत पासवर्ड", 401);
   }
   await clearRateLimit(store, "admin-login", ip);
   await audit(store, "admin.login", "admin", { ip });
-  return json({ ok: true, token: issueAdminToken(env), expiresIn: 12 * 3600 });
+  return json({
+    ok: true,
+    token: issueAdminToken(env, await adminAuthVersion(store)),
+    expiresIn: 12 * 3600,
+  });
+}
+
+function validNewAdminPassword(password) {
+  return typeof password === "string" && password.length >= 12 && password.length <= 128;
+}
+
+export async function handleAdminPasswordChange({ req, ctx, store, env }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "admin-password-change", ip, 6, ADMIN_LOGIN_WINDOW);
+  const currentPassword = String(body.currentPassword || "");
+  const newPassword = String(body.newPassword || "");
+  if (!(await checkAdminPassword(currentPassword, env, store))) {
+    throw new HttpError("वर्तमान पासवर्ड सही नहीं है", 401);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  if (newPassword === currentPassword) {
+    throw new HttpError("नया पासवर्ड वर्तमान पासवर्ड से अलग होना चाहिए", 400);
+  }
+  await putJson(store, K.adminPasswordOverride(), hashPassword(newPassword));
+  const authVersion = await bumpAdminAuthVersion(store);
+  await audit(store, "admin.password.change", "admin", { ip });
+  return json({
+    ok: true,
+    token: issueAdminToken(env, authVersion),
+    message: "एडमिन पासवर्ड बदल दिया गया है।",
+  });
+}
+
+function resetBaseUrl(env) {
+  const configured = String(env?.PUBLIC_BASE_URL || "");
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return "";
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+export async function handleAdminForgotPassword({ req, ctx, store, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "admin-forgot-password", ip, 5, 60 * 60 * 1000);
+  await rateLimit(store, "admin-forgot-password-global", "admin", 3, 60 * 60 * 1000);
+  const recipient = String(env?.ADMIN_EMAIL || "").trim().toLowerCase();
+  const baseUrl = resetBaseUrl(env);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) || !baseUrl ||
+      !env?.RESEND_API_KEY || !env?.EMAIL_FROM) {
+    throw new HttpError(
+      "पासवर्ड रिकवरी उपलब्ध नहीं है। Cloudflare secrets में ADMIN_EMAIL, RESEND_API_KEY, EMAIL_FROM और PUBLIC_BASE_URL सेट करें।",
+      503
+    );
+  }
+  const token = crypto.randomBytes(32).toString("base64url");
+  const tokenHash = hashResetToken(token);
+  const resetKey = K.adminPasswordReset(tokenHash);
+  const expiresAt = Date.now() + 30 * 60 * 1000;
+  await Promise.all(
+    (await listKeys(store, "auth/admin-password-reset/")).map((key) => del(store, key))
+  );
+  await putJson(store, resetKey, { expiresAt });
+  const resetUrl = `${baseUrl}/exam/admin.html?reset=${encodeURIComponent(token)}`;
+  const delivery = await sendEmail(env, {
+    to: recipient,
+    subject: "एडमिन पासवर्ड रीसेट",
+    text: `एडमिन पासवर्ड रीसेट करने के लिए इस लिंक को 30 मिनट के भीतर खोलें:\n${resetUrl}\n\nयदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।`,
+    html: `<p>एडमिन पासवर्ड रीसेट करने के लिए <a href="${resetUrl}">इस लिंक</a> को 30 मिनट के भीतर खोलें।</p><p>यदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।</p>`,
+  });
+  if (!delivery.sent) {
+    await del(store, resetKey);
+    throw new HttpError("रीसेट ईमेल नहीं भेजा जा सका। Resend configuration जाँचकर फिर प्रयास करें।", 503);
+  }
+  return json({
+    ok: true,
+    message: "यदि एडमिन ईमेल कॉन्फ़िगर है, तो पासवर्ड रीसेट लिंक भेज दिया गया है।",
+  });
+}
+
+export async function handleAdminResetPassword({ req, ctx, store, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "admin-reset-password", ip, 8, 15 * 60 * 1000);
+  const body = await readJson(req);
+  const token = String(body.token || "");
+  const newPassword = String(body.newPassword || "");
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  const tokenHash = hashResetToken(token);
+  const reset = await store.consumeResetToken(K.adminPasswordReset(tokenHash), Date.now());
+  if (!reset) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  await putJson(store, K.adminPasswordOverride(), hashPassword(newPassword));
+  await bumpAdminAuthVersion(store);
+  await audit(store, "admin.password.reset", "admin", { ip });
+  return json({ ok: true, message: "एडमिन पासवर्ड रीसेट हो गया है।" });
 }
 
 export async function handleAdminOverview({ store }) {
@@ -1154,7 +1265,7 @@ export async function handleAdminStudentGet({ store, req }) {
       active.push({ ...attempt, examTitle: exam?.title || attempt.examId });
     }
   }
-  const { pinHash, ...safeStudent } = student;
+  const { pinHash, passwordHash, ...safeStudent } = student;
   return json({
     ok: true,
     student: {
@@ -1187,9 +1298,23 @@ export async function handleAdminStudentSave({ store, req }) {
   if (data.tradeId && !catalog.tradeMap.has(data.tradeId)) {
     throw new HttpError("चुना गया ट्रेड मौजूद नहीं है", 400);
   }
-  const holder = await getJson(store, K.mobileIndex(data.mobile));
+  const holder = data.mobile ? await getJson(store, K.mobileIndex(data.mobile)) : null;
   if (holder && holder.studentId !== existing?.id) {
     throw new HttpError("यह मोबाइल नंबर पहले से किसी छात्र के पास है", 409);
+  }
+  if (data.citsNumber) {
+    const citsHolder = await getJson(store, K.studentCitsIndex(data.citsNumber));
+    if (citsHolder && citsHolder.studentId !== existing?.id) {
+      throw new HttpError("यह CITS नंबर पहले से किसी छात्र के पास है", 409);
+    }
+    const duplicateCits = (await listJson(store, "students/")).some(
+      (record) => record.id !== existing?.id &&
+        (
+          String(record.citsNumber || "").toUpperCase() === data.citsNumber ||
+          String(record.mobile || "") === data.citsNumber
+        )
+    );
+    if (duplicateCits) throw new HttpError("यह CITS नंबर पहले से किसी छात्र के पास है", 409);
   }
   let id = existing?.id;
   if (!id) {
@@ -1207,6 +1332,7 @@ export async function handleAdminStudentSave({ store, req }) {
     name: data.name,
     fatherName: data.fatherName,
     mobile: data.mobile,
+    citsNumber: data.citsNumber,
     email: data.email,
     tradeId: data.tradeId,
     batch: data.batch,
@@ -1227,6 +1353,7 @@ export async function handleAdminStudentSave({ store, req }) {
   }
   const ownsMobile = Boolean(existing && holder?.studentId === existing.id);
   const mobileReserved =
+    !student.mobile ||
     ownsMobile ||
     (await store.setIfAbsent(K.mobileIndex(student.mobile), {
       studentId: student.id,
@@ -1234,17 +1361,35 @@ export async function handleAdminStudentSave({ store, req }) {
   if (!mobileReserved) {
     throw new HttpError("यह मोबाइल नंबर पहले से किसी छात्र के पास है", 409);
   }
+  let citsReserved = false;
+  if (data.citsNumber && existing?.citsNumber !== data.citsNumber) {
+    citsReserved = await store.setIfAbsent(K.studentCitsIndex(data.citsNumber), {
+      studentId: student.id,
+    });
+    if (!citsReserved) {
+      if (!ownsMobile && student.mobile) await del(store, K.mobileIndex(student.mobile));
+      throw new HttpError("यह CITS नंबर पहले से किसी छात्र के पास है", 409);
+    }
+  }
   try {
     await putJson(store, K.students(id), student);
   } catch (error) {
-    if (!ownsMobile) await del(store, K.mobileIndex(student.mobile));
+    if (!ownsMobile && student.mobile) await del(store, K.mobileIndex(student.mobile));
+    if (citsReserved) await del(store, K.studentCitsIndex(data.citsNumber));
     throw error;
   }
   if (existing?.mobile && existing.mobile !== student.mobile) {
     await del(store, K.mobileIndex(existing.mobile));
   }
+  if (existing?.citsNumber && existing.citsNumber !== student.citsNumber) {
+    await del(store, K.studentCitsIndex(existing.citsNumber));
+  }
+  if (student.citsNumber && existing?.citsNumber === student.citsNumber &&
+      !(await getJson(store, K.studentCitsIndex(student.citsNumber)))) {
+    await store.setIfAbsent(K.studentCitsIndex(student.citsNumber), { studentId: student.id });
+  }
   await audit(store, existing ? "student.update" : "student.create", "admin", { studentId: id });
-  const { pinHash, ...safeStudent } = student;
+  const { pinHash, passwordHash, ...safeStudent } = student;
   return json({
     ok: true,
     student: studentSummary({ ...safeStudent, photo: student.photo }, ""),
@@ -1295,7 +1440,8 @@ export async function handleAdminStudentDelete({ store, req }) {
     await del(store, K.attempt(examId, student.id));
     await del(store, K.attemptExamIndex(examId, student.id));
   }
-  await del(store, K.mobileIndex(student.mobile));
+  if (student.mobile) await del(store, K.mobileIndex(student.mobile));
+  if (student.citsNumber) await del(store, K.studentCitsIndex(student.citsNumber));
   await del(store, K.students(student.id));
   await audit(store, "student.delete", "admin", {
     studentId: student.id,
@@ -1568,7 +1714,10 @@ export async function handleAdminSettingsSave({ store, req }) {
   const input = body.settings || {};
   const current = (await getJson(store, K.settings())) || DEFAULT_SETTINGS;
   const siteName = clean(input.siteName, 80) || current.siteName;
-  const collegeName = clean(input.collegeName, 80) || current.collegeName;
+  const groupName =
+    clean(input.groupName ?? input.collegeName, 80) ||
+    current.groupName ||
+    current.collegeName;
   const passPct = input.defaultPassPct === undefined ? current.defaultPassPct : number(input.defaultPassPct, current.defaultPassPct);
   if (!Number.isFinite(passPct) || passPct < 0 || passPct > 100) {
     throw new HttpError("डिफ़ॉल्ट पास प्रतिशत 0-100 के बीच होना चाहिए", 400);
@@ -1582,7 +1731,8 @@ export async function handleAdminSettingsSave({ store, req }) {
   const settings = {
     ...current,
     siteName,
-    collegeName,
+    collegeName: groupName,
+    groupName,
     registrationOpen: bool(input.registrationOpen, current.registrationOpen !== false),
     defaultPassPct: Math.round(passPct * 100) / 100,
     defaultDurationMin: duration,
@@ -1655,7 +1805,10 @@ export async function handleAdminExport({ store }) {
     exams,
     papers,
     questions,
-    students,
+    students: students.map((student) => {
+      const { passwordHash, pinHash, ...safeStudent } = student;
+      return safeStudent;
+    }),
     results,
     notices,
     chat,

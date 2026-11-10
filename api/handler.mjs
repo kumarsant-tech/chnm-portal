@@ -6,6 +6,7 @@ import {
   handleBootstrap,
   handleRegister,
   handleStudentLogin,
+  handleStudentPasswordChange,
 } from "./lib/api-public.mjs";
 import {
   handleStudentAutosave,
@@ -35,6 +36,9 @@ import {
   handleAdminLegacyPreview,
   handleAdminLive,
   handleAdminLogin,
+  handleAdminForgotPassword,
+  handleAdminResetPassword,
+  handleAdminPasswordChange,
   handleAdminOverview,
   handleAdminQuestionDelete,
   handleAdminQuestionGet,
@@ -79,10 +83,13 @@ const PUBLIC_ACTIONS = {
   register: handleRegister,
   student_login: handleStudentLogin,
   admin_login: handleAdminLogin,
+  admin_forgot_password: handleAdminForgotPassword,
+  admin_reset_password: handleAdminResetPassword,
   site_notices: handleSiteNotices,
 };
 
 const STUDENT_ACTIONS = {
+  student_password_change: handleStudentPasswordChange,
   student_dashboard: handleStudentDashboard,
   student_exam_get: handleStudentExamGet,
   student_start: handleStudentStart,
@@ -131,6 +138,7 @@ const ADMIN_ACTIONS = {
   admin_results_csv: handleAdminResultsCsv,
   admin_stats: handleAdminStats,
   admin_settings_save: handleAdminSettingsSave,
+  admin_password_change: handleAdminPasswordChange,
   admin_audit: handleAdminAudit,
   admin_legacy_preview: handleAdminLegacyPreview,
   admin_legacy_import: handleAdminLegacyImport,
@@ -175,13 +183,13 @@ export default async (req, ctx) => {
     }
 
     if (STUDENT_ACTIONS[action]) {
-      const student = await requireStudent(req, store, env);
+      const student = await requireStudent(req, store, env, action === "student_password_change");
       return await STUDENT_ACTIONS[action]({ req, ctx, env, store, body, student });
     }
 
     const handler = ADMIN_ACTIONS[action];
     if (handler) {
-      const admin = await requireAdmin(req, env);
+      const admin = await requireAdmin(req, store, env);
       return await handler({ req, ctx, env, store, body, admin });
     }
 

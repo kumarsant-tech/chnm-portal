@@ -14,6 +14,7 @@ export const DEFAULT_TRADES = [{ id: "chnm", name: "CHNM", code: "CHNM" }];
 export const DEFAULT_SETTINGS = {
   siteName: "Future Instructor – CHNM Portal",
   collegeName: "Future Instructor Group",
+  groupName: "Future Instructor Group",
   registrationOpen: true,
   defaultPassPct: 40,
   defaultDurationMin: 60,
