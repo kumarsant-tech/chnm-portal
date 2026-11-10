@@ -2,6 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chnm-portal",
   "main": "cloudflare/worker.mjs",
+  "vars": {
+    "EMAIL_FROM": "Future Instructor <notice@futureinstructor.in>"
+  },
   "workers_dev": true,
   "preview_urls": true,
   "routes": [
