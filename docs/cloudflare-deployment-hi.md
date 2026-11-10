@@ -30,11 +30,9 @@ npx wrangler d1 create chnm-portal
 
 ```powershell
 npx wrangler d1 migrations apply chnm-portal --remote
-npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put ADMIN_SECRET
 ```
 
-दोनों secrets के लिए अलग, मजबूत values डालें। उन्हें command arguments, source files, GitHub या chat में न लिखें।
+Worker पहली बार deploy होने के बाद secrets configure करें; उस Worker के बनने से पहले `secret put` काम नहीं करेगा।
 
 ## 3. मौजूदा live data सुरक्षित migrate करें
 
@@ -66,9 +64,11 @@ Import केवल खाली D1 database में शुरू होगा
 ```powershell
 npm run build
 npx wrangler deploy
+npx wrangler secret put ADMIN_PASSWORD
+npx wrangler secret put ADMIN_SECRET
 ```
 
-Cloudflare द्वारा दिया गया `*.workers.dev` URL नई site होगा। पहले admin login, student login, exam start/autosave/submit/result, और पुराने imported results जाँचें। सफल cutover के बाद ही सभी को नया URL दें।
+दोनों secrets के लिए अलग, मजबूत values डालें। उन्हें command arguments, source files, GitHub या chat में न लिखें। Cloudflare द्वारा दिया गया `*.workers.dev` URL नई site होगा; secrets set होने और smoke tests पास होने तक इसे परीक्षार्थियों से साझा न करें। पहले admin login, student login, exam start/autosave/submit/result, और पुराने imported results जाँचें। सफल cutover के बाद ही सभी को नया URL दें।
 
 ## 5. GitHub से auto-deploy
 
