@@ -213,6 +213,7 @@ export const K = {
   result: (attemptId) => `results/${attemptId}`,
   studentResultIndex: (studentId, attemptId) => `idx/student-results/${studentId}/${attemptId}`,
   examResultIndex: (examId, attemptId) => `idx/exam-results/${examId}/${attemptId}`,
+  resultReleaseEmail: (examId, studentId) => `emails/result-release/${examId}/${studentId}`,
   rateLimit: (scope, id) => `rl/${scope}/${id}`,
   adminPasswordOverride: () => "auth/admin-password-override",
   adminAuthVersion: () => "auth/admin-auth-version",

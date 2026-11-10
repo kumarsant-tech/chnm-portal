@@ -155,6 +155,7 @@ const ADMIN_ACTIONS = {
 };
 
 export default async (req, ctx) => {
+  let action = "";
   try {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "POST अनुरोध आवश्यक है" }), {
@@ -163,14 +164,21 @@ export default async (req, ctx) => {
       });
     }
     const body = await readJson(req);
-    const action = typeof body.action === "string" ? body.action.trim() : "";
+    action = typeof body.action === "string" ? body.action.trim() : "";
     if (!action) throw new HttpError("action आवश्यक है", 400);
     const env = ctx?.env || {};
     let store;
     try {
       store = await getDb(env);
     } catch (error) {
-      console.error("db unavailable", error);
+      console.error("db unavailable", {
+        action,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorCode:
+          typeof error?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code)
+            ? error.code
+            : undefined,
+      });
       return fail(
         "डेटाबेस उपलब्ध नहीं है — deployment और database binding जाँचें",
         503
@@ -198,7 +206,14 @@ export default async (req, ctx) => {
     if (error instanceof HttpError) {
       return fail(error.message, error.status, error.details);
     }
-    console.error("api error", error);
+    console.error("api error", {
+      action: action || "unknown",
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorCode:
+        typeof error?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code)
+          ? error.code
+          : undefined,
+    });
     return fail("सर्वर में तकनीकी त्रुटि हुई — कृपया दोबारा प्रयास करें", 500);
   }
 };

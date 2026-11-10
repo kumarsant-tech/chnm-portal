@@ -1,6 +1,7 @@
 import api from "../api/handler.mjs";
 import { getDb, listJson } from "../api/lib/db.mjs";
 import { finalizeExpiredForExam } from "../api/lib/scoring.mjs";
+import { processResultReleaseEmails } from "../api/lib/result-notifications.mjs";
 import { REDIRECTS } from "./redirects.mjs";
 
 const EXAM_CSP =
@@ -27,7 +28,7 @@ function secure(response, pathname) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const redirect = REDIRECTS.get(url.pathname);
     if (redirect) {
@@ -43,6 +44,7 @@ export default {
       return api(request, {
         ip: request.headers.get("cf-connecting-ip") || "unknown",
         env,
+        waitUntil: ctx?.waitUntil?.bind(ctx),
       });
     }
 
@@ -54,8 +56,24 @@ export default {
     const exams = await listJson(store, "exams/");
     let finalized = 0;
     for (const exam of exams) {
-      if (!exam || exam.status !== "published") continue;
-      finalized += (await finalizeExpiredForExam(store, exam)).length;
+      if (!exam) continue;
+      if (exam.status === "published") {
+        finalized += (await finalizeExpiredForExam(store, exam)).length;
+      }
+      if (
+        exam.notifyResultsOnRelease === true &&
+        exam.releaseResults === true &&
+        (!exam.releaseAt || Date.parse(exam.releaseAt) <= Date.now())
+      ) {
+        try {
+          await processResultReleaseEmails(store, env, exam);
+        } catch (error) {
+          console.error("scheduled result release email processing failed", {
+            examId: exam.id,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          });
+        }
+      }
     }
     console.log("Expired exam attempts finalized:", finalized);
   },

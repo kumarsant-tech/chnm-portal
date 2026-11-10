@@ -41,15 +41,26 @@ export async function handleRegister({ req, ctx, store, env }) {
     const trade = await getJson(store, K.trades(input.tradeId));
     if (!trade || trade.active === false) throw new HttpError("चुना गया ट्रेड उपलब्ध नहीं है", 400);
   }
+  let existingStudents;
+  const allStudents = async () => {
+    if (!existingStudents) existingStudents = await listJson(store, "students/");
+    return existingStudents;
+  };
   const holder = input.mobile ? await getJson(store, K.mobileIndex(input.mobile)) : null;
-  if (holder) throw new HttpError("यह मोबाइल नंबर पहले से रजिस्टर है", 409);
+  if (holder) throw new HttpError("यह मोबाइल नंबर पहले से रजिस्टर है — लॉगिन करें", 409);
+  if (
+    input.mobile &&
+    (await allStudents()).some((record) => phone(record.mobile) === input.mobile)
+  ) {
+    throw new HttpError("यह मोबाइल नंबर पहले से रजिस्टर है — लॉगिन करें", 409);
+  }
   if (input.citsNumber) {
     const citsHolder = await getJson(store, K.studentCitsIndex(input.citsNumber));
     if (citsHolder) throw new HttpError("यह CITS नंबर पहले से रजिस्टर है", 409);
-    const legacyMatch = (await listJson(store, "students/")).some(
+    const legacyMatch = (await allStudents()).some(
       (record) =>
-        String(record.citsNumber || "").toUpperCase() === input.citsNumber ||
-        String(record.mobile || "") === input.citsNumber
+        String(record.citsNumber || "").trim().toUpperCase() === input.citsNumber ||
+        phone(record.mobile) === input.citsNumber
     );
     if (legacyMatch) throw new HttpError("यह CITS नंबर पहले से रजिस्टर है", 409);
   }
@@ -91,7 +102,13 @@ export async function handleRegister({ req, ctx, store, env }) {
     if (citsReserved) await store.delete(K.studentCitsIndex(input.citsNumber));
     throw error;
   }
-  await audit(store, "student.register", id, { ip });
+  try {
+    await audit(store, "student.register", id, { ip });
+  } catch (error) {
+    console.error("registration audit logging failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
   const groupName = settings.groupName || settings.collegeName || DEFAULT_SETTINGS.groupName;
   let notification = { sent: false, reason: "not_provided" };
   if (input.email) {
