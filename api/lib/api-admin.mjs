@@ -37,7 +37,7 @@ import {
   recentAudit,
   hashPin,
 } from "./auth.mjs";
-import { sendEmail } from "./email.mjs";
+import { emailConfigured, sendEmail } from "./email.mjs";
 import { processResultReleaseEmails } from "./result-notifications.mjs";
 import {
   examSummary,
@@ -321,10 +321,9 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
   await rateLimit(store, "admin-forgot-password-global", "admin", 3, 60 * 60 * 1000);
   const recipient = String(env?.ADMIN_EMAIL || "").trim().toLowerCase();
   const baseUrl = resetBaseUrl(env);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) || !baseUrl ||
-      !env?.RESEND_API_KEY || !env?.EMAIL_FROM) {
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) || !baseUrl || !emailConfigured(env)) {
     throw new HttpError(
-      "पासवर्ड रिकवरी उपलब्ध नहीं है। Cloudflare secrets में ADMIN_EMAIL, RESEND_API_KEY, EMAIL_FROM और PUBLIC_BASE_URL सेट करें।",
+      "पासवर्ड रिकवरी उपलब्ध नहीं है। ADMIN_EMAIL और PUBLIC_BASE_URL के साथ Gmail API (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN) या Resend (RESEND_API_KEY, EMAIL_FROM) configure करें।",
       503
     );
   }
@@ -345,7 +344,7 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
   });
   if (!delivery.sent) {
     await del(store, resetKey);
-    throw new HttpError("रीसेट ईमेल नहीं भेजा जा सका। Resend configuration जाँचकर फिर प्रयास करें।", 503);
+    throw new HttpError("रीसेट ईमेल नहीं भेजा जा सका। ईमेल provider configuration जाँचकर फिर प्रयास करें।", 503);
   }
   return json({
     ok: true,

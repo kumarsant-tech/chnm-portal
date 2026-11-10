@@ -4311,8 +4311,11 @@
       detailRow("ADMIN_PASSWORD", "शुरुआती पासवर्ड (पासवर्ड बदलने के बाद वैकल्पिक)") +
       detailRow("ADMIN_SECRET", "सत्र टोकन हस्ताक्षर के लिए स्थिर, 32+ byte secret") +
       detailRow("ADMIN_EMAIL", "एडमिन रिकवरी ईमेल") +
-      detailRow("RESEND_API_KEY", "ईमेल भेजने की Resend API key") +
-      detailRow("EMAIL_FROM", "Resend में सत्यापित भेजने वाला पता") +
+      detailRow("GMAIL_CLIENT_ID", "Gmail API OAuth client ID") +
+      detailRow("GMAIL_CLIENT_SECRET", "Gmail API OAuth client secret") +
+      detailRow("GMAIL_REFRESH_TOKEN", "gmail.send scope वाला OAuth refresh token") +
+      detailRow("RESEND_API_KEY", "वैकल्पिक Resend API key") +
+      detailRow("EMAIL_FROM", "Resend के लिए सत्यापित sender; Gmail में आवश्यक नहीं") +
       detailRow("PUBLIC_BASE_URL", "HTTPS वेबसाइट origin, जैसे https://portal.example") +
       "</dl><div class=\"notice warn\" style=\"margin-top:12px\">D1 में पासवर्ड का salted hash रखा जाता है; ADMIN_SECRET न बदलें।</div></section>";
 

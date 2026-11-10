@@ -36,7 +36,7 @@ npm run test:d1
 ## Admin secrets और database सुरक्षा
 
 - Runtime secrets Cloudflare Worker में encrypted secrets के रूप में रखे जाते हैं। उनकी values source code, GitHub, screenshot या chat में न लिखें।
-- छात्र ईमेल और admin password recovery के लिए `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` और `PUBLIC_BASE_URL` configure करें। Recovery link केवल `ADMIN_EMAIL` पर भेजा जाता है; `PUBLIC_BASE_URL` को वास्तविक HTTPS site origin पर सेट करें।
+- छात्र ईमेल और admin password recovery के लिए Gmail API (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`) या Resend (`RESEND_API_KEY`, verified `EMAIL_FROM`) configure करें। Gmail OAuth consent में Gmail API सक्षम करें और `gmail.send` scope वाला refresh token दें। साथ में `ADMIN_EMAIL` और `PUBLIC_BASE_URL` configure करें; recovery link केवल `ADMIN_EMAIL` पर भेजा जाता है।
 - Admin password change/reset का salted hash D1 में रखा जाता है; `ADMIN_SECRET` token signing key अलग और स्थिर रहता है। Password change/reset पर पुराने admin sessions तुरंत अमान्य हो जाते हैं। पहली admin setup के लिए `ADMIN_PASSWORD` अभी भी रखें।
 - Secret बदलने का काम authorized Cloudflare admin/developer ही करे। Secret values को terminal command arguments में न डालें।
 - D1 schema migration, `wrangler.jsonc` का database ID, binding या `cloudflare/migrations/` में बदलाव से production data प्रभावित हो सकता है। Backup और migration योजना के बिना इन्हें न बदलें।
