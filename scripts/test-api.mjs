@@ -448,6 +448,77 @@ console.log("\n4. Result release + isolation");
   check("live list clears after submit", (await call("admin_live", {}, globalThis.adminToken)).data.items?.some((item) => item.attemptId === attemptId) === false);
 }
 
+console.log("\n4b. Five simultaneous demo learners");
+{
+  const learners = await Promise.all(
+    Array.from({ length: 5 }, (_, index) =>
+      call(
+        "register",
+        {
+          name: `Demo Learner ${index + 1}`,
+          mobile: `98765100${String(index + 1).padStart(2, "0")}`,
+          tradeId: "chnm",
+          consent: true,
+        },
+        "",
+        `10.5.0.${index + 1}`
+      )
+    )
+  );
+  const registered = learners.every((learner) => learner.status === 200 && learner.data.token);
+  check("all 5 synthetic learners register", registered, learners.map((learner) => learner.status).join(", "));
+
+  if (registered) {
+    const starts = await Promise.all(
+      learners.map((learner) => call("student_start", { examId }, learner.data.token))
+    );
+    const started = starts.every((result) => result.status === 200 && result.data.attempt?.attemptId);
+    check("all 5 learners start the published exam concurrently", started, starts.map((result) => result.status).join(", "));
+
+    if (started) {
+      const saves = await Promise.all(
+        starts.map((result, index) =>
+          call(
+            "student_autosave",
+            {
+              examId,
+              attemptId: result.data.attempt.attemptId,
+              seq: 2,
+              responses: { [questionIds[0]]: index % 4 },
+              visited: [questionIds[0]],
+              current: 0,
+            },
+            learners[index].data.token
+          )
+        )
+      );
+      check("all 5 learners autosave independently", saves.every((save) => save.status === 200), saves.map((save) => save.status).join(", "));
+
+      const submissions = await Promise.all(
+        starts.map((result, index) =>
+          call(
+            "student_submit",
+            {
+              examId,
+              attemptId: result.data.attempt.attemptId,
+              confirm: true,
+              seq: 3,
+              responses: { [questionIds[0]]: index % 4 },
+              visited: [questionIds[0]],
+            },
+            learners[index].data.token
+          )
+        )
+      );
+      check(
+        "all 5 learners submit and receive separate results",
+        submissions.every((submission) => submission.status === 200 && submission.data.resultId),
+        submissions.map((submission) => submission.status).join(", ")
+      );
+    }
+  }
+}
+
 console.log("\n5. Server-side timer expiry");
 {
   const save = await call(
