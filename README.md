@@ -2,17 +2,17 @@
 
 यह रिपॉज़िटरी मूल CHNM वेबसाइट का होम पेज कंटेंट/फोटो/डिज़ाइन और सभी लैब सुरक्षित रखती है, और उसके साथ **पूरी CBT परीक्षा प्रणाली**, **Training Methodology डिजिटल पुस्तक** तथा **25-अध्याय Trade Theory डिजिटल पुस्तक** देती है।
 
-> वर्तमान production: **Netlify** — https://chnm26.netlify.app/। **Cloudflare Workers + D1** अलग hosting/database के रूप में तैयार किए जा रहे हैं; data export/import और account authentication के बाद ही उसका नया URL live माना जाएगा। विवरण: [Cloudflare deployment guide](docs/cloudflare-deployment-hi.md)।
+> वर्तमान production: **Cloudflare Workers + D1** — https://chnm-portal.kumarsant1947.workers.dev/। GitHub की `main` branch पर बदलाव push करने के बाद Cloudflare अपने-आप build और deploy करता है। आसान निर्देश: [वेबसाइट रखरखाव manual](docs/site-maintenance-manual-hi.md)।
 
 ## लाइव लिंक
 
 | पेज | URL |
 |---|---|
-| होम पेज | https://chnm26.netlify.app/ |
-| छात्र पोर्टल | https://chnm26.netlify.app/exam/index.html |
-| एडमिन | https://chnm26.netlify.app/exam/admin.html |
-| अध्ययन केंद्र | https://chnm26.netlify.app/study/index.html |
-| Trade Theory पुस्तक | https://chnm26.netlify.app/study/trade/index.html |
+| होम पेज | https://chnm-portal.kumarsant1947.workers.dev/ |
+| छात्र पोर्टल | https://chnm-portal.kumarsant1947.workers.dev/exam/index.html |
+| एडमिन | https://chnm-portal.kumarsant1947.workers.dev/exam/admin |
+| अध्ययन केंद्र | https://chnm-portal.kumarsant1947.workers.dev/study/index.html |
+| Trade Theory पुस्तक | https://chnm-portal.kumarsant1947.workers.dev/study/trade/index.html |
 
 ## मुख्य फीचर्स
 
@@ -27,8 +27,7 @@
 - **सूचना और समूह चैट (पोर्टल के अंदर):** एडमिन भेजी सूचना भेजते ही सभी छात्रों के डैशबोर्ड पर सीधे दिखती है (नई सूचना का बैज काउंट, सभी/बैच-वार audience, एडिट/हटाना)। हर पंजीकृत छात्र अपने आप समूह चैट में शामिल रहता है — एडमिन का संदेश तुरंत सबको दिखता है, संदेश हटाना और flood protection सहित। कोई बाहरी ऐप (WhatsApp/Telegram) या join लिंक नहीं चाहिए।
 - **सुरक्षा:** env-आधारित admin password (env न मिलने पर server-side scrypt hash fallback), HMAC tokens, rate limiting, server-side timer/scoring, answer key gating, result isolation, duplicate submit prevention
 - **अलग Practice और Final:** practice के उत्तर/परिणाम final से अलग; final के अंक और उत्तर-कुंजी release के बाद ही दिखते हैं (release करते ही दोनों खुल जाते हैं)
-- **Current live data:** Netlify Blobs; **Cloudflare target:** D1 migration के बाद
-- **Cloudflare target:** Static assets + `/api` Worker + D1 key-value storage; live Netlify backup के लिए सुरक्षित exporter/importer scripts शामिल हैं
+- **Live hosting/data:** Cloudflare Workers Static Assets + `/api` Worker + D1 database। पुरानी Netlify site/data अलग है और इस setup में बदली नहीं गई।
 
 ## प्रश्न पेपर अपलोड फोल्डर
 
@@ -53,20 +52,20 @@ exam/                                                      पोर्टल, C
 exam/templates/                                            प्रश्न पेपर अपलोड फोल्डर (CSV/XLSX/HTML + गाइड)
 study/                                                     Training Methodology डिजिटल पुस्तक + सिमुलेटर
 study/trade/                                               Trade Theory 25-अध्याय पुस्तक + सिमुलेटर
-netlify/functions/api.mjs                                  मुख्य API (Netlify Functions v2)
-netlify/functions/auto-submit.mjs                          scheduled auto-submit (हर 5 मिनट)
-netlify/lib/                                               auth, db/Blobs, scoring, handlers
+cloudflare/worker.mjs                                      Cloudflare Worker: API/static assets/cron
+netlify/functions/api.mjs                                  साझा CBT API
+netlify/lib/                                               auth, D1/Blobs database, scoring, handlers
 scripts/build.mjs                                          dist बनाना
 scripts/dev-server.mjs                                     स्थानीय server (in-memory store)
-scripts/test-api.mjs                                       69-check API test suite
+scripts/test-api.mjs                                       API regression tests
 scripts/make-templates.mjs                                 Excel/CSV/JSON टेम्पलेट
 docs/                                                      हिंदी गाइड + परीक्षण रिपोर्ट
-netlify.toml                                               deploy/build/headers config
+wrangler.jsonc                                              Cloudflare Worker/D1 configuration
 ```
 
 ## स्थानीय चलाना
 
-Node.js 22+ चाहिए (Netlify build में `NODE_VERSION = "22"` सेट है)।
+Node.js 22+ चाहिए।
 
 ```bash
 node scripts/build.mjs
@@ -79,36 +78,18 @@ node scripts/test-api.mjs        # API suite
 - अध्ययन केंद्र: `http://127.0.0.1:8888/study/index.html`
 - Trade Theory पुस्तक: `http://127.0.0.1:8888/study/trade/index.html`
 
-`USE_MEMORY_STORE=1` के बिना dev server Netlify Blobs context ढूँढेगा। स्थानीय परीक्षण के लिए memory store उपयोग करें — restart पर data मिटता है।
+`USE_MEMORY_STORE=1` के बिना dev server persistent store context ढूँढेगा। स्थानीय परीक्षण के लिए memory store उपयोग करें — restart पर data मिटता है।
 
-## Netlify deployment
+## बदलाव और deployment
 
-पूरी हिंदी गाइड: **`docs/deployment-guide-hi.md`**
-
-संक्षेप:
-1. GitHub repo में **पूरा प्रोजेक्ट root** push करें (`dist/`, `node_modules/` नहीं)।
-2. Netlify → Import project (build command व publish directory `netlify.toml` से स्वतः; functions `netlify/functions`)।
-3. Environment variables: `ADMIN_PASSWORD`, `ADMIN_SECRET` (विवरण `docs/environment-variables.md`)।
-4. Deploy → `https://<site>.netlify.app/exam/admin.html` से login → पहली परीक्षा बनाएँ।
-5. Deploy के बाद `docs/deployment-guide-hi.md` की post-deploy checklist चलाएँ।
-
-GitHub के बिना:
-```bash
-npm install -g netlify-cli
-netlify login
-netlify init
-netlify env:set ADMIN_PASSWORD "मजबूत-पासवर्ड"
-netlify env:set ADMIN_SECRET "32+ random अक्षर"
-netlify deploy --build --prod
-```
-
-> Netlify Drop पर **पूरा प्रोजेक्ट root ZIP** अपलोड करें (जैसे `chnm-netlify-upload.zip`) — तब `netlify.toml` से build चलती है और Functions/Blobs भी deploy होते हैं। केवल `dist/` अपलोड करने पर `/api` काम नहीं करेगा। API `/api` path पर function v2 config से चलती है; कोई अलग redirect जरूरी नहीं।
->
-> Environment variable बदलने के बाद **नया deploy जरूरी** है (functions को नई value तभी मिलती है)।
+आसान, चरण-दर-चरण निर्देश: [वेबसाइट रखरखाव manual](docs/site-maintenance-manual-hi.md)।
+Cloudflare setup और auto-deploy का विवरण: [Cloudflare deployment guide](docs/cloudflare-deployment-hi.md)।
 
 ## गाइड
 
-- [डिप्लॉयमेंट गाइड](docs/deployment-guide-hi.md)
+- [पुरानी Netlify deployment guide](docs/deployment-guide-hi.md) (वर्तमान production के लिए नहीं)
+- [वेबसाइट रखरखाव manual](docs/site-maintenance-manual-hi.md)
+- [Cloudflare deployment guide](docs/cloudflare-deployment-hi.md)
 - [एडमिन गाइड](docs/admin-guide-hi.md)
 - [छात्र गाइड](docs/student-guide-hi.md)
 - [Environment Variables](docs/environment-variables.md)
@@ -118,11 +99,11 @@ netlify deploy --build --prod
 
 - होम पेज का कंटेंट, शिक्षक/समूह फोटो, डिज़ाइन और सभी लैब सुरक्षित हैं। उपयोगकर्ता के अनुरोध पर साइडबार से पुराना **कंप्यूटर लैब समूह (क्रम 34–50)**, अलग **Training Methodology** फोल्डर और **CHNM Academy** फोल्डर हटाए गए हैं। होम पेज में उपयोगकर्ता के स्पष्ट अनुरोध से हेडर में **📝 ऑनलाइन टेस्ट** लिंक जोड़ा गया, नीचे का तैरता परीक्षा बटन हटाया गया और Training Methodology navigation को नई डिजिटल बुक से जोड़ा गया (फोटो, मुख्य कंटेंट, लेआउट और रंग अपरिवर्तित; पुराना TM DOM content सुरक्षित)।
 - अध्ययन सामग्री NIMI की विषय-सूची पर आधारित **स्वतंत्र, सरल हिंदी सामग्री** है; मूल पुस्तक का पाठ/चित्र सम्मिलित नहीं है (श्रेय: © NIMI)।
-- `netlify.toml` में `X-Frame-Options: SAMEORIGIN` जरूरी है — इससे होम पेज की same-origin 3D लैब iframe काम करती है।
+- `netlify.toml` पुराने Netlify deploy के लिए है; वर्तमान production Cloudflare Workers पर deploy होती है।
 - `exam/` के लिए CSP `no-store` के साथ लागू है; admin password कभी frontend में न रखें।
-- **Admin login fallback:** अगर Netlify Functions को `ADMIN_PASSWORD` नहीं मिलता (free-plan scope समस्या), तो `netlify/lib/admin-credentials.mjs` में रखा **scrypt hash** काम आता है। Env variable सेट होने पर वही प्राथमिक रहता है। पासवर्ड बदलने के लिए `node scripts/set-admin-password.mjs "नया-पासवर्ड"` चलाएँ और redeploy करें। यह फ़ाइल client/dist में नहीं जाती; इसमें plaintext password नहीं है।
+- **Admin secrets:** Production में admin credentials Cloudflare Worker के encrypted secrets में हैं; इन्हें source code या GitHub में न रखें।
 - **सत्र स्थिरता:** admin token `localStorage` में रहता है (पुराना `sessionStorage` token स्वतः migrate होता है), और token का signature server-side fallback hash से बनता है — इसलिए env अस्थिर होने या tab reload होने पर admin अपने आप लॉगआउट नहीं होता।
-- **Blobs पुनर्प्रयास:** store बनाने में अस्थायी विफलता आने पर cached promise reset हो जाता है, ताकि function instance हमेशा के लिए खराब न हो।
+- **Persistent store पुनर्प्रयास:** store बनाने में अस्थायी विफलता आने पर cached promise reset हो जाता है, ताकि function instance हमेशा के लिए खराब न हो।
 - **CITS-शैली CBT:** परीक्षा से पहले भाषा (हिंदी/English) और निर्देश-पुष्टि; प्रश्न स्क्रीन पर भाषा टॉगल, "चिह्नित करें और अगला" बटन, सर्वर टाइमर और प्रश्न पैलेट। प्रश्न में ` / ` से हिंदी और English अलग किए जाते हैं (आयात CSV इसी प्रारूप में हो सकती है)।
 - **एडमिन लाइव निगरानी:** साइडबार में **लाइव परीक्षा** — प्रगति, अंतिम गतिविधि, शेष समय और "फाइनल करें"; परिणाम पेज पर **मेरिट (शीर्ष 10)**।
 - मूल प्रोजेक्ट backup: `chnm-portal-with-exam.backup.zip`; नवीनतम बदलाव से पहले के backup: `chnm-portal-with-exam.backup-before-cits-upgrade.zip`, `chnm-portal-with-exam.backup-before-reliability-fix.zip` (इससे पहले: `…backup-before-admin-link.zip`, `…backup-before-admin-fallback.zip`)।
