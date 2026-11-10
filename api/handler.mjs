@@ -206,18 +206,14 @@ export default async (req, ctx) => {
     if (error instanceof HttpError) {
       return fail(error.message, error.status, error.details);
     }
-    const diagnostic = {
+    console.error("api error", {
       action: action || "unknown",
       errorName: error instanceof Error ? error.name : "UnknownError",
       errorCode:
         typeof error?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code)
           ? error.code
           : undefined,
-    };
-    if (error instanceof Error && error.name === "NotSupportedError") {
-      diagnostic.errorStack = error.stack;
-    }
-    console.error("api error", diagnostic);
+    });
     return fail("सर्वर में तकनीकी त्रुटि हुई — कृपया दोबारा प्रयास करें", 500);
   }
 };
