@@ -127,14 +127,15 @@ export async function hashPassword(password) {
     });
     throw error;
   }
-  const hash = await derivePasswordHash(password, salt, 120000);
-  return `pbkdf2v2$${Buffer.from(salt).toString("base64url")}$${hash.toString("base64url")}`;
+  const hash = await derivePasswordHash(password, salt, 100000);
+  return `pbkdf2v3$${Buffer.from(salt).toString("base64url")}$${hash.toString("base64url")}`;
 }
 
 export async function checkPassword(password, stored) {
   try {
     const [kind, salt, hash] = String(stored || "").split("$");
-    const iterations = kind === "pbkdf2v2" ? 120000 : kind === "pbkdf2" ? 60000 : 0;
+    const iterations =
+      kind === "pbkdf2v3" ? 100000 : kind === "pbkdf2v2" ? 120000 : kind === "pbkdf2" ? 60000 : 0;
     if (!iterations || !salt || !hash) return false;
     const expected = Buffer.from(hash, "base64url");
     const actual = await derivePasswordHash(

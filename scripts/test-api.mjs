@@ -71,7 +71,7 @@ console.log("\n0b. Web Crypto password hashing compatibility");
   const passwordHash = await hashPassword("test-password-for-web-crypto");
   check(
     "password hash uses the existing versioned PBKDF2 format",
-    passwordHash.startsWith("pbkdf2v2$")
+    passwordHash.startsWith("pbkdf2v3$")
   );
   check(
     "Web Crypto verifies a newly hashed password",
