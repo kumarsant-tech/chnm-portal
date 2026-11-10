@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>प्रश्न अपलोड गाइड — CHNM CGT परीक्षा पोर्टल</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: "Segoe UI", "Noto Sans Devanagari", Arial, sans-serif; margin: 0; background: #eef2f6; color: #16212c; line-height: 1.65; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px 60px; }
+  .card { background: #fff; border: 1px solid #d5dee7; border-radius: 12px; padding: 24px 26px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(16, 34, 51, .05); }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  p { margin: 8px 0; }
+  .lead { color: #52606d; margin: 0 0 6px; }
+  .tag { display: inline-block; background: #0f2f4a; color: #fff; font-size: 12px; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; margin-bottom: 14px; }
+  ol, ul { margin: 8px 0 8px 22px; padding: 0; }
+  li { margin: 6px 0; }
+  code { background: #eef2f6; border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+  .files { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 12px; }
+  .file { display: block; border: 1px solid #cdd8e3; border-radius: 10px; padding: 12px 14px; text-decoration: none; color: #0f2f4a; background: #f8fafc; }
+  .file b { display: block; font-size: 15px; }
+  .file span { font-size: 12.5px; color: #52606d; }
+  .file:hover { border-color: #0f2f4a; background: #fff; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 10px; }
+  th, td { border: 1px solid #ccd6e0; padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; white-space: nowrap; }
+  .note { background: #fff8e6; border: 1px solid #f0d48a; border-radius: 10px; padding: 12px 14px; margin-top: 12px; font-size: 14px; }
+  .ok { background: #eaf7ee; border-color: #a9d8b8; }
+  .btn { display: inline-block; background: #0f2f4a; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+  .btn:hover { background: #16456b; }
+  .step { display: flex; gap: 12px; align-items: flex-start; margin: 10px 0; }
+  .num { flex: 0 0 26px; height: 26px; border-radius: 50%; background: #0f2f4a; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 3px; }
+  .muted { color: #52606d; }
+  @media print { body { background: #fff; } .card { box-shadow: none; } .btn { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <span class="tag">CHNM CGT — प्रश्न पत्र अपलोड</span>
+    <h1>प्रश्न पत्र अपलोड करने की पूरी गाइड</h1>
+    <p class="lead">यह फोल्डर ही आपका <b>अपलोड फोल्डर</b> है। यहाँ से नमूना फाइल डाउनलोड करें, अपने प्रश्न भरें और एडमिन पैनल में अपलोड करके प्रीव्यू करें। CSV, Excel (XLSX), JSON और HTML — चारों चलते हैं।</p>
+    <div class="files">
+      <a class="file" href="question-paper-sample.csv" download><b>CSV नमूना</b><span>10 तैयार Trade Theory प्रश्न — तुरंत आयात योग्य</span></a>
+      <a class="file" href="questions-template.csv" download><b>CSV खाली टेम्पलेट</b><span>हेडर तैयार — अपने प्रश्न भरें</span></a>
+      <a class="file" href="questions-template.xlsx" download><b>Excel टेम्पलेट</b><span>XLSX — Excel में खोलकर भरें</span></a>
+      <a class="file" href="question-paper-sample.html" download><b>HTML नमूना</b><span>तालिका वाली HTML फाइल</span></a>
+      <a class="file" href="questions-sample.json" download><b>JSON नमूना</b><span>तकनीकी उपयोग के लिए</span></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>1. प्रश्न पत्र अपलोड करें</h2>
+    <div class="step"><span class="num">1</span><div>एडमिन पैनल खोलें: <a href="../admin.html">admin.html</a> → <b>प्रश्न बैंक</b>।</div></div>
+    <div class="step"><span class="num">2</span><div><b>आयात करें</b> बटन दबाएँ। डिफ़ॉल्ट विषय चुनें (जैसे Trade Theory) और चाहें तो सीधे किसी परीक्षा को चुनें।</div></div>
+    <div class="step"><span class="num">3</span><div>CSV / XLSX / HTML फाइल चुनें या खींचकर छोड़ें। स्क्रीन पर <b>पहली 12 पंक्तियाँ, विषय, विकल्प, सही उत्तर और अंक</b> दिखेंगे — यही प्रीव्यू है।</div></div>
+    <div class="step"><span class="num">4</span><div>गलत पंक्तियाँ लाल चेतावनी में दिखेंगी। ठीक करके फाइल दोबारा चुनें, फिर <b>आयात करें</b> दबाएँ। डुप्लीकेट प्रश्न (वही Question ID या वही प्रश्न टेक्स्ट) छोड़ दिए जाते हैं।</div></div>
+    <p class="note">एक बार में अधिकतम <b>1000 प्रश्न</b>। आयात के बाद भी प्रश्न बैंक में जाकर किसी प्रश्न को बदला जा सकता है।</p>
+  </div>
+
+  <div class="card">
+    <h2>2. फाइल में कॉलम कैसे भरें</h2>
+    <table>
+      <thead><tr><th>कॉलम</th><th>क्या लिखें</th></tr></thead>
+      <tbody>
+        <tr><td>Question ID</td><td>अपना यूनिक कोड, जैसे <code>TT-PAPER-01</code>। खाली छोड़ें तो सिस्टम अपने-आप बना देगा।</td></tr>
+        <tr><td>Subject</td><td>विषय का नाम या कोड — Trade Theory / TT, TM, Soft Skills, Networking आदि।</td></tr>
+        <tr><td>Question</td><td>पूरा प्रश्न (हिंदी, अंग्रेज़ी या दोनों)।</td></tr>
+        <tr><td>Option A–D</td><td>चार विकल्प अलग-अलग कॉलम में। कम से कम दो विकल्प जरूरी हैं।</td></tr>
+        <tr><td>Correct Answer</td><td>सिर्फ <b>A</b>, <b>B</b>, <b>C</b> या <b>D</b> (या विकल्प का नंबर 1–4)।</td></tr>
+        <tr><td>Marks</td><td>प्रति प्रश्न अंक, जैसे 1 या 2। खाली छोड़ें तो परीक्षा का डिफ़ॉल्ट लगेगा।</td></tr>
+        <tr><td>Negative Marks</td><td>गलत उत्तर पर कटौती। शून्य या खाली = कोई कटौती नहीं।</td></tr>
+        <tr><td>Explanation</td><td>उत्तर की व्याख्या — परिणाम में छात्र को दिखती है (जब Answer Key खोली हो)।</td></tr>
+        <tr><td>Image</td><td>वैकल्पिक चित्र का लिंक, जैसे <code>img/circuit.png</code>। खाली छोड़ सकते हैं।</td></tr>
+      </tbody>
+    </table>
+    <p class="note ok"><b>सुझाव:</b> पुराना पेपर Word/Excel में है तो उसे CSV में “Save As” करें और ऊपर वाले हेडर नाम इस्तेमाल करें। HTML पेपर में केवल एक <code>&lt;table&gt;</code> रखें — बाकी सारा टेक्स्ट अनदेखा हो जाता है।</p>
+  </div>
+
+  <div class="card">
+    <h2>3. पेपर सेट करें (एडमिन)</h2>
+    <ol>
+      <li><b>परीक्षाएँ → नई परीक्षा</b>: शीर्षक, कोड, विषय, समय (मिनट), पास %, प्रकार (Practice / Final), तारीख और प्रयास सीमा भरें।</li>
+      <li>प्रश्न चुनें और <b>प्रीव्यू</b> से पूरा पेपर देखें। क्रम/अंक ठीक होने पर <b>ड्राफ्ट</b> में सेव करें।</li>
+      <li><b>Lock</b> करें — पेपर का स्नैपशॉट और हैश बन जाता है, फिर बदलाव नहीं होते।</li>
+      <li><b>Publish</b> करें। अब छात्र अपने मोबाइल पर लॉगिन करके परीक्षा दे सकते हैं।</li>
+    </ol>
+    <p class="muted">Published परीक्षा में प्रश्न बदलने हों तो पहले Unpublish करें — परिणाम सुरक्षित रहते हैं।</p>
+  </div>
+
+  <div class="card">
+    <h2>4. छात्र मोबाइल पर परीक्षा देगा</h2>
+    <ol>
+      <li>छात्र पहली बार <a href="../register.html">register.html</a> पर नाम, मोबाइल, ईमेल और ट्रेड भरकर रजिस्ट्रेशन करता है।</li>
+      <li>उसे <b>CHNM</b> से शुरू होने वाला ID मिलता है, जैसे <b>CHNM12</b> — यही उसकी पहचान है।</li>
+      <li>लॉगिन के लिए वही CHNM ID और रजिस्टर्ड मोबाइल नंबर डालता है।</li>
+      <li>अपनी परीक्षा खोलकर निर्देश पढ़ता है और शुरू करता है। उत्तर अपने-आप सेव होते हैं; समय खत्म होने पर परीक्षा स्वतः जमा हो जाती है।</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>5. परिणाम बाद में प्रकाशित करें</h2>
+    <p>Final परीक्षा का परिणाम छात्र को तब तक नहीं दिखता जब तक आप प्रकाशित न करें।</p>
+    <ol>
+      <li><b>परिणाम → परीक्षा चुनें → Release Results</b>।</li>
+      <li>चाहें तो <b>Show Answers</b> चालू करें — छात्र को सही उत्तर और व्याख्या दिखेगी।</li>
+      <li>छात्र अपने डैशबोर्ड पर स्कोर, प्रतिशत और पास/फेल देख सकेगा।</li>
+    </ol>
+    <p class="note">Practice परीक्षा का परिणाम तुरंत दिखता है — उसे Release की जरूरत नहीं।</p>
+  </div>
+
+  <div class="card" style="text-align:center">
+    <a class="btn" href="../admin.html">एडमिन पैनल खोलें</a>
+    <p class="muted" style="margin-top:12px;font-size:13px">यह गाइड सिर्फ निर्देशों के लिए है — इसमें कोई पासवर्ड नहीं है।</p>
+  </div>
+</div>
+</body>
+</html>

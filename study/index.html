@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>अध्ययन सामग्री · Training Methodology (सरल हिंदी)</title>
+  <meta name="description" content="Training Methodology NSQF स्तर 5 — 16 अध्यायों की सरल हिंदी डिजिटल पुस्तक, इंटरैक्टिव सिमुलेटर और क्विज़ के साथ। CITS / ITI अनुदेशक प्रशिक्षण के लिए।">
+  <link rel="stylesheet" href="../exam/assets/styles.css">
+  <link rel="stylesheet" href="study.css">
+<link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
+</head>
+<body class="study-body">
+  <header class="fi-header">
+    <a class="brand" href="../index.html" aria-label="Future Instructor होम">
+      <span class="brand-mark">FI</span>
+      <span class="brand-text">
+        <strong>Future Instructor</strong>
+        <small>CHNM / CITS · अध्ययन केंद्र</small>
+      </span>
+    </a>
+    <div class="header-spacer"></div>
+    <nav class="header-links" aria-label="मुख्य मेन्यू">
+      <a class="header-link desk-only" href="../index.html">होम / लैब</a>
+      <a class="header-link" href="index.html" aria-current="page">अध्ययन सामग्री</a>
+      <a class="header-link" href="trade/index.html">ट्रेड थ्योरी बुक</a>
+      <a class="header-link" href="../exam/index.html">छात्र पोर्टल</a>
+      <a class="header-link desk-only" href="../exam/result.html">परिणाम</a>
+    </nav>
+  </header>
+
+  <main class="study-wrap">
+    <section class="study-hero" aria-labelledby="studyTitle">
+      <span class="pill dark">CITS · NSQF स्तर 5 · 16 मॉड्यूल</span>
+      <h1 id="studyTitle">Training Methodology —<br>सरल भाषा में, अभ्यास के साथ।</h1>
+      <p class="lead">
+        अनुदेशक बनने की पूरी यात्रा — भूमिका और मनोविज्ञान से लेकर आकलन, प्रबंधन, NSQF और उभरती तकनीक तक।
+        हर अध्याय में सरल हिंदी सारांश, रोज़मर्रा के उदाहरण, इंटरैक्टिव सिमुलेटर और छोटा क्विज़ है।
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-lg" id="resumeBtn" href="chapter.html?m=1">पढ़ना शुरू करें</a>
+        <a class="btn btn-lg btn-ghost" href="#modules">सभी 16 अध्याय देखें</a>
+        <a class="btn btn-lg btn-ghost" href="trade/index.html">ट्रेड थ्योरी — 25 अध्याय</a>
+      </div>
+      <div class="hero-stats" aria-label="अध्ययन सामग्री की जानकारी">
+        <div class="hero-stat"><b>16</b><span>अध्याय</span></div>
+        <div class="hero-stat"><b id="simCount">30</b><span>इंटरैक्टिव सिमुलेटर</span></div>
+        <div class="hero-stat"><b>64</b><span>अभ्यास प्रश्न</span></div>
+      </div>
+      <div class="study-progress">
+        <div class="progress-head">
+          <span>आपकी प्रगति</span>
+          <span><b id="progressText">0 / 16 अध्याय</b></span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-label="पढ़े गए अध्याय" aria-valuemin="0" aria-valuemax="16" aria-valuenow="0" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hub-info" aria-label="कैसे पढ़ें">
+      <div class="panel">
+        <div class="ico">1</div>
+        <h3>अध्याय पढ़ें</h3>
+        <p>हर अध्याय में लक्ष्य, सरल व्याख्या, मुख्य बिंदु और एक उदाहरण है।</p>
+      </div>
+      <div class="panel">
+        <div class="ico">2</div>
+        <h3>सिमुलेटर चलाएँ</h3>
+        <p>भूमिका पहचानें, क्रम बनाएँ, लागत निकालें और तकनीक मिलाएँ — करके सीखें।</p>
+      </div>
+      <div class="panel">
+        <div class="ico">3</div>
+        <h3>क्विज़ दें</h3>
+        <p>चार प्रश्नों से अपनी समझ जाँचें। स्कोर और प्रगति इसी ब्राउज़र में सुरक्षित रहती है।</p>
+      </div>
+    </section>
+
+    <section id="modules" aria-labelledby="modulesTitle">
+      <div class="study-toolbar">
+        <h2 id="modulesTitle">सभी अध्याय</h2>
+        <div class="grow"></div>
+        <label class="study-search" for="studySearch">
+          <span class="sr-only">अध्याय खोजें</span>
+          <input id="studySearch" type="search" placeholder="अध्याय या विषय खोजें…" autocomplete="off">
+        </label>
+        <div class="filter-chips" role="group" aria-label="अध्याय फ़िल्टर">
+          <button class="chip" type="button" data-filter="all" aria-pressed="true">सभी</button>
+          <button class="chip" type="button" data-filter="pending" aria-pressed="false">बाकी</button>
+          <button class="chip" type="button" data-filter="done" aria-pressed="false">पढ़े हुए</button>
+        </div>
+      </div>
+      <div class="module-grid" id="moduleGrid" aria-live="polite"></div>
+    </section>
+
+    <p class="chapter-note" style="margin-top:26px">
+      <b>स्रोत और श्रेय:</b> यह स्वतंत्र अध्ययन सहायक सामग्री है, NIMI की आधिकारिक पुस्तक नहीं।
+      विषय-क्रम NIMI, चेन्नई की <i>Training Methodology — NSQF Level 5 (संशोधित 2022)</i> के 16 मॉड्यूल पर आधारित है।
+      मूल पुस्तक का पाठ, चित्र या डिज़ाइन यहाँ कॉपी नहीं किया गया; सारी सामग्री सरल हिंदी में स्वतंत्र रूप से लिखी गई है।
+      मूल पुस्तक © NIMI — उसे पुनःप्रकाशित नहीं किया गया है। पूरी पुस्तक के लिए NIMI, चेन्नई से प्राप्त करें।
+    </p>
+  </main>
+
+  <footer class="study-footer">
+    <div class="copyright-box">
+      <b>उपयोग:</b> यह पृष्ठ सीखने के लिए है। प्रगति केवल आपके ब्राउज़र के localStorage में रहती है — किसी सर्वर पर नहीं भेजी जाती।
+      ब्राउज़र डेटा साफ करने पर प्रगति मिट सकती है।
+    </div>
+  </footer>
+
+  <noscript>
+    <div class="study-wrap"><div class="notice warn">यह अध्ययन पुस्तक चलाने के लिए JavaScript आवश्यक है। कृपया ब्राउज़र में JavaScript चालू करें।</div></div>
+  </noscript>
+
+  <script src="data/modules-1-4.js"></script>
+  <script src="data/modules-5-8.js"></script>
+  <script src="data/modules-9-12.js"></script>
+  <script src="data/modules-13-16.js"></script>
+  <script src="data/extra-topics.js"></script>
+  <script src="data/extra-topics-2.js"></script>
+  <script src="store.js"></script>
+  <script src="study.js"></script>
+<script src="./../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>विषय-वार सूची · Trade Theory</title>
+  <meta name="description" content="CHNM Trade Theory के सभी विषय एक जगह — अध्याय-वार टॉपिक, तकनीकी चित्र, लाइव सिमुलेटर और क्विज़ के सीधे लिंक।">
+  <link rel="stylesheet" href="../../exam/assets/styles.css">
+  <link rel="stylesheet" href="../study.css">
+  <link rel="stylesheet" href="trade.css">
+<link rel="stylesheet" href="./../../assets/modern-ui.css?v=2">
+</head>
+<body class="study-body">
+  <header class="fi-header">
+    <a class="brand" href="../../index.html" aria-label="Future Instructor होम">
+      <span class="brand-mark">FI</span>
+      <span class="brand-text">
+        <strong>Future Instructor</strong>
+        <small>CHNM / CITS · Trade Theory</small>
+      </span>
+    </a>
+    <div class="header-spacer"></div>
+    <nav class="header-links" aria-label="मुख्य मेन्यू">
+      <a class="header-link desk-only" href="../../index.html">होम / लैब</a>
+      <a class="header-link" href="index.html">Trade Theory</a>
+      <a class="header-link" href="topics.html" aria-current="page">विषय-वार सूची</a>
+      <a class="header-link desk-only" href="../index.html">TM किताब</a>
+    </nav>
+  </header>
+
+  <main class="study-wrap">
+    <section class="study-hero topics-hero" aria-labelledby="topicsTitle">
+      <span class="pill dark">संपूर्ण पाठ्यक्रम · थीम और अध्याय के अनुसार</span>
+      <h1 id="topicsTitle">विषय-वार सूची —<br>जो पढ़ना है, सीधे वहीं पहुँचें।</h1>
+      <p class="lead">
+        पूरा CHNM ट्रेड थ्योरी पाठ्यक्रम थीम और अध्याय में बँटा हुआ है। किसी भी टॉपिक पर क्लिक करें —
+        अध्याय उसी सेक्शन पर खुलेगा, जहाँ रूल्ड कॉपी जैसी व्याख्या, हिंदी + English नोट्स, फुल फ़ॉर्म,
+        तालिका, चित्र, 3D मॉडल और लाइव लैब मौजूद हैं।
+      </p>
+      <div class="hero-stats trade-stats" aria-label="सूची की जानकारी">
+        <div class="hero-stat"><b id="topicTotal">0</b><span>विषय</span></div>
+        <div class="hero-stat"><b id="chapterTotal">0</b><span>अध्याय</span></div>
+        <div class="hero-stat"><b id="diagramTotal">0</b><span>चित्र</span></div>
+        <div class="hero-stat"><b id="liveTotal">0</b><span>लाइव लैब</span></div>
+      </div>
+    </section>
+
+    <div class="topics-toolbar">
+      <label class="study-search topics-search" for="topicSearch">
+        <span class="sr-only">विषय खोजें</span>
+        <input id="topicSearch" type="search" placeholder="टॉपिक, उपकरण, प्रोटोकॉल या प्रश्न खोजें…" autocomplete="off">
+      </label>
+      <div class="filter-chips topics-theme-chips" id="themeChips" role="group" aria-label="थीम फ़िल्टर"></div>
+    </div>
+
+    <div class="topics-resultbar">
+      <p id="resultText" aria-live="polite">सभी विषय</p>
+      <div class="topics-legend">
+        <a href="index.html">25 अध्याय</a>
+        <a href="chapter.html?m=15#labs">लाइव लैब</a>
+      </div>
+    </div>
+
+    <div id="topicList" class="topics-list"></div>
+
+    <p class="trade-hub-note">
+      <b>स्रोत और श्रेय:</b> विषय-क्रम DGT / CSTARI के CITS <i>CHNM / ICTSM</i> पाठ्यक्रम (संस्करण 2.1, 2024) पर आधारित;
+      व्याख्या और चित्र स्वतंत्र रूप से सरल हिंदी में बनाए गए हैं। मूल पुस्तक का पाठ/चित्र सम्मिलित नहीं है। © NIMI।
+    </p>
+  </main>
+
+  <footer class="study-footer">
+    <div class="copyright-box">
+      <b>उपयोग:</b> हर टॉपिक का लिंक उसी अध्याय के सेक्शन पर जाता है। प्रगति और क्विज़ स्कोर केवल इस ब्राउज़र में सुरक्षित रहते हैं।
+    </div>
+  </footer>
+
+  <noscript>
+    <div class="study-wrap"><div class="notice warn">विषय सूची देखने के लिए JavaScript आवश्यक है।</div></div>
+  </noscript>
+
+  <script src="data/ch-01-05.js"></script>
+  <script src="data/ch-06-10.js"></script>
+  <script src="data/ch-11-15.js"></script>
+  <script src="data/ch-16-20.js"></script>
+  <script src="data/ch-21-25.js"></script>
+  <script src="visuals.js"></script>
+  <script src="trade-live.js"></script>
+  <script src="topics.js"></script>
+<script src="./../../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

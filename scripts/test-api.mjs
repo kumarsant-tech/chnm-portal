@@ -1,0 +1,857 @@
+// End-to-end API test against the in-memory Blobs replacement.
+// Run: ELECTRON_RUN_AS_NODE=1 <node> scripts/test-api.mjs
+process.env.USE_MEMORY_STORE = "1";
+process.env.ADMIN_PASSWORD = "test-admin-pass";
+process.env.ADMIN_SECRET = "test-admin-secret";
+
+const { default: api } = await import("../netlify/functions/api.mjs");
+const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../netlify/lib/db.mjs");
+const { seedLegacyQuestions } = await import("../netlify/lib/seed.mjs");
+
+let passed = 0;
+let failed = 0;
+const failures = [];
+
+function check(name, condition, extra = "") {
+  if (condition) {
+    passed += 1;
+    console.log(`  ok   ${name}`);
+  } else {
+    failed += 1;
+    failures.push(name);
+    console.log(`  FAIL ${name}${extra ? ` — ${extra}` : ""}`);
+  }
+}
+
+async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
+  const headers = { "content-type": "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const req = new Request("http://localhost/api", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const res = await api(req, { ip });
+  const type = res.headers.get("content-type") || "";
+  const data = type.includes("json") ? await res.json() : await res.text();
+  return { status: res.status, data, headers: res.headers };
+}
+
+const store = await getDb();
+await seedLegacyQuestions(store);
+
+console.log("\n1. Public bootstrap + admin auth");
+{
+  const boot = await call("bootstrap");
+  check("bootstrap 200", boot.status === 200, boot.status);
+  check("3 default subjects", boot.data.subjects?.length === 3, boot.data.subjects?.length);
+  check(
+    "only CHNM trade is offered",
+    boot.data.trades?.length === 1 && boot.data.trades[0].id === "chnm",
+    JSON.stringify(boot.data.trades)
+  );
+  check("settings exposed", Boolean(boot.data.settings?.siteName));
+
+  const bad = await call("admin_login", { password: "wrong" });
+  check("wrong admin password rejected", bad.status === 401, bad.status);
+  const login = await call("admin_login", { password: "test-admin-pass" });
+  check("admin login ok", login.status === 200 && login.data.token, login.status);
+  globalThis.adminToken = login.data.token;
+
+  const unauthorized = await call("admin_overview", {}, "");
+  check("admin API blocked without token", unauthorized.status === 401, unauthorized.status);
+}
+
+console.log("\n2. Create questions + exam");
+const examPayload = {
+  title: "Trade Theory Final Test",
+  code: "TT-FINAL-1",
+  subjectId: "trade-theory",
+  tradeId: "chnm",
+  durationMin: 30,
+  passPct: 40,
+  marksPerQuestion: 1,
+  negativeMarks: 0.25,
+  instructions: "सभी प्रश्न अनिवार्य हैं।",
+  type: "final",
+  attemptsAllowed: 1,
+  releaseResults: false,
+  showAnswers: false,
+  active: true,
+};
+let examId;
+let questionIds = [];
+{
+  const imported = await call(
+    "admin_questions_import",
+    {
+      subjectId: "trade-theory",
+      setName: "CHNM Set-A · test",
+      questions: [
+        {
+          subject: "Trade Theory",
+          question: "HTTP प्रोटोकॉल का मानक पोर्ट कौन-सा है?",
+          optionA: "21",
+          optionB: "80",
+          optionC: "443",
+          optionD: "25",
+          correctAnswer: "B",
+          explanation: "HTTP = 80",
+        },
+        {
+          subject: "Trade Theory",
+          question: "RAM किस प्रकार की मेमोरी है?",
+          optionA: "Volatile",
+          optionB: "Non-volatile",
+          optionC: "Read-only",
+          optionD: "Optical",
+          correctAnswer: "A",
+          explanation: "बिजली जाने पर डेटा मिट जाता है।",
+        },
+        {
+          subject: "Trade Theory",
+          question: "DNS का पोर्ट कौन-सा है?",
+          options: ["53", "67", "80", "110"],
+          correctIndex: 0,
+          marks: 2,
+          negativeMarks: 0.5,
+        },
+      ],
+    },
+    globalThis.adminToken
+  );
+  check("question import ok", imported.status === 200, JSON.stringify(imported.data));
+  check("3 questions added", imported.data.added === 3, imported.data.added);
+  check(
+    "import creates named folder",
+    imported.data.set?.setName === "CHNM Set-A · test" && Boolean(imported.data.set?.setId),
+    JSON.stringify(imported.data.set)
+  );
+  questionIds = imported.data.addedQids;
+
+  const setBank = await call(
+    "admin_questions",
+    { subjectId: "trade-theory", setId: imported.data.set.setId, pageSize: 100 },
+    globalThis.adminToken
+  );
+  check(
+    "folder filter returns only that set",
+    setBank.status === 200 &&
+      setBank.data.total === 3 &&
+      setBank.data.items.every((question) => question.setId === imported.data.set.setId),
+    JSON.stringify({ total: setBank.data.total })
+  );
+  check(
+    "sets summary contains folder with count",
+    Boolean(
+      setBank.data.sets?.some(
+        (set) => set.setId === imported.data.set.setId && set.count === 3
+      )
+    ),
+    JSON.stringify(setBank.data.sets)
+  );
+
+  const secondSet = await call(
+    "admin_questions_import",
+    {
+      subjectId: "trade-theory",
+      setName: "CHNM Set-B · test",
+      questions: [
+        {
+          question: "दूसरे सेट का परीक्षण प्रश्न कौन-सा है?",
+          options: ["सेट B", "सेट A", "सेट C", "सेट D"],
+          correctIndex: 0,
+        },
+      ],
+    },
+    globalThis.adminToken
+  );
+  check(
+    "second import gets a different folder",
+    secondSet.status === 200 &&
+      secondSet.data.added === 1 &&
+      secondSet.data.set.setId !== imported.data.set.setId,
+    JSON.stringify(secondSet.data.set)
+  );
+  const manual = await call(
+    "admin_question_save",
+    {
+      subjectId: "trade-theory",
+      question: {
+        text: "मैनुअल प्रश्न का फ़ोल्डर कौन-सा है?",
+        options: ["मैनुअल", "आयात", "सेट", "कोई नहीं"],
+        correctIndex: 0,
+      },
+    },
+    globalThis.adminToken
+  );
+  check(
+    "manually created question lands in manual folder",
+    manual.status === 200 && manual.data.question.setId === "manual",
+    JSON.stringify(manual.data.question?.setId)
+  );
+
+  const dup = await call(
+    "admin_questions_import",
+    {
+      subjectId: "trade-theory",
+      questions: [
+        {
+          question: "HTTP प्रोटोकॉल का मानक पोर्ट कौन-सा है?",
+          options: ["21", "80", "443", "25"],
+          correctAnswer: "B",
+        },
+      ],
+    },
+    globalThis.adminToken
+  );
+  check("duplicate import detected", dup.status === 200 && dup.data.duplicates.length === 1);
+
+  const save = await call(
+    "admin_exam_save",
+    { exam: examPayload, questionIds },
+    globalThis.adminToken
+  );
+  check("exam created", save.status === 200, JSON.stringify(save.data));
+  examId = save.data.exam.id;
+
+  const duplicateCode = await call(
+    "admin_exam_save",
+    { exam: { ...examPayload, title: "Another" }, questionIds },
+    globalThis.adminToken
+  );
+  check("duplicate exam code blocked", duplicateCode.status === 409, duplicateCode.status);
+
+  const preview = await call("admin_exam_preview", { examId }, globalThis.adminToken);
+  check("admin preview has answers", preview.status === 200 && preview.data.questions[0].correctIndex !== undefined);
+  check("preview total marks = 4", preview.data.totalMarks === 4, preview.data.totalMarks);
+
+  const lock = await call("admin_exam_lock", { examId }, globalThis.adminToken);
+  check("exam locked", lock.status === 200 && lock.data.exam.status === "locked", JSON.stringify(lock.data));
+  const publish = await call("admin_exam_publish", { examId }, globalThis.adminToken);
+  check("exam published", publish.status === 200 && publish.data.exam.status === "published");
+
+  const structural = await call(
+    "admin_exam_save",
+    { exam: { ...examPayload, marksPerQuestion: 2 }, questionIds },
+    globalThis.adminToken
+  );
+  check("published paper structural edit blocked", structural.status === 409, structural.status);
+}
+
+console.log("\n3. Student registration, login, exam attempt");
+let studentToken;
+let resultId;
+{
+  const registration = await call("register", {
+    name: "Test Student",
+    fatherName: "Test Father",
+    mobile: "9876500001",
+    email: "student@example.com",
+    tradeId: "chnm",
+    batch: "2026",
+    photo: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    consent: true,
+  });
+  check("self registration ok", registration.status === 200, JSON.stringify(registration.data));
+  const studentId = registration.data.student?.id;
+  check("registration id starts with CHNM", /^CHNM\d+$/.test(studentId || ""), studentId);
+  studentToken = registration.data.token;
+
+  const login = await call("student_login", { id: studentId, mobile: "9876500001" });
+  check("student login ok", login.status === 200 && login.data.token);
+  const wrongMobile = await call("student_login", { id: studentId, mobile: "9876500002" });
+  check("student login wrong mobile rejected", wrongMobile.status === 401);
+
+  const dash = await call("student_dashboard", {}, studentToken);
+  check("dashboard 200", dash.status === 200, JSON.stringify(dash.data).slice(0, 200));
+  check("published exam visible", dash.data.exams?.some((exam) => exam.id === examId));
+  check("student cannot call admin API", (await call("admin_overview", {}, studentToken)).status === 401);
+
+  const draft = await call(
+    "admin_exam_save",
+    {
+      exam: { ...examPayload, title: "Draft Paper Visible Test", code: "TT-DRAFT-VISIBLE" },
+      questionIds: [],
+    },
+    globalThis.adminToken
+  );
+  const draftId = draft.data.exam?.id;
+  const dashDraft = await call("student_dashboard", {}, studentToken);
+  const preparing = (dashDraft.data.preparing || []).find((exam) => exam.id === draftId);
+  check("draft paper visible as preparing", Boolean(preparing), JSON.stringify(dashDraft.data.preparing));
+  check(
+    "preparing entry never exposes questions",
+    Boolean(preparing) &&
+      !("questionIds" in preparing) &&
+      !("questions" in preparing) &&
+      preparing.status === "draft",
+    JSON.stringify(preparing)
+  );
+
+  const started = await call("student_start", { examId }, studentToken);
+  check("exam started", started.status === 200, JSON.stringify(started.data));
+  const attemptId = started.data.attempt.attemptId;
+  check("paper has no correct answers", started.data.paper.questions.every((q) => q.correctIndex === undefined));
+
+  const saved = await call(
+    "student_autosave",
+    {
+      examId,
+      attemptId,
+      seq: 2,
+      responses: { [questionIds[0]]: 1, [questionIds[1]]: 0 },
+      marked: [questionIds[2]],
+      visited: [questionIds[0], questionIds[1], questionIds[2]],
+      current: 2,
+    },
+    studentToken
+  );
+  check("autosave ok", saved.status === 200 && saved.data.savedSeq === 2, JSON.stringify(saved.data));
+
+  const stale = await call(
+    "student_autosave",
+    { examId, attemptId, seq: 1, responses: {} },
+    studentToken
+  );
+  check("stale autosave ignored", stale.status === 200 && stale.data.ignored === true);
+
+  const live = await call("admin_live", {}, globalThis.adminToken);
+  const liveRow = live.data.items?.find((item) => item.attemptId === attemptId);
+  check("admin live lists active attempt", live.status === 200 && Boolean(liveRow), JSON.stringify(live.data).slice(0, 200));
+  check("live progress counts answers", liveRow?.answered === 2, liveRow?.answered);
+  check("live progress total matches paper", liveRow?.totalQuestions === 3, liveRow?.totalQuestions);
+  check("student cannot read live monitor", (await call("admin_live", {}, studentToken)).status === 401);
+
+  const resumed = await call("student_start", { examId }, studentToken);
+  check("start resumes same attempt", resumed.status === 200 && resumed.data.resumed === true);
+  check("resumed attempt keeps answers", resumed.data.attempt.responses[questionIds[0]] === 1);
+
+  const submit = await call(
+    "student_submit",
+    {
+      examId,
+      attemptId,
+      confirm: true,
+      seq: 3,
+      responses: { [questionIds[0]]: 1, [questionIds[1]]: 0, [questionIds[2]]: 2 },
+      marked: [],
+      visited: questionIds,
+      current: 0,
+    },
+    studentToken
+  );
+  check("submit ok", submit.status === 200, JSON.stringify(submit.data));
+  resultId = submit.data.resultId;
+  check("unreleased result hidden", submit.data.result.percentage === null, submit.data.result);
+
+  const again = await call("student_submit", { examId, attemptId, confirm: true }, studentToken);
+  check("duplicate submit idempotent", again.status === 200 && again.data.duplicate === true);
+
+  const pending = await call("student_result_get", { resultId }, studentToken);
+  check("student result pending", pending.status === 200 && pending.data.pending === true);
+
+  const noAnswers = await call("student_exam_get", { examId }, studentToken);
+  check("completed exam shows no answers", noAnswers.data.paper === null);
+}
+
+console.log("\n4. Result release + isolation");
+{
+  const release = await call(
+    "admin_exam_release",
+    { examId, releaseResults: true },
+    globalThis.adminToken
+  );
+  check("result released", release.status === 200 && release.data.exam.releaseResults === true);
+
+  const detail = await call("student_result_get", { resultId }, studentToken);
+  check("released result visible", detail.status === 200 && detail.data.result.percentage !== null);
+  check("answer key visible after release", Array.isArray(detail.data.result.answers) && detail.data.result.answers.length === 3);
+  check(
+    "answer carries subject id",
+    detail.data.result.answers.every((answer) => answer.subjectId === "trade-theory"),
+    JSON.stringify(detail.data.result.answers.map((answer) => answer.subjectId))
+  );
+  check(
+    "study plan computed after release",
+    Array.isArray(detail.data.result.studyPlan) &&
+      detail.data.result.studyPlan.length === 1 &&
+      detail.data.result.studyPlan[0].subjectId === "trade-theory" &&
+      detail.data.result.studyPlan[0].total === 3 &&
+      detail.data.result.studyPlan[0].weak === true &&
+      detail.data.result.studyPlan[0].studyHref === "../study/index.html",
+    JSON.stringify(detail.data.result.studyPlan)
+  );
+  check("score computed 1.5/4", detail.data.result.obtained === 1.5, detail.data.result.obtained);
+  check("negative marking applied", detail.data.result.correct === 2 && detail.data.result.wrong === 1);
+
+  const other = await call("register", {
+    name: "Other Student",
+    mobile: "9876500002",
+    tradeId: "chnm",
+    consent: true,
+  });
+  const otherToken = other.data.token;
+  const stolen = await call("student_result_get", { resultId }, otherToken);
+  check("other student cannot read result", stolen.status === 404, stolen.status);
+
+  const list = await call("student_results", {}, studentToken);
+  check("own result list", list.data.results?.length === 1 && list.data.results[0].resultId === resultId);
+
+  const csv = await call("admin_results_csv", { examId }, globalThis.adminToken);
+  check("CSV download", csv.status === 200 && csv.headers.get("content-type")?.includes("text/csv"));
+  if (!String(csv.data).includes("9876500001")) console.log("csv sample:", String(csv.data).slice(0, 400));
+  check("CSV has header + row", String(csv.data).includes("Registration ID") && String(csv.data).includes("9876500001"));
+
+  const results = await call("admin_results", {}, globalThis.adminToken);
+  check("results include merit list", results.status === 200 && Array.isArray(results.data.merit) && results.data.merit.length >= 1);
+  check("merit rank 1 is top scorer", results.data.merit?.[0]?.percentage === 37.5, results.data.merit?.[0]);
+  check("live list clears after submit", (await call("admin_live", {}, globalThis.adminToken)).data.items?.some((item) => item.attemptId === attemptId) === false);
+}
+
+console.log("\n5. Server-side timer expiry");
+{
+  const save = await call(
+    "admin_exam_save",
+    {
+      exam: {
+        ...examPayload,
+        title: "Expiry Test",
+        code: "TT-EXPIRY-1",
+        durationMin: 1,
+      },
+      questionIds: [questionIds[0]],
+    },
+    globalThis.adminToken
+  );
+  const expiryExam = save.data.exam.id;
+  await call("admin_exam_lock", { examId: expiryExam }, globalThis.adminToken);
+  await call("admin_exam_publish", { examId: expiryExam }, globalThis.adminToken);
+
+  const reg = await call("register", { name: "Timer Student", mobile: "9876500003", tradeId: "chnm", consent: true });
+  const timerToken = reg.data.token;
+  const start = await call("student_start", { examId: expiryExam }, timerToken);
+  check("timer exam started", start.status === 200);
+  const attempt = await getJson(store, `attempts/${expiryExam}/${reg.data.student.id}`);
+  attempt.endAt = Date.now() - 60000;
+  await putJson(store, `attempts/${expiryExam}/${reg.data.student.id}`, attempt);
+  const expired = await call(
+    "student_autosave",
+    { examId: expiryExam, attemptId: start.data.attempt.attemptId, seq: 2, responses: { [questionIds[0]]: 1 } },
+    timerToken
+  );
+  check("expired autosave auto-submits", expired.status === 200 && expired.data.expired === true, JSON.stringify(expired.data));
+  const autoResult = await getJson(store, `results/${expired.data.resultId}`);
+  check("auto result stored", Boolean(autoResult) && autoResult.autoSubmitted === true);
+}
+
+console.log("\n6. Practice exam reveals answers immediately");
+{
+  const save = await call(
+    "admin_exam_save",
+    {
+      exam: {
+        ...examPayload,
+        title: "Practice Test",
+        code: "TT-PRACTICE-1",
+        type: "practice",
+        releaseResults: false,
+        showAnswers: false,
+        attemptsAllowed: 3,
+        durationMin: 10,
+      },
+      questionIds: [questionIds[0], questionIds[1]],
+    },
+    globalThis.adminToken
+  );
+  const practiceId = save.data.exam.id;
+  await call("admin_exam_lock", { examId: practiceId }, globalThis.adminToken);
+  await call("admin_exam_publish", { examId: practiceId }, globalThis.adminToken);
+
+  const start = await call("student_start", { examId: practiceId }, studentToken);
+  check("practice exam start", start.status === 200);
+  const submit = await call(
+    "student_submit",
+    {
+      examId: practiceId,
+      attemptId: start.data.attempt.attemptId,
+      confirm: true,
+      seq: 2,
+      responses: { [questionIds[0]]: 1 },
+    },
+    studentToken
+  );
+  check("practice result visible immediately", submit.data.result.percentage !== null, submit.data.result.percentage);
+  const result = await call("student_result_get", { resultId: submit.data.resultId }, studentToken);
+  check("practice answers visible", Array.isArray(result.data.result.answers) && result.data.result.answers.length === 2);
+  check("practice excluded from exam list", (await call("student_dashboard", {}, studentToken)).data.practice?.some((exam) => exam.id === practiceId) === false);
+}
+
+console.log("\n7. Legacy data import");
+{
+  await putJson(store, "config", { active: true, published: true, subject: "TM", count: 10, duration: 60, passPct: 40, college: "Old College", showAnswers: true });
+  await putJson(store, "s/FIG-99999", {
+    id: "FIG-99999",
+    name: "Legacy Student",
+    mobile: "9876599999",
+    trade: "CHNM / CITS",
+    email: "legacy@example.com",
+    photo: "",
+    college: "Old College",
+    at: "2025-01-01T00:00:00.000Z",
+  });
+  await putJson(store, "r/FIG-99999", {
+    id: "FIG-99999",
+    name: "Legacy Student",
+    mobile: "9876599999",
+    college: "Old College",
+    subject: "TM",
+    n: 10,
+    correct: 7,
+    attempted: 8,
+    score: 70,
+    total: 100,
+    pass: true,
+    at: "2025-01-10T00:00:00.000Z",
+    q: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    ans: [1, 2, 2, 1, 0, 3, 1, 1, 0, 0],
+  });
+  const preview = await call("admin_legacy_preview", {}, globalThis.adminToken);
+  check("legacy preview finds records", preview.data.legacy?.students === 1 && preview.data.legacy?.results === 1, JSON.stringify(preview.data.legacy));
+  const imported = await call("admin_legacy_import", {}, globalThis.adminToken);
+  check("legacy import ok", imported.status === 200 && imported.data.report.results.imported === 1, JSON.stringify(imported.data.report));
+  const again = await call("admin_legacy_import", {}, globalThis.adminToken);
+  check("legacy import idempotent", again.data.report.results.existing === 1, JSON.stringify(again.data.report));
+
+  const login = await call("student_login", { id: "FIG-99999", mobile: "9876599999" });
+  check("legacy student login", login.status === 200);
+  const dash = await call("student_dashboard", {}, login.data.token);
+  const legacyResult = dash.data.results?.find((result) => result.resultId === "RES-LEGACY-FIG-99999");
+  check("legacy result visible", Boolean(legacyResult), JSON.stringify(dash.data.results));
+  check("legacy score preserved", legacyResult?.percentage === 70, legacyResult?.percentage);
+}
+
+console.log("\n8. Admin stats, export, safety guards");
+{
+  const stats = await call("admin_stats", {}, globalThis.adminToken);
+  check("stats 200", stats.status === 200 && stats.data.overall.count >= 2, JSON.stringify(stats.data.overall));
+  const overview = await call("admin_overview", {}, globalThis.adminToken);
+  check("overview 200", overview.status === 200 && overview.data.summary.students >= 3);
+  check("overview hides nothing critical", !JSON.stringify(overview.data).includes("pinHash"));
+
+  const exportRes = await call("admin_export", {}, globalThis.adminToken);
+  check("data export download", exportRes.status === 200 && exportRes.headers.get("content-disposition")?.includes("chnm-data"));
+
+  const delStudent = await call("admin_student_delete", { studentId: "FIG-99999", confirm: "FIG-99999" }, globalThis.adminToken);
+  check("student delete with results blocked", delStudent.status === 409, delStudent.status);
+
+  const delExam = await call("admin_exam_delete", { examId, confirm: true }, globalThis.adminToken);
+  check("published exam delete blocked", delExam.status === 409, delExam.status);
+}
+
+console.log("\n9. Topic-wise paper, सूचनाएँ और समूह चैट");
+{
+  const admin = globalThis.adminToken;
+
+  const saved = [];
+  for (const row of [
+    { topic: "SMPS", text: "नया SMPS प्रश्न क", marks: 2 },
+    { topic: "SMPS", text: "नया SMPS प्रश्न ख", marks: 1 },
+    { topic: "Networking", text: "नया Networking प्रश्न क", marks: 1 },
+  ]) {
+    const res = await call(
+      "admin_question_save",
+      {
+        subjectId: "trade-theory",
+        question: { text: row.text, options: ["सही विकल्प", "गलत विकल्प"], correctIndex: 0, marks: row.marks, topic: row.topic },
+      },
+      admin
+    );
+    if (res.status === 200) saved.push(res.data.question);
+  }
+  check("topic questions saved", saved.length === 3, JSON.stringify(saved.map((q) => q.qid)));
+  check("topic persisted on question", saved.every((q) => q.topic), JSON.stringify(saved.map((q) => q.topic)));
+
+  const topics = await call("admin_topics", { subjectId: "trade-theory" }, admin);
+  const smpsRow = topics.data.topics?.find((row) => row.topic === "SMPS");
+  check(
+    "admin_topics groups by topic",
+    topics.status === 200 && smpsRow?.count === 2 && smpsRow?.marks === 3,
+    JSON.stringify(topics.data.topics || []).slice(0, 200)
+  );
+  check("admin_topics needs subject", (await call("admin_topics", {}, admin)).status === 400);
+  check(
+    "admin_topics blocked for student",
+    (await call("admin_topics", { subjectId: "trade-theory" }, studentToken)).status === 401
+  );
+
+  const build = await call(
+    "admin_paper_build",
+    { subjectId: "trade-theory", plan: [{ topic: "SMPS", count: 2 }, { topic: "Networking", count: 1 }], randomize: false },
+    admin
+  );
+  check("paper build picks requested counts", build.status === 200 && build.data.total === 3, JSON.stringify(build.data).slice(0, 200));
+  check("paper build sums marks", build.data.marks === 4, build.data.marks);
+  check("paper build ids unique", new Set(build.data.questionIds).size === 3);
+  check(
+    "paper build reports topic split",
+    build.data.byTopic?.length === 2 && build.data.byTopic[0].count === 2,
+    JSON.stringify(build.data.byTopic)
+  );
+  const shortBuild = await call("admin_paper_build", { subjectId: "trade-theory", plan: [{ topic: "SMPS", count: 5 }] }, admin);
+  check(
+    "paper build reports shortage",
+    shortBuild.status === 200 && shortBuild.data.total === 2 && shortBuild.data.short[0]?.have === 2,
+    JSON.stringify(shortBuild.data.short)
+  );
+  const emptyBuild = await call("admin_paper_build", { subjectId: "trade-theory", plan: [{ topic: "विषय नहीं मिला", count: 3 }] }, admin);
+  check("paper build rejects empty selection", emptyBuild.status === 400, emptyBuild.status);
+  check("paper build needs plan", (await call("admin_paper_build", { subjectId: "trade-theory", plan: [] }, admin)).status === 400);
+
+  const builtExam = await call(
+    "admin_exam_save",
+    { exam: { ...examPayload, id: undefined, title: "CBT1 Topic Wise", code: "CBT1-TOPIC" }, questionIds: build.data.questionIds },
+    admin
+  );
+  check(
+    "topic paper becomes a real exam",
+    builtExam.status === 200 && builtExam.data.exam.totalQuestions === 3 && builtExam.data.exam.totalMarks === 4,
+    JSON.stringify({ s: builtExam.status, q: builtExam.data.exam?.totalQuestions, m: builtExam.data.exam?.totalMarks })
+  );
+
+  const notice = await call(
+    "admin_notice_save",
+    { notice: { title: "CBT1 परीक्षा 10 नवम्बर", body: "समय सुबह 10 बजे।", level: "important", audience: "all" } },
+    admin
+  );
+  check("notice saved", notice.status === 200 && notice.data.notice.id, JSON.stringify(notice.data).slice(0, 160));
+  const noticeId = notice.data.notice.id;
+
+  const list = await call("notices_list", {}, studentToken);
+  check("student sees admin notice", list.status === 200 && list.data.notices.some((n) => n.id === noticeId));
+  check("notice unread counted", list.data.unread >= 1, list.data.unread);
+  check("notice level preserved", list.data.notices.find((n) => n.id === noticeId)?.level === "important");
+  check("notices need student token", (await call("notices_list")).status === 401);
+
+  await call("notice_read", { noticeId }, studentToken);
+  const afterRead = await call("notices_list", {}, studentToken);
+  check(
+    "notice marked read",
+    afterRead.data.notices.find((n) => n.id === noticeId)?.read === true &&
+      afterRead.data.unread === list.data.unread - 1,
+    JSON.stringify({ read: afterRead.data.notices.find((n) => n.id === noticeId)?.read, unread: afterRead.data.unread })
+  );
+
+  const batchNotice = await call(
+    "admin_notice_save",
+    { notice: { title: "बैच 2027 कक्षा", body: "केवल बैच 2027 के लिए।", audience: "batch:2027" } },
+    admin
+  );
+  const batchNoticeId = batchNotice.data.notice?.id;
+  const other = await call("register", { name: "Batch Other", mobile: "9876500019", batch: "2027", consent: true }, "", "10.0.9.19");
+  const otherToken = other.data.token;
+  const hiddenFor = await call("notices_list", {}, studentToken);
+  const shownFor = await call("notices_list", {}, otherToken);
+  check("batch notice hidden from other batch", !hiddenFor.data.notices.some((n) => n.id === batchNoticeId));
+  check("batch notice reaches its batch", shownFor.data.notices.some((n) => n.id === batchNoticeId));
+  check("register defaults trade to CHNM", other.data.student?.tradeName === "CHNM" || other.data.student?.tradeId === "chnm", JSON.stringify(other.data.student || {}).slice(0, 160));
+
+  const adminNotices = await call("admin_notices", {}, admin);
+  check("admin notice list", adminNotices.status === 200 && adminNotices.data.notices.length >= 2);
+  const removed = await call("admin_notice_delete", { noticeId: batchNoticeId }, admin);
+  const afterDelete = await call("admin_notices", {}, admin);
+  check(
+    "notice deleted",
+    removed.status === 200 && !afterDelete.data.notices.some((n) => n.id === batchNoticeId)
+  );
+
+  const tradeNotice = await call(
+    "admin_notice_save",
+    { notice: { title: "ट्रेड CHNM कक्षा", body: "केवल CHNM ट्रेड के लिए।", audience: "trade:chnm" } },
+    admin
+  );
+  const tradeNoticeId = tradeNotice.data.notice?.id;
+  const quietNotice = await call(
+    "admin_notice_save",
+    { notice: { title: "बंद की गई सूचना", body: "यह होम पेज पर नहीं दिखनी चाहिए।", active: false } },
+    admin
+  );
+  const publicRes = await call("site_notices", {});
+  check("site notices work without a token", publicRes.status === 200 && Array.isArray(publicRes.data.notices), publicRes.status);
+  check("site notices include the all-audience notice", publicRes.data.notices.some((n) => n.id === noticeId));
+  check("site notices hide trade-targeted notices", !publicRes.data.notices.some((n) => n.id === tradeNoticeId));
+  check("site notices hide inactive notices", !publicRes.data.notices.some((n) => n.id === quietNotice.data.notice?.id));
+  check("site notices carry no read state", publicRes.data.notices.every((n) => n.read === false));
+  check("site notices need no student identity", (await call("site_notices", {})).data.notices.length === publicRes.data.notices.length);
+  for (let round = 0; round < 6; round += 1) {
+    await call(
+      "admin_notice_save",
+      { notice: { title: "होम अपडेट " + round, body: "होम पेज जाँच " + round, audience: "all" } },
+      admin
+    );
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const capped = await call("site_notices", {});
+  check("site notices capped at five", capped.data.notices.length === 5, capped.data.notices.length);
+  check("site notices newest first", capped.data.notices[0]?.title === "होम अपडेट 5", capped.data.notices[0]?.title);
+  await call("admin_notice_delete", { noticeId: tradeNoticeId }, admin);
+
+  const emptyChat = await call("chat_send", { text: "   " }, studentToken);
+  check("empty chat message rejected", emptyChat.status === 400, emptyChat.status);
+  const first = await call("chat_send", { text: "जी सर, कल क्लास में पहुँचूँगा।" }, studentToken);
+  check("student chat send ok", first.status === 200 && first.data.message.sid, JSON.stringify(first.data).slice(0, 160));
+  const shared = await call("chat_list", {}, otherToken);
+  check("every student auto-joins the chat", shared.data.messages.some((m) => m.id === first.data.message.id));
+  check("chat reports member count", shared.data.members >= 2, shared.data.members);
+  check("chat needs student token", (await call("chat_list")).status === 401);
+
+  // Chat cursors are millisecond stamps; the 5 ms gap guarantees the next send
+  // lands in a later millisecond so the incremental poll is deterministic.
+  const cursor = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const newer = await call("chat_send", { text: "दूसरा छात्र संदेश" }, otherToken);
+  const poll = await call("chat_list", { after: cursor }, studentToken);
+  check(
+    "incremental poll returns only newer messages",
+    poll.status === 200 && poll.data.messages.length === 1 && poll.data.messages[0].id === newer.data.message.id,
+    JSON.stringify({ newer: newer.data.message?.id, ids: poll.data.messages?.map((m) => m.id) })
+  );
+
+  for (let i = 0; i < 310; i += 1) {
+    // Same 14-digit zero-padded stamp the API uses, dated in the past, so these
+    // synthetic rows are the oldest entries once the 300-message cap applies.
+    const id = `${String(1_700_000_000_000 + i).padStart(14, "0")}-fill`;
+    await putJson(store, `chat/${id}`, { id, sid: "CHNM9", name: "भराव", text: `भराव ${i}`, createdAt: "2026-01-01T00:00:00.000Z" });
+  }
+  await call("chat_send", { text: "भराव के बाद संदेश" }, otherToken);
+  check("chat trimmed to newest 300", (await listKeys(store, "chat/")).length === 300, (await listKeys(store, "chat/")).length);
+
+  const moderation = await call("admin_chat", {}, admin);
+  check("admin sees chat with members", moderation.status === 200 && moderation.data.members.length >= 2);
+  const wipe = await call("admin_chat_delete", { messageId: newer.data.message.id }, admin);
+  const stillThere = (await call("chat_list", {}, otherToken)).data.messages.some(
+    (m) => m.id === newer.data.message.id
+  );
+  check(
+    "admin deletes a chat message",
+    wipe.status === 200 && !stillThere,
+    JSON.stringify({ status: wipe.status, data: wipe.data, stillThere, id: newer.data.message.id })
+  );
+  check("admin chat delete rejects unknown id", (await call("admin_chat_delete", { messageId: "9999-nope" }, admin)).status === 404);
+
+  let blocked = 0;
+  for (let i = 0; i < 25; i += 1) {
+    const flood = await call("chat_send", { text: `फ्लड ${i + 1}` }, studentToken);
+    if (flood.status === 429) blocked += 1;
+  }
+  check("chat flood rate-limited", blocked > 0, blocked);
+  check("student blocked from admin chat", (await call("admin_chat", {}, studentToken)).status === 401);
+
+  const adminSent = await call("admin_chat_send", { text: "कल परीक्षा 10 बजे — समय पर आ जाएँ" }, admin);
+  check("admin sends chat message", adminSent.status === 200 && adminSent.data.message.sid === "ADMIN", adminSent.status);
+  const afterAdminSend = await call("chat_list", { after: cursor }, studentToken);
+  check(
+    "admin message reaches every student",
+    (afterAdminSend.data.messages || []).some((m) => m.sid === "ADMIN" && m.text.startsWith("कल परीक्षा")),
+    JSON.stringify(afterAdminSend.data.messages || [])
+  );
+  check("empty admin chat rejected", (await call("admin_chat_send", { text: "   " }, admin)).status === 400);
+  check("student cannot use admin chat send", (await call("admin_chat_send", { text: "छात्र का प्रयास" }, studentToken)).status === 401);
+
+  const backup = await call("admin_export", {}, admin);
+  check(
+    "JSON backup includes notices and chat",
+    Array.isArray(backup.data.notices) &&
+      backup.data.notices.some((n) => n.title === "CBT1 परीक्षा 10 नवम्बर") &&
+      Array.isArray(backup.data.chat) &&
+      backup.data.chat.length > 0,
+    JSON.stringify({ notices: backup.data.notices?.length, chat: backup.data.chat?.length })
+  );
+}
+
+console.log("\n10. परीक्षा के English निर्देश (instructionsEn)");
+{
+  const admin = globalThis.adminToken;
+  const enText = "Read every question carefully. Use the palette to review marked answers.";
+
+  const withEn = await call(
+    "admin_exam_save",
+    {
+      exam: {
+        ...examPayload,
+        title: "Bilingual Instructions Test",
+        code: "TT-BILINGUAL-1",
+        instructions: "सभी प्रश्न अनिवार्य हैं।",
+        instructionsEn: enText,
+      },
+      questionIds,
+    },
+    admin
+  );
+  check("exam saved with instructionsEn", withEn.status === 200, JSON.stringify(withEn.data));
+  check(
+    "instructionsEn round-trips through admin save",
+    withEn.data.exam?.instructionsEn === enText,
+    JSON.stringify(withEn.data.exam?.instructionsEn)
+  );
+  check(
+    "Hindi instructions kept alongside English",
+    withEn.data.exam?.instructions === "सभी प्रश्न अनिवार्य हैं।",
+    JSON.stringify(withEn.data.exam?.instructions)
+  );
+  const enExamId = withEn.data.exam.id;
+
+  const reg = await call("register", {
+    name: "Instructions Student",
+    mobile: "9876500021",
+    tradeId: "chnm",
+    consent: true,
+  }, "", "10.0.9.21");
+  const insToken = reg.data.token;
+
+  const opened = await call("student_exam_get", { examId: enExamId }, insToken);
+  check("student exam entry has instructionsEn", opened.data.exam?.instructionsEn === enText, JSON.stringify(opened.data.exam?.instructionsEn));
+  check(
+    "student exam entry hides answers",
+    JSON.stringify(opened.data).indexOf("correctIndex") < 0,
+    "answers leaked to student payload"
+  );
+
+  const withoutEn = await call(
+    "admin_exam_save",
+    {
+      exam: { ...examPayload, title: "Hindi Only Instructions", code: "TT-HINDI-ONLY-1", instructionsEn: undefined },
+      questionIds,
+    },
+    admin
+  );
+  check(
+    "exam without instructionsEn stores empty string",
+    withoutEn.status === 200 && withoutEn.data.exam?.instructionsEn === "",
+    JSON.stringify(withoutEn.data.exam?.instructionsEn)
+  );
+
+  const settings = await call(
+    "admin_settings_save",
+    { settings: { siteName: "Future Instructor", collegeName: "CHNM", defaultInstructionsEn: "Global English instructions." } },
+    admin
+  );
+  check(
+    "defaultInstructionsEn saved",
+    settings.status === 200 && settings.data.settings?.defaultInstructionsEn === "Global English instructions.",
+    JSON.stringify(settings.data.settings?.defaultInstructionsEn)
+  );
+  const boot = await call("bootstrap");
+  check(
+    "bootstrap exposes defaultInstructionsEn to the exam UI",
+    boot.data.settings?.defaultInstructionsEn === "Global English instructions.",
+    JSON.stringify(boot.data.settings?.defaultInstructionsEn)
+  );
+}
+
+console.log(`\n===== ${passed} passed, ${failed} failed =====`);
+if (failed) {
+  console.log("Failures:", failures.join(", "));
+  process.exit(1);
+}
+__resetMemoryStore();

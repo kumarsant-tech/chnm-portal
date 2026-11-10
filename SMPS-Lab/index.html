@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SMPS लैब · मुख्य हब / Main Hub</title>
+<meta name="description" content="SMPS लैब का व्यवस्थित हब — सुरक्षा, सिद्धांत, सिम्युलेटर, रिपेयर और CITS प्रैक्टिकल क्रम से।">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&amp;family=Noto+Sans+Devanagari:wght@400;500;600&amp;display=swap">
+<style>
+:root{--bg:#ECF0EA;--surface:#F8FAF6;--fg:#13201A;--muted:#51635A;--line:#C9D4CB;--accent:#0B6B4D;--accent-ink:#FFFFFF;--tint:#FFFFFF;
+ --f-d:'Anek Devanagari','Noto Sans Devanagari',system-ui,sans-serif;--f-b:'Noto Sans Devanagari','Anek Devanagari',system-ui,sans-serif}
+/* मॉड्यूल पेजों जैसी ही थिम — localStorage 'smps-theme' साझा */
+:root[data-theme="dark"]{--bg:#0F1613;--surface:#17211C;--fg:#E4EEE7;--muted:#9DB0A5;--line:#2B3A32;--accent:#4FD1A1;--accent-ink:#06150F;--tint:#17211C;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px 96px;background:var(--bg);color:var(--fg);font-family:var(--f-b);line-height:1.6}
+.page{max-width:1000px;margin:0 auto}
+header.h{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#12967a));color:var(--accent-ink);display:grid;place-items:center;font-size:28px;box-shadow:0 8px 20px rgba(11,107,77,.24)}
+h1{font-family:var(--f-d);font-size:clamp(22px,5vw,32px);margin:0}
+.sub{color:var(--muted);font-size:14px;margin-top:2px}
+.lang-btn{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:9px 15px;font-weight:700;cursor:pointer;font-family:var(--f-b);color:var(--fg)}
+#lang-flip{margin-left:0}
+.intro{margin:18px 0 8px;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.path{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.path span{border:1px dashed var(--line);border-radius:99px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--accent) 6%,var(--tint))}
+.big{margin-top:16px;padding:16px 18px;border:2px solid var(--accent);border-radius:16px;background:var(--surface)}
+.big a{display:inline-block;margin-top:8px;padding:10px 18px;border-radius:99px;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:700}
+section.grp{margin-top:26px}
+.grp-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 4px}
+.grp-h h2{font-family:var(--f-d);font-size:clamp(17px,3.4vw,21px);margin:0}
+.grp-h small{color:var(--muted);font-size:12.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:12px;margin-top:12px}
+.m-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);text-decoration:none;color:var(--fg);transition:transform .15s,box-shadow .15s}
+.m-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(11,107,77,.14)}
+.m-ic{font-size:24px;width:44px;height:44px;flex:0 0 auto;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--accent) 12%,var(--tint))}
+.m-tx{min-width:0}
+.m-tx em{display:block;font-style:normal;font-size:11.5px;color:var(--accent);font-weight:800;letter-spacing:.02em}
+.m-tx b{display:block;font-size:15px;line-height:1.35}
+.m-tx p{margin:4px 0 6px;font-size:12.5px;color:var(--muted)}
+.m-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.m-meta i{font-style:normal;border:1px solid var(--line);border-radius:99px;padding:2px 8px}
+footer{margin-top:28px;color:var(--muted);font-size:12.5px;line-height:1.6}
+</style><link rel="stylesheet" href="smps.css?v=2">
+<link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
+<script>/* थिम मॉड्यूल पेजों जैसी — सहेजी हुई कीमत, नहीं तो dark */(function(){try{var s=localStorage.getItem('smps-theme');document.documentElement.setAttribute('data-theme',s||'dark')}catch(e){document.documentElement.setAttribute('data-theme','dark')}})();</script>
+</head><body>
+<div class="page">
+<header class="h">
+  <div class="logo" aria-hidden="true">⚡</div>
+  <div><h1>SMPS <span data-lang="hi">लैब · व्यवस्थित हब</span><span data-lang="en" hidden>Lab · Organised hub</span></h1>
+  <div class="sub"><span data-lang="hi">क्रम से सीखें: सुरक्षा → सिद्धांत → सिम्युलेटर → रिपेयर → प्रमाणन</span><span data-lang="en" hidden>Learn in order: safety, theory, simulators, repair, certification</span></div></div>
+  <button class="lang-btn" id="theme-flip" aria-label="थिम बदलें / Switch theme">🌓</button>
+  <button class="lang-btn" id="lang-flip">हिंदी ⇄ English</button>
+</header>
+
+<div class="intro">
+  <b><span data-lang="hi">हर मॉड्यूल अलग फ़ाइल है — एक ख़राब हो तो बाकी सुरक्षित रहते हैं।</span><span data-lang="en" hidden>Every module is a separate file, so one broken page cannot affect the rest.</span></b>
+  <div><span data-lang="hi">नीचे कार्ड खोलें, हर पेज के ऊपर बनी पट्टी से अगला/पिछला मॉड्यूल तुरंत बदलें, और हिंदी ⇄ English बटन से भाषा बदलें।</span><span data-lang="en" hidden>Open a card below, use the bar at the top of each page to jump to the next or previous module, and switch language with the Hindi ⇄ English button.</span></div>
+  <div class="path">
+    <span><span data-lang="hi">1 · पहले सुरक्षा</span><span data-lang="en" hidden>1 · Safety first</span></span>
+    <span><span data-lang="hi">2 · फिर सिद्धांत</span><span data-lang="en" hidden>2 · Then theory</span></span>
+    <span><span data-lang="hi">3 · सिम्युलेटर में अभ्यास</span><span data-lang="en" hidden>3 · Practise in simulators</span></span>
+    <span><span data-lang="hi">4 · बेंच पर जाँच</span><span data-lang="en" hidden>4 · Test on the bench</span></span>
+    <span><span data-lang="hi">5 · CITS और शब्दावली</span><span data-lang="en" hidden>5 · CITS and glossary</span></span>
+  </div>
+</div>
+
+<div class="big">
+  <b><span data-lang="hi">📖 पूरी गाइड एक ही फ़ाइल में</span><span data-lang="en" hidden>📖 The full guide in one file</span></b>
+  <p style="margin:4px 0 0"><span data-lang="hi">साइट का मुख्य पन्ना (वही root index) — सभी मॉड्यूल एक साथ।</span><span data-lang="en" hidden>The main page of the site (same root index) — all modules together.</span></p>
+  <a href="../index.html"><span data-lang="hi">पूरी गाइड खोलें →</span><span data-lang="en" hidden>Open the full guide →</span></a>
+</div>
+
+<section class="grp">
+  <div class="grp-h"><h2><span data-lang="hi">① शुरुआत</span><span data-lang="en" hidden>① Getting started</span></h2>
+  <small><span data-lang="hi">सबसे पहले यही — सुरक्षा पढ़े बिना बेंच पर न जाएँ।</span><span data-lang="en" hidden>Start here — never go to the bench before this.</span></small></div>
+  <div class="grid">
+    <a class="m-card" href="00-home.html"><div class="m-ic">🏠</div><div class="m-tx"><em>M00 · 00-home.html</em><b><span data-lang="hi">होम (सभी मॉड्यूल)</span><span data-lang="en" hidden>Home (all modules)</span></b><p><span data-lang="hi">एक जगह से हर मॉड्यूल, पैनल और सिम्युलेटर खोलें।</span><span data-lang="en" hidden>Open every module, panel and simulator from one place.</span></p><div class="m-meta"><i>5 मि · min</i></div></a>
+    <a class="m-card" href="01-safety.html"><div class="m-ic">🛡️</div><div class="m-tx"><em>M01 · 01-safety.html</em><b><span data-lang="hi">पहले सुरक्षा</span><span data-lang="en" hidden>Safety first</span></b><p><span data-lang="hi">कैपेसिटर में बची चार्ज, डिस्चार्ज, 0V जाँच और PPE।</span><span data-lang="en" hidden>Stored capacitor charge, discharge, 0V check and protective gear.</span></p><div class="m-meta"><i>15 मि · min</i></div></a>
+    <a class="m-card" href="02-learning-lab.html"><div class="m-ic">🎓</div><div class="m-tx"><em>M02 · 02-learning-lab.html</em><b><span data-lang="hi">गाइडेड लर्निंग लैब</span><span data-lang="en" hidden>Guided learning lab</span></b><p><span data-lang="hi">कदम-दर-कदम अभ्यास — क्या दबाना है, क्या देखना है।</span><span data-lang="en" hidden>Step by step practice — what to press and what to observe.</span></p><div class="m-meta"><i>20 मि · min</i></div></a>
+  </div>
+</section>
+
+<section class="grp">
+  <div class="grp-h"><h2><span data-lang="hi">② सिद्धांत (Theory)</span><span data-lang="en" hidden>② Theory</span></h2>
+  <small><span data-lang="hi">पहले समझें करंट कहाँ-कहाँ से गुजरता है।</span><span data-lang="en" hidden>First understand where the current travels.</span></small></div>
+  <div class="grid">
+    <a class="m-card" href="03-basics.html"><div class="m-ic">📏</div><div class="m-tx"><em>M03 · 03-basics.html</em><b><span data-lang="hi">बुनियादी बातें (ओम लॉ + सफ़र)</span><span data-lang="en" hidden>Basics (Ohm's law + journey)</span></b><p><span data-lang="hi">वोल्टेज, करंट, प्रतिरोध, पावर और AC से DC की यात्रा।</span><span data-lang="en" hidden>Voltage, current, resistance, power and the AC to DC journey.</span></p><div class="m-meta"><i>20 मि · min</i></div></a>
+    <a class="m-card" href="04-how-smps-works.html"><div class="m-ic">📚</div><div class="m-tx"><em>M04 · 04-how-smps-works.html</em><b><span data-lang="hi">SMPS कैसे काम करता है</span><span data-lang="en" hidden>How an SMPS works</span></b><p><span data-lang="hi">EMI फ़िल्टर, रेक्टिफ़ायर, स्विचिंग, ट्रांसफ़ॉर्मर, रेगुलेशन — ब्लॉकवार।</span><span data-lang="en" hidden>EMI filter, rectifier, switching, transformer and regulation, block by block.</span></p><div class="m-meta"><i>25 मि · min</i></div></a>
+    <a class="m-card" href="05-real-parts.html"><div class="m-ic">🔍</div><div class="m-tx"><em>M05 · 05-real-parts.html</em><b><span data-lang="hi">असली कंपोनेंट + लाइव सर्किट</span><span data-lang="en" hidden>Real parts + live circuit</span></b><p><span data-lang="hi">बोर्ड पर हर पार्ट की पहचान और उसका काम।</span><span data-lang="en" hidden>Identify every part on the board and what it does.</span></p><div class="m-meta"><i>20 मि · min</i></div></a>
+  </div>
+</section>
+
+<section class="grp">
+  <div class="grp-h"><h2><span data-lang="hi">③ सिम्युलेटर (अभ्यास)</span><span data-lang="en" hidden>③ Simulators (practice)</span></h2>
+  <small><span data-lang="hi">बिजली छुए बिना बार-बार गलती करके सीखें।</span><span data-lang="en" hidden>Practise and make mistakes without touching live power.</span></small></div>
+  <div class="grid">
+    <a class="m-card" href="06-realsim.html"><div class="m-ic">🧪</div><div class="m-tx"><em>M06 · 06-realsim.html</em><b><span data-lang="hi">रियल SMPS सिम्युलेटर</span><span data-lang="en" hidden>Real SMPS simulator</span></b><p><span data-lang="hi">हर स्टेज खोलें, सिग्नल देखें और आउटपुट पर असर जाँचें।</span><span data-lang="en" hidden>Open each stage, watch signals and check the effect on output.</span></p><div class="m-meta"><i>25 मि · min</i></div></a>
+    <a class="m-card" href="07-waveform.html"><div class="m-ic">🎛️</div><div class="m-tx"><em>M07 · 07-waveform.html</em><b><span data-lang="hi">वेवफ़ॉर्म सिम्युलेटर</span><span data-lang="en" hidden>Waveform simulator</span></b><p><span data-lang="hi">रेल, रिपल, PWM ड्यूटी और फ़्रीक्वेंसी की समझ।</span><span data-lang="en" hidden>Rails, ripple, PWM duty and frequency explained clearly.</span></p><div class="m-meta"><i>20 मि · min</i></div></a>
+  </div>
+</section>
+
+<section class="grp">
+  <div class="grp-h"><h2><span data-lang="hi">④ रिपेयर और जाँच (Bench)</span><span data-lang="en" hidden>④ Repair and testing (bench)</span></h2>
+  <small><span data-lang="hi">मल्टीमीटर, बेंच और ख़राबी खोजने की तरकीब।</span><span data-lang="en" hidden>Multimeter, bench work and a fault-finding method.</span></small></div>
+  <div class="grid">
+    <a class="m-card" href="08-bench.html"><div class="m-ic">🧰</div><div class="m-tx"><em>M08 · 08-bench.html</em><b><span data-lang="hi">रिपेयर टेस्ट बेंच</span><span data-lang="en" hidden>Repair test bench</span></b><p><span data-lang="hi">बेंच सेटअप, लोड, शॉर्ट-सर्किट सुरक्षा और जाँच क्रम।</span><span data-lang="en" hidden>Bench setup, load, short-circuit protection and test order.</span></p><div class="m-meta"><i>25 मि · min</i></div></a>
+    <a class="m-card" href="09-multimeter.html"><div class="m-ic">📟</div><div class="m-tx"><em>M09 · 09-multimeter.html</em><b><span data-lang="hi">मल्टीमीटर से जाँच</span><span data-lang="en" hidden>Multimeter testing</span></b><p><span data-lang="hi">कंटिन्यूटी, डायोड, रेजिस्टेंस और वोल्टेज की सही रीडिंग।</span><span data-lang="en" hidden>Correct continuity, diode, resistance and voltage readings.</span></p><div class="m-meta"><i>20 मि · min</i></div></a>
+    <a class="m-card" href="10-fault-finding.html"><div class="m-ic">🩺</div><div class="m-tx"><em>M10 · 10-fault-finding.html</em><b><span data-lang="hi">ख़राबी खोज (फ़ॉल्ट डॉक्टर)</span><span data-lang="en" hidden>Fault finding (fault doctor)</span></b><p><span data-lang="hi">लक्षण → जाँच → कारण → समाधान का क्रम।</span><span data-lang="en" hidden>Symptom, test, cause and fix — in that order.</span></p><div class="m-meta"><i>25 मि · min</i></div></a>
+    <a class="m-card" href="11-calculators.html"><div class="m-ic">🧮</div><div class="m-tx"><em>M11 · 11-calculators.html</em><b><span data-lang="hi">कैलकुलेटर + लाइव प्रोब</span><span data-lang="en" hidden>Calculators + live probes</span></b><p><span data-lang="hi">पावर, करंट, रिपल और वोल्टेज ड्रॉप की गणना।</span><span data-lang="en" hidden>Power, current, ripple and voltage-drop calculations.</span></p><div class="m-meta"><i>15 मि · min</i></div></a>
+  </div>
+</section>
+
+<section class="grp">
+  <div class="grp-h"><h2><span data-lang="hi">⑤ प्रमाणन और संदर्भ</span><span data-lang="en" hidden>⑤ Certification and reference</span></h2>
+  <small><span data-lang="hi">CITS प्रैक्टिकल और तकनीकी शब्दों का संग्रह।</span><span data-lang="en" hidden>CITS practicals and the technical word collection.</span></small></div>
+  <div class="grid">
+    <a class="m-card" href="12-cits.html"><div class="m-ic">📘</div><div class="m-tx"><em>M12 · 12-cits.html</em><b><span data-lang="hi">CITS प्रैक्टिकल</span><span data-lang="en" hidden>CITS practicals</span></b><p><span data-lang="hi">परीक्षा शैली के काम, चेकलिस्ट और मूल्यांकन बिंदु।</span><span data-lang="en" hidden>Exam-style tasks, checklists and evaluation points.</span></p><div class="m-meta"><i>30 मि · min</i></div></a>
+    <a class="m-card" href="13-glossary.html"><div class="m-ic">📝</div><div class="m-tx"><em>M13 · 13-glossary.html</em><b><span data-lang="hi">शब्दावली</span><span data-lang="en" hidden>Glossary</span></b><p><span data-lang="hi">हर तकनीकी शब्द का हिंदी अर्थ और फुल फ़ॉर्म।</span><span data-lang="en" hidden>Every technical term with Hindi meaning and full form.</span></p><div class="m-meta"><i>10 मि · min</i></div></a>
+  </div>
+</section>
+
+<footer>
+  <b><span data-lang="hi">फर्जी अनुदेशक</span><span data-lang="en" hidden>Fake Instructor</span></b> <span data-lang="hi">· SMPS पूरी गाइड · 2026-27</span><span data-lang="en" hidden>· Complete SMPS Guide · 2026-27</span><br>
+  <span data-lang="hi">यह पेज केवल टेस्ट और जानकारी के लिए विकसित किया गया है।</span><span data-lang="en" hidden>This page is developed only for testing and information.</span><br>
+  <span data-lang="hi">सभी ट्रेडमार्क और सामग्री उनके संबंधित स्वामियों के हैं।</span><span data-lang="en" hidden>All trademarks and content belong to their respective owners.</span><br>
+  <span data-lang="hi">यह एक व्यक्तिगत प्रोजेक्ट है — सभी अधिकार सुरक्षित।</span><span data-lang="en" hidden>This is a personal project — all rights reserved.</span><br>
+  <span data-lang="hi">पता — Coming Soon</span><span data-lang="en" hidden>Address — Coming Soon</span>
+</footer>
+</div>
+
+<!-- छात्र पोर्टल चैट बटन -->
+<div id="wa-ask" style="position:fixed;right:14px;bottom:14px;z-index:96;font-family:'Segoe UI',system-ui,sans-serif">
+  <style>
+    #wa-ask .wa-btn{display:block;width:56px;height:56px;border-radius:50%;background:#0f7b8a;border:2px solid #083e46;
+      box-shadow:0 6px 18px rgba(0,0,0,.45);text-align:center;line-height:56px;font-size:30px;text-decoration:none;transition:transform .15s ease}
+    #wa-ask .wa-btn:hover{transform:scale(1.08)}
+    #wa-ask .wa-lab{position:absolute;right:62px;bottom:12px;white-space:nowrap;background:#101d12;color:#e8ffe8;
+      border:1px solid #2a5a35;border-radius:10px;padding:6px 10px;font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .15s ease}
+    #wa-ask:hover .wa-lab{opacity:1}
+  </style>
+  <a id="portal-chat-link" class="wa-btn" href="../exam/index.html#chat" aria-label="समूह चैट खोलें / Open group chat">
+    <span aria-hidden="true" style="filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))">💬</span>
+  </a>
+  <span class="wa-lab"><span data-lang="hi">सवाल है? छात्र समूह चैट में पूछें →</span><span data-lang="en" hidden>Got a question? Ask in the student group chat →</span></span>
+</div>
+<script>
+(function(){
+  'use strict';
+  var GC='santvarman';
+  try{
+    if(GC){var sc=document.createElement('script');sc.async=1;
+      sc.setAttribute('data-goatcounter','https://'+GC+'.goatcounter.com/count');
+      sc.src='https://gc.zgo.at/count.js';document.head.appendChild(sc);}
+  }catch(e){}
+  /* भाषा बदलना */
+  var lan='hi';
+  var fb=document.getElementById('lang-flip');
+  function apply(){
+    document.documentElement.lang=lan;
+    document.title=lan==='hi'?'SMPS लैब · मुख्य हब':'SMPS Lab · Main Hub';
+    document.querySelectorAll('[data-lang]').forEach(function(n){n.hidden=(n.getAttribute('data-lang')!==lan)});
+  }
+  if(fb)fb.addEventListener('click',function(){lan=(lan==='hi')?'en':'hi';try{localStorage.setItem('smps-lab-hub-lang',lan)}catch(e){}apply()});
+  try{var sv=localStorage.getItem('smps-lab-hub-lang');if(sv==='en')lan='en'}catch(e){}
+  apply();
+  /* थिम बदलना — मॉड्यूल पेजों वाली ही की localStorage में सेव होती है */
+  var tb=document.getElementById('theme-flip');
+  function themeLabel(){tb.textContent=document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙';}
+  if(tb){themeLabel();tb.addEventListener('click',function(){
+    var n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',n);
+    try{localStorage.setItem('smps-theme',n)}catch(e){}
+    themeLabel();
+  });}
+})();
+</script>
+<script src="./../assets/modern-ui.js?v=1" defer></script>
+</body></html>

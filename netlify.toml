@@ -1,0 +1,64 @@
+[build]
+  command = "node scripts/build.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), fullscreen=(self)"
+
+[[headers]]
+  for = "/exam/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Cache-Control = "no-store, max-age=0"
+
+# Computer Lab पेज /Computer-Lab/ folder में गए हैं; पुराने root URL redirect हो जाएँ।
+# 'होम' पेज हटा दिया गया है — /Computer-Lab/ सीधे पहला विषय खोलता है।
+[[redirects]]
+  from = "/Computer-Lab"
+  to = "/Computer-Lab/02-basics.html"
+  status = 301
+
+[[redirects]]
+  from = "/Computer-Lab/"
+  to = "/Computer-Lab/02-basics.html"
+  status = 301
+
+[[redirects]]
+  from = "/Computer-Lab/index.html"
+  to = "/Computer-Lab/02-basics.html"
+  status = 301
+
+[[redirects]]
+  from = "/Computer-Lab-3D-Single-File.html"
+  to = "/Computer-Lab/02-basics.html"
+  status = 301
+
+[[redirects]]
+  from = "/SMPS-Lab/Computer-Lab-3D-Single-File.html"
+  to = "/Computer-Lab/02-basics.html"
+  status = 301
+
+[[redirects]]
+  from = "/assembly-lab.html"
+  to = "/Computer-Lab/assembly-lab.html"
+  status = 301
+
+[[redirects]]
+  from = "/basic-office-lab.html"
+  to = "/Computer-Lab/basic-office-lab.html"
+  status = 301

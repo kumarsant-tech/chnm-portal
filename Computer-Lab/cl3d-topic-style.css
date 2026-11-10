@@ -1,0 +1,48 @@
+/* ===================================================================
+   कंप्यूटर लैब · topic-page mode की styling
+   (हर विषय अब अलग HTML पेज है — generated पेज यही फ़ाइल जोड़ते हैं)
+   =================================================================== */
+
+/* होम/पूरी-सूची पेज का लोगो अब लिंक है */
+a.sb-logo{color:inherit;text-decoration:none}
+a.sb-logo:hover .sb-logo-tx b{color:var(--accent2, var(--accent))}
+
+/* मेनू में हर विषय अपना पेज है — यह लाइन उसी को बताती है */
+#sec-home .sec-hero::after{content:'🎒 हर विषय अब अलग पेज है — बाईं ओर के मेनू (☰) या नीचे की सूची से चुनिए'}
+
+/* हर विषय-पेज के नीचे पिछला / अगला विषय */
+.tp-nav{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0 6px}
+.tp-btn{flex:1 1 240px;min-width:0;display:block;padding:12px 14px;border:1.5px solid var(--line,#C9D4CB);
+  border-radius:14px;background:var(--surface,#F8FAF6);color:inherit;text-decoration:none;transition:.16s}
+.tp-btn small{display:block;font-size:11.5px;font-weight:700;color:var(--muted,#51635A);margin-bottom:3px}
+.tp-btn b{display:block;font-size:15.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-btn:hover{border-color:var(--accent,#0B6B4D);transform:translateY(-1px)}
+.tp-btn.next{text-align:right}
+.tp-btn.ghost{opacity:.55;cursor:default}
+.tp-btn.ghost:hover{transform:none;border-color:var(--line,#C9D4CB)}
+@media print{.tp-nav{display:none}}
+
+/* होम पेज की "सारे विषय" कार्ड-सूची */
+.tp-list{margin:22px 0 4px}
+.tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin:12px 0}
+.tp-card{position:relative;display:block;min-width:0;padding:13px 14px;border:1.5px solid var(--line,#C9D4CB);
+  border-radius:15px;background:var(--surface,#F8FAF6);color:inherit;text-decoration:none;transition:.16s}
+.tp-card:hover{border-color:var(--accent,#0B6B4D);transform:translateY(-2px)}
+.tpc-n{position:absolute;top:9px;right:11px;font-family:var(--f-mono,monospace);font-size:11px;color:var(--muted,#51635A)}
+.tpc-ico{font-size:24px;display:block;margin-bottom:5px}
+.tp-card b{display:block;font-size:15.2px;line-height:1.35;margin-bottom:3px}
+.tp-card small{display:block;color:var(--muted,#51635A);font-size:12.8px;line-height:1.45}
+.tpc-g{display:inline-block;margin-top:8px;font-size:11px;font-family:var(--f-mono,monospace);
+  border:1px solid var(--line,#C9D4CB);border-radius:20px;padding:1px 8px;color:var(--muted,#51635A)}
+.tp-card.seen::after{content:'✓ पढ़ा';position:absolute;bottom:9px;right:11px;font-size:11px;font-weight:700;color:var(--accent,#0B6B4D)}
+@media print{.tp-grid{page-break-inside:avoid}}
+
+
+/* ----- Portal mode: पोर्टल से आए तो लैब का फुल शेल छिपाएं, सिर्फ़ कंटेंट दिखाएं ----- */
+.portal-mode .sidebar, .portal-mode .sb-scrim, .portal-mode .mobbar, .portal-mode .topbar .hamb, .portal-mode .foot{display:none!important}
+.portal-mode .main{margin-left:0!important}
+.pm-bar{position:sticky;top:0;z-index:250;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:var(--surface,#0f172a);color:var(--fg,#e2e8f0);border-bottom:1px solid var(--line,#334155);font-weight:700;font-size:14px}
+.pm-bar a{color:inherit;text-decoration:none;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#22d3ee);background:color-mix(in srgb,var(--accent,#22d3ee) 14%,transparent);font-weight:600;font-size:13.5px;white-space:nowrap}
+.pm-bar a:hover{background:color-mix(in srgb,var(--accent,#22d3ee) 26%,transparent);transform:translateY(-1px)}
+@media print{.pm-bar{display:none!important}}
+.portal-mode .topbar{top:46px}

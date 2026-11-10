@@ -1,0 +1,210 @@
+<!-- ============================================================
+     कंप्यूटर लैब  ·  विषय: प्रैक्टिकल Bash Scripting   (51-lin-script.html)
+     यह पेज index.html के अंदर दबे modules को अलग-अलग फ़ाइलों से
+     जोड़कर बनता है — सामग्री assets/cl3d-*.js में एक ही जगह है।
+     ============================================================ -->
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>प्रैक्टिकल Bash Scripting · कंप्यूटर लैब</title>
+<meta name="description" content="कमांड आना आधा काम है; असली सिस्टम-प्रशासन तब शुरू होता है जब आप वही काम रोज़ अपने आप कराने के लिए स्क्रिप्ट लिखते हैं। यह पृष्ठ शून्य से शुरू करता है — shebang और chmod +x, चर व quoting का सही नियम, e">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Noto+Sans+Devanagari:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="cl3d-style.css?v=1">
+<link rel="stylesheet" href="cl3d-slim-style.css?v=1">
+<link rel="stylesheet" href="cl3d-topic-style.css?v=2">
+<link rel="stylesheet" href="../assets/modern-ui.css?v=2">
+</head>
+
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-head">
+    <a class="sb-logo" href="02-basics.html" title="पहला विषय">
+      <span class="sb-logo-ico">🖥️</span>
+      <span class="sb-logo-tx">
+        <b>कंप्यूटर लैब</b>
+        <small>Future Instructor Group</small>
+      </span>
+    </a>
+    <button class="sb-close" id="sbClose" aria-label="मेनू बंद करें">✕</button>
+  </div>
+
+  <div class="sb-search">
+    <span>🔍</span>
+    <input type="search" id="navSearch" placeholder="खोजें… जैसे: RAM, वायरिंग, BIOS" aria-label="सेक्शन खोजें">
+  </div>
+
+  <div class="sb-progress">
+    <div class="sb-prog-tx"><span>कोर्स प्रगति</span><b id="progTxt">0%</b></div>
+    <div class="sb-prog-bar"><i id="progBar"></i></div>
+  </div>
+
+  <div class="sb-quick">
+    <div class="sb-quick-lbl">अलग लैब पेज · सीधे खोलिए</div>
+    <a class="nav-item quick" href="basic-office-lab.html">
+      <span class="ni-ico">💻</span><span class="ni-tx">बेसिक कंप्यूटर + MS Office</span><span class="ni-new">नया</span>
+    </a>
+    <a class="nav-item quick t2" href="basic-office-lab.html#fullforms">
+      <span class="ni-ico">🔠</span><span class="ni-tx">फुल फ़ॉर्म (290+)</span><span class="ni-new">खोज</span>
+    </a>
+    <a class="nav-item quick" href="assembly-lab.html">
+      <span class="ni-ico">🧪</span><span class="ni-tx">असेंबली लैब</span>
+    </a>
+  </div>
+
+  <nav class="sb-nav" id="sbNav" aria-label="मुख्य मेनू"><!-- JS --></nav>
+
+  <div class="sb-foot">
+    <div class="sb-foot-row">
+      <button class="mini-btn" id="btnTheme" title="थीम बदलें">🌗 थीम</button>
+      <button class="mini-btn" id="btnFont" title="फॉन्ट साइज़">Aa फॉन्ट</button>
+      <button class="mini-btn" id="btnPrint" title="प्रिंट / PDF">🖨️ प्रिंट</button>
+      <button class="mini-btn" id="btnReset" title="प्रगति रीसेट">↺ रीसेट</button>
+    </div>
+    <div class="sb-foot-row">
+      <button class="mini-btn" id="btnLang" title="टेबल में भाषा बदलें">🌐 हिंदी + EN</button>
+    </div>
+    <small class="sb-credit">Sant Varman 420 · हार्डवेयर ट्रेनर मोड</small>
+  </div>
+</aside>
+<div class="sb-scrim" id="sbScrim"></div>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+  <header class="topbar">
+    <button class="hamb" id="btnHamb" aria-label="मेनू खोलें">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="tb-title">
+      <h1 id="pageTitle">होम</h1>
+      <p id="pageSub">कंप्यूटर हार्डवेयर प्रयोगशाला — थ्योरी + प्रैक्टिकल</p>
+    </div>
+    <div class="tb-right">
+      <span class="tb-badge" id="tbBadge">🟢 तैयार</span>
+    </div>
+  </header>
+
+  <div class="content" id="content"><!-- JS renders sections --></div>
+
+  <footer class="foot">
+    <p><b>कंप्यूटर लैब</b> — असेंबली से डिसअसेंबली तक, वायरिंग से कनेक्शन तक।</p>
+    <p class="foot-small">थ्योरी + प्रैक्टिकल + सिम्युलेटर · शिक्षण हेतु निःशुल्क उपयोग।</p>
+  </footer>
+</main>
+
+<!-- मोबाइल नीचे की पट्टी -->
+<nav class="mobbar" id="mobbar">
+  <button data-mob="prev">◀ पिछला</button>
+  <button data-mob="menu">☰ मेनू</button>
+  <button data-mob="next">अगला ▶</button>
+</nav>
+<!-- सामग्री modules (क्रम बनाए रखा गया है: data → i18n → sims) -->
+<script src="cl3d-data-intro.js" defer></script>
+<script src="cl3d-data-mb-theory.js" defer></script>
+<script src="cl3d-data-mb-guide.js" defer></script>
+<script src="cl3d-data-svc-theory.js" defer></script>
+<script src="cl3d-data-svc-guide.js" defer></script>
+<script src="cl3d-data-hardware.js" defer></script>
+<script src="cl3d-data-practical.js" defer></script>
+<script src="cl3d-i18n-en.js" defer></script>
+<script src="cl3d-simulators.js" defer></script>
+<script src="cl3d-sim-assembly.js" defer></script>
+<script src="cl3d-sim-service.js" defer></script>
+<script src="cl3d-data-sci1.js" defer></script>
+<script src="cl3d-data-sci2.js" defer></script>
+<script src="cl3d-data-hw2a.js" defer></script>
+<script src="cl3d-data-hw2b.js" defer></script>
+<script src="cl3d-data-hw2c.js" defer></script>
+<script src="cl3d-data-win1.js" defer></script>
+<script src="cl3d-data-win2.js" defer></script>
+<script src="cl3d-data-lin1.js" defer></script>
+<script src="cl3d-data-lin2.js" defer></script>
+<script src="cl3d-data-office1.js" defer></script>
+<script src="cl3d-data-office2.js" defer></script>
+<script src="cl3d-data-office3.js" defer></script>
+<script src="cl3d-data-net1.js" defer></script>
+<script src="cl3d-data-sec1.js" defer></script>
+<script src="cl3d-data-sw1.js" defer></script>
+<script src="cl3d-data-sw2.js" defer></script>
+<script>window.CL_TOPIC = "lin-script";</script>
+<script id="cl3d-topic-map">
+window.CL_TOPIC_FILES = {
+  "home": "index.html",
+  "basics": "02-basics.html",
+  "parts": "03-parts.html",
+  "mb-foundation": "04-mb-foundation.html",
+  "mb-chipset": "05-mb-chipset.html",
+  "mb-components": "06-mb-components.html",
+  "mb-sockets": "07-mb-sockets.html",
+  "mb-graphics": "08-mb-graphics.html",
+  "mb-brands": "09-mb-brands.html",
+  "mb-choose": "10-mb-choose.html",
+  "assembly": "11-assembly.html",
+  "disassembly": "12-disassembly.html",
+  "wiring": "13-wiring.html",
+  "power": "14-power.html",
+  "motherboard": "15-motherboard.html",
+  "storage": "16-storage.html",
+  "bios": "17-bios.html",
+  "os": "18-os.html",
+  "network": "19-network.html",
+  "sv-safety": "20-sv-safety.html",
+  "sv-teardown": "21-sv-teardown.html",
+  "sv-clean": "22-sv-clean.html",
+  "sv-thermal": "23-sv-thermal.html",
+  "sv-diagnose": "24-sv-diagnose.html",
+  "sv-upgrade": "25-sv-upgrade.html",
+  "troubleshoot": "26-troubleshoot.html",
+  "labs": "27-labs.html",
+  "quiz": "28-quiz.html",
+  "glossary": "29-glossary.html",
+  "sci-gens": "30-sci-gens.html",
+  "sci-numbers": "31-sci-numbers.html",
+  "sci-logic": "32-sci-logic.html",
+  "sci-data": "33-sci-data.html",
+  "sci-dcom": "34-sci-dcom.html",
+  "hw-cpu": "35-hw-cpu.html",
+  "hw-mem": "36-hw-mem.html",
+  "hw-store": "37-hw-store.html",
+  "hw-gpu": "38-hw-gpu.html",
+  "hw-periph": "39-hw-periph.html",
+  "hw-mobile": "40-hw-mobile.html",
+  "hw-tools": "41-hw-tools.html",
+  "win-intro": "42-win-intro.html",
+  "win-ui": "43-win-ui.html",
+  "win-admin": "44-win-admin.html",
+  "win-cli": "45-win-cli.html",
+  "win-install": "46-win-install.html",
+  "lin-intro": "47-lin-intro.html",
+  "lin-cli": "48-lin-cli.html",
+  "lin-admin": "49-lin-admin.html",
+  "lin-install": "50-lin-install.html",
+  "lin-script": "51-lin-script.html",
+  "off-intro": "52-off-intro.html",
+  "off-word": "53-off-word.html",
+  "off-excel-1": "54-off-excel-1.html",
+  "off-excel-2": "55-off-excel-2.html",
+  "off-ppt": "56-off-ppt.html",
+  "off-access": "57-off-access.html",
+  "off-outlook": "58-off-outlook.html",
+  "net-web": "59-net-web.html",
+  "net-browser": "60-net-browser.html",
+  "sec-security": "61-sec-security.html",
+  "sec-data": "62-sec-data.html",
+  "sw-prog": "63-sw-prog.html",
+  "sw-util": "64-sw-util.html",
+  "sw-ai": "65-sw-ai.html",
+  "sw-labs": "66-sw-labs.html",
+  "sw-quiz": "67-sw-quiz.html",
+  "sw-glossary": "68-sw-glossary.html"
+};
+</script>
+<script src="cl3d-app.js?v=2" defer></script>
+<script src="cl3d-lang-sync.js" defer></script>
+<script src="../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+/* SMPS लैब · साझा सुधार परत (हर मॉड्यूल पेज पर) */
+:root { --smps-r: 18px; --smps-shadow: 0 1px 2px rgba(6, 40, 26, .06), 0 12px 30px rgba(6, 40, 26, .10); }
+
+body { -webkit-font-smoothing: antialiased; }
+
+/* मॉड्यूल स्विचर (JS से लगता है) */
+.smps-switch {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  margin: 0 0 10px;
+  background: color-mix(in srgb, var(--surface, #fff) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line, #c9d4cb);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .06);
+  font-family: inherit;
+}
+.smps-switch a, .smps-switch button, .smps-switch select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #c9d4cb);
+  background: var(--surface, #fff);
+  color: var(--fg, #13201a);
+  text-decoration: none;
+  cursor: pointer;
+}
+.smps-switch select { border-radius: 12px; max-width: 62vw; }
+.smps-switch .ss-brand { color: var(--accent, #0b6b4d); }
+.smps-switch .ss-now {
+  font-weight: 800;
+  border-color: color-mix(in srgb, var(--accent, #0b6b4d) 45%, var(--line, #c9d4cb));
+  background: color-mix(in srgb, var(--accent, #0b6b4d) 10%, var(--surface, #fff));
+}
+.smps-switch .ss-next { background: var(--accent, #0b6b4d); color: #fff; border-color: var(--accent, #0b6b4d); }
+.smps-switch .ss-grow { flex: 1 1 auto; }
+
+/* टैब पट्टी — साफ़ पिल्स, मोबाइल में स्क्रॉल */
+nav.tabs { gap: 8px; padding-block: 10px; scrollbar-width: thin; }
+nav.tabs button, nav.tabs a {
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line, #c9d4cb);
+  background: var(--surface, #fff);
+  transition: transform .14s ease, box-shadow .18s ease, background .18s ease;
+}
+nav.tabs [aria-selected="true"], nav.tabs .on, nav.tabs [aria-current="true"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #0b6b4d) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+/* कार्ड/बॉक्स एक जैसा आधुनिक रूप */
+.v5-box, .cits-card, .panel, .card, .tbl-wrap, .v5-gauge, .v5-q, .v5-hero, .v5-scope, .v5-rail, .tips {
+  border-radius: var(--smps-r);
+}
+.v5-box, .cits-card, .v5-gauge, .v5-q { box-shadow: var(--smps-shadow); }
+
+/* हेडिंग में रंग की पट्टी — स्कैन करना आसान */
+h2::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: .9em;
+  margin-right: 9px;
+  vertical-align: -.08em;
+  border-radius: 999px;
+  background: var(--accent, #0b6b4d);
+}
+h2, h3 { scroll-margin-top: 96px; }
+
+/* बटन/इनपुट */
+button, .v5-btn, .v5-nav, .lang-btn, .cits-btn { transition: transform .14s ease, box-shadow .18s ease, background .18s ease; }
+button:hover:not(:disabled), .v5-btn:hover, .cits-btn:hover { transform: translateY(-1px); }
+button:disabled { cursor: not-allowed; }
+
+/* टेबल */
+table { border-collapse: separate; border-spacing: 0; }
+th { position: sticky; top: 0; background: color-mix(in srgb, var(--accent, #0b6b4d) 8%, var(--surface, #fff)); }
+
+@media (max-width: 620px) {
+  .smps-switch { padding: 8px 10px; }
+  .smps-switch .ss-grow { flex-basis: 100%; order: 5; }
+  .smps-switch select { max-width: 100%; flex: 1 1 100%; }
+}
+
+@media print {
+  .smps-switch, nav.tabs, #wa-ask, #fi-top, #fi-progress { display: none !important; }
+}
+
+/* ============================================================
+   किताब परत (book reading layer) — v=2
+   मकसद: हर मॉड्यूल पन्ना क़िताब के पन्ने जैसा पढ़ा जाए।
+   सिम्युलेटर/बटन/स्लाइडर पर रेखाएँ नहीं चढ़तीं — रेखाएँ केवल
+   smps-nav.js द्वारा चिह्नित गद्यांशों (p.bk-prose, li.bk-prose) पर लगती हैं।
+   ============================================================ */
+:root {
+  --bk-line: 32px;
+  --bk-paper: #fffdf6;
+  --bk-edge: #d9cfb8;
+  --bk-rule: rgba(39, 104, 164, .14);
+  --bk-margin: rgba(196, 86, 86, .42);
+  --bk-ink: #211f18;
+  --bk-muted: #5b6a60;
+  --bk-pad-l: 74px;
+  --bk-rule-x: 48px;
+}
+:root[data-theme="dark"] {
+  --bk-paper: #1b231e;
+  --bk-edge: #3b4b41;
+  --bk-rule: rgba(160, 205, 255, .10);
+  --bk-margin: rgba(226, 128, 116, .28);
+  --bk-ink: #e9f1ea;
+  --bk-muted: #a9bcb0;
+}
+
+body .wrap {
+  position: relative;
+  background-color: var(--bk-paper);
+  background-image: linear-gradient(to right, transparent 0 var(--bk-rule-x), var(--bk-margin) var(--bk-rule-x) calc(var(--bk-rule-x) + 2px), transparent calc(var(--bk-rule-x) + 2px));
+  color: var(--bk-ink);
+  border: 1px solid var(--bk-edge);
+  border-radius: 6px 16px 16px 6px;
+  padding: clamp(22px, 4vw, 42px) clamp(16px, 3vw, 32px) 52px var(--bk-pad-l);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .05), 0 18px 44px rgba(0, 0, 0, .13);
+}
+/* पुराने कार्ड-सेक्शन अब पन्ने की धार की तरह, तैरते डिब्बे नहीं */
+body .wrap > section:not(#live):not(#real) {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--bk-edge) 70%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 22px 0 26px;
+  margin: 0;
+}
+body .wrap > section:last-of-type { border-bottom: 0; }
+
+/* पढ़ने का कदम-फ़ॉन्ट */
+body .wrap p, body .wrap li { font-size: clamp(15.5px, 1.6vw, 17px); }
+
+/* रेखांकित गद्य — केवल JS द्वारा चिह्नित लंबे पैराग्राफ़/सूची पर */
+body .wrap .bk-prose {
+  line-height: var(--bk-line);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--bk-line) - 1px), var(--bk-rule) calc(var(--bk-line) - 1px) var(--bk-line));
+  background-position: 0 0;
+  margin-block: 0 var(--bk-line);
+}
+body .wrap .bk-prose:last-child { margin-bottom: 0; }
+
+/* पाठ का खुलने वाला सिर (chapter opener) */
+.bk-kicker {
+  font-family: var(--f-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bk-muted);
+  margin-bottom: 6px;
+}
+h2.bk-title {
+  font-size: clamp(22px, 4.2vw, 32px);
+  line-height: 1.25;
+  margin: 0 0 12px;
+  background-image: linear-gradient(transparent 72%, rgba(255, 222, 122, .5) 72%);
+  display: inline;
+  padding-bottom: 2px;
+}
+:root[data-theme="dark"] h2.bk-title { background-image: linear-gradient(transparent 72%, rgba(178, 132, 40, .45) 72%); }
+h2.bk-title::before { display: none; }
+.bk-intro { max-width: 68ch; }
+.bk-aims {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent, #0b6b4d);
+  background: color-mix(in srgb, var(--accent, #0b6b4d) 7%, transparent);
+  border-radius: 0 12px 12px 0;
+}
+.bk-aims > b { display: block; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--bk-muted); margin-bottom: 6px; }
+.bk-aims ul { margin: 0; padding-left: 22px; }
+.bk-aims li { margin: 4px 0; }
+
+/* सारांश और अभ्यास */
+.bk-recap .bk-page { max-width: 74ch; }
+h3.bk-sub {
+  margin: 26px 0 10px;
+  font-size: clamp(16px, 2.4vw, 19px);
+  border-bottom: 1px dashed color-mix(in srgb, var(--bk-edge) 80%, transparent);
+  padding-bottom: 6px;
+}
+body .wrap ol.bk-points { padding-left: 26px; margin: 0; }
+body .wrap ol.bk-points > li { margin: 0 0 calc(var(--bk-line) - 8px); }
+.bk-qa { display: grid; gap: 8px; }
+.bk-item {
+  border: 1px solid color-mix(in srgb, var(--bk-edge) 78%, transparent);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--bk-paper) 70%, var(--surface, #fff));
+}
+.bk-item > summary { cursor: pointer; font-weight: 700; list-style-position: inside; }
+.bk-item > summary::marker { color: var(--accent, #0b6b4d); }
+.bk-item[open] > summary { margin-bottom: 8px; }
+.bk-item > p { margin: 0; padding-left: 22px; border-left: 2px solid color-mix(in srgb, var(--accent, #0b6b4d) 45%, transparent); }
+.bk-try {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 2px dashed color-mix(in srgb, var(--accent, #0b6b4d) 55%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent, #0b6b4d) 6%, transparent);
+}
+.bk-try > b { display: block; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--accent, #0b6b4d); margin-bottom: 6px; }
+.bk-try > p { margin: 0; }
+
+@media (max-width: 760px) {
+  :root { --bk-pad-l: 34px; --bk-rule-x: 16px; --bk-line: 29px; }
+}
+@media (max-width: 440px) {
+  :root { --bk-pad-l: 26px; --bk-rule-x: 10px; }
+}
+@media print {
+  :root { --bk-paper: #fff; --bk-ink: #000; --bk-edge: #999; --bk-rule: rgba(0, 0, 0, .12); }
+  body .wrap { box-shadow: none; border: 0; }
+  .bk-item { border-color: #bbb; }
+}
+

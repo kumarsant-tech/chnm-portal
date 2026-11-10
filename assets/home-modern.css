@@ -1,0 +1,148 @@
+/* =====================================================================
+   HOME MODERN · होम पेज के लिए थीम-पिकर + एनिमेशन परत
+   सिर्फ़ index.html (होम) पर लगती है। कोई फ़ोटो, सिमुलेटर या HTML नहीं छुआ।
+   ===================================================================== */
+
+/* ---------- नई थीम के रंग-टोकन ---------- */
+:root[data-theme="paper"]{
+  --bg:#F4EDDC;--surface:#FFFBF0;--fg:#241F16;--muted:#6B6047;--line:#DCD0B4;
+  --accent:#9A5B22;--accent-2:#2C6E91;--accent-ink:#FFFFFF;--trace:#2C6E91;--warn:#B45309;--bad:#B3261E;--good:#1B7F3B;--code:#EFE6D2;
+  --glass:rgba(255,251,240,.80);--glass-brd:rgba(122,95,60,.24);--shadow:0 10px 28px rgba(80,58,20,.12),0 2px 6px rgba(80,58,20,.07);
+  --grad:linear-gradient(135deg,#9A5B22 0%,#2C6E91 100%);color-scheme:light}
+:root[data-theme="midnight"]{
+  --bg:#0A0F1E;--surface:#121A2E;--fg:#E6ECFA;--muted:#93A2C4;--line:#26314C;
+  --accent:#6EA8FE;--accent-2:#9BF0D8;--accent-ink:#061024;--trace:#9BF0D8;--warn:#FFC96B;--bad:#FF8A80;--good:#6FD08C;--code:#16203A;
+  --glass:rgba(18,26,46,.76);--glass-brd:rgba(150,180,255,.20);--shadow:0 16px 40px rgba(0,0,0,.50);
+  --grad:linear-gradient(135deg,#6EA8FE 0%,#9BF0D8 100%);color-scheme:dark}
+:root[data-theme="mint"]{
+  --bg:#E9F6EF;--surface:#FFFFFF;--fg:#0F241C;--muted:#4E6B5E;--line:#BFE0CE;
+  --accent:#0E8A5F;--accent-2:#17A2B8;--accent-ink:#FFFFFF;--trace:#17A2B8;--warn:#B26A00;--bad:#C62828;--good:#1B7F3B;--code:#DCF2E6;
+  --glass:rgba(255,255,255,.76);--glass-brd:rgba(255,255,255,.92);--shadow:0 10px 30px rgba(14,138,95,.12),0 2px 6px rgba(14,138,95,.06);
+  --grad:linear-gradient(135deg,#0E8A5F 0%,#17A2B8 100%);color-scheme:light}
+:root[data-theme="slate"]{
+  --bg:#EDF0F4;--surface:#FFFFFF;--fg:#171C24;--muted:#5A6572;--line:#CFD6DF;
+  --accent:#3A5A8C;--accent-2:#6D5BD0;--accent-ink:#FFFFFF;--trace:#5B8DEF;--warn:#B45309;--bad:#C0392B;--good:#1E7F4F;--code:#E3E8EF;
+  --glass:rgba(255,255,255,.78);--glass-brd:rgba(255,255,255,.92);--shadow:0 10px 30px rgba(23,28,36,.12),0 2px 6px rgba(23,28,36,.06);
+  --grad:linear-gradient(135deg,#3A5A8C 0%,#6D5BD0 100%);color-scheme:light}
+:root[data-theme="contrast"]{
+  --bg:#000000;--surface:#0C0C0C;--fg:#FFFFFF;--muted:#E9E9E9;--line:#7A7A7A;
+  --accent:#FFD400;--accent-2:#00E5FF;--accent-ink:#000000;--trace:#00E5FF;--warn:#FFB700;--bad:#FF6B6B;--good:#4BE08A;--code:#161616;
+  --glass:rgba(0,0,0,.88);--glass-brd:#FFD400;--shadow:0 0 0 1px rgba(255,255,255,.16);
+  --grad:linear-gradient(135deg,#FFD400 0%,#00E5FF 100%);color-scheme:dark}
+:root[data-theme="contrast"] .appbar{border-bottom:2px solid var(--accent)}
+:root[data-theme="contrast"] .card,:root[data-theme="contrast"] .panel,:root[data-theme="contrast"] .cits-card{border-width:2px}
+
+/* ---------- थीम पिकर (appbar बटन + पैनल) ---------- */
+#hmThemeBtn{position:relative;overflow:hidden}
+#hmThemeBtn::after{content:"";position:absolute;inset:auto 5px 4px;height:3px;border-radius:99px;background:var(--grad);opacity:0;transition:opacity .25s}
+#hmThemeBtn.hm-on::after{opacity:1}
+.hm-panel{position:fixed;z-index:120;top:calc(var(--appbar,64px) + env(safe-area-inset-top,0px) + 8px);right:clamp(10px,3vw,24px);
+  width:min(360px,calc(100vw - 20px));max-height:min(74vh,560px);overflow:auto;padding:14px;border-radius:20px;
+  background:var(--glass);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);
+  border:1px solid var(--glass-brd);box-shadow:0 24px 60px rgba(0,0,0,.28);color:var(--fg);
+  opacity:0;transform:translateY(-10px) scale(.98);pointer-events:none;transition:opacity .2s var(--hm-ease,cubic-bezier(.22,.61,.36,1)),transform .2s var(--hm-ease,cubic-bezier(.22,.61,.36,1))}
+.hm-panel.hm-open{opacity:1;transform:none;pointer-events:auto}
+.hm-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.hm-head b{font-family:var(--f-disp);font-size:15px;font-weight:800}
+.hm-x{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:16px;cursor:pointer;line-height:1}
+.hm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hm-sw{display:flex;align-items:center;gap:8px;min-height:46px;padding:8px;border-radius:14px;border:2px solid var(--line);
+  background:var(--surface);color:var(--fg);font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-align:left;
+  transition:transform .16s var(--hm-ease),box-shadow .2s,border-color .2s}
+.hm-sw:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.hm-sw[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+.hm-dot{flex:none;width:26px;height:26px;border-radius:9px;border:1px solid rgba(0,0,0,.22);position:relative;overflow:hidden}
+.hm-dot i{position:absolute;inset:0;display:block}
+.hm-dot i+i{clip-path:polygon(100% 0,100% 100%,0 100%)}
+.hm-sw [data-lang]{display:block;line-height:1.25}
+.hm-foot{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.hm-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700}
+.hm-switch{flex:none;width:48px;height:28px;border-radius:99px;border:1px solid var(--line);background:var(--code);position:relative;cursor:pointer;transition:background .2s,border-color .2s}
+.hm-switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .2s var(--hm-ease)}
+.hm-switch[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.hm-switch[aria-pressed="true"]::after{transform:translateX(20px)}
+.hm-note{font-size:11.5px;color:var(--muted);line-height:1.5}
+@media (max-width:560px){
+  .hm-panel{left:8px;right:8px;width:auto;top:auto;bottom:calc(8px + env(safe-area-inset-bottom,0px));max-height:62vh;border-radius:22px}
+  .hm-panel:not(.hm-open){transform:translateY(14px)}
+  .hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---------- रंग बदलते समय हल्का cross-fade ---------- */
+.hm-xfade body,.hm-xfade .wrap,.hm-xfade .appbar,.hm-xfade .panel,.hm-xfade .card,.hm-xfade .cits-card,.hm-xfade .hn,.hm-xfade .ha,.hm-xfade .home-hero,
+.hm-xfade table,.hm-xfade th,.hm-xfade td,.hm-xfade code,.hm-xfade .formula{
+  transition:background-color .38s ease,color .38s ease,border-color .38s ease}
+
+/* ---------- aurora: धीमी चलती रौशनी (सिर्फ़ सजावट) ---------- */
+.hm-aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:.55}
+.hm-aurora span{position:absolute;display:block;width:52vmax;height:52vmax;border-radius:50%;filter:blur(70px);opacity:.42;will-change:transform}
+.hm-aurora span:nth-child(1){left:-14vmax;top:-18vmax;background:radial-gradient(circle at 40% 40%,color-mix(in srgb,var(--accent) 55%,transparent),transparent 62%);animation:hmDrift1 26s ease-in-out infinite alternate}
+.hm-aurora span:nth-child(2){right:-16vmax;top:-8vmax;background:radial-gradient(circle at 60% 40%,color-mix(in srgb,var(--accent-2,var(--trace)) 50%,transparent),transparent 62%);animation:hmDrift2 32s ease-in-out infinite alternate}
+.hm-aurora span:nth-child(3){left:24vmax;bottom:-26vmax;background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--trace) 38%,transparent),transparent 64%);animation:hmDrift1 38s ease-in-out infinite alternate-reverse}
+@keyframes hmDrift1{to{transform:translate3d(7vmax,5vmax,0) scale(1.12)}}
+@keyframes hmDrift2{to{transform:translate3d(-8vmax,6vmax,0) scale(1.08)}}
+@media (max-width:700px){.hm-aurora{opacity:.4}.hm-aurora span{filter:blur(54px)}}
+
+/* ---------- hero का प्रवेश ---------- */
+.home-hero{position:relative;overflow:hidden}
+.wrap .home-hero{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,transparent),transparent);border-color:color-mix(in srgb,var(--accent) 26%,var(--line))}
+.home-hero::before{content:"";position:absolute;left:-20%;top:-60%;width:60%;height:220%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 22%,transparent),transparent);transform:rotate(12deg);animation:hmSheen 6.5s ease-in-out infinite;pointer-events:none}
+@keyframes hmSheen{0%,72%{transform:translateX(-160%) rotate(12deg)}100%{transform:translateX(320%) rotate(12deg)}}
+.home-hero h1{animation:hmUp .7s cubic-bezier(.22,.61,.36,1) both}
+.home-hero .home-hero-sub{animation:hmUp .7s .12s cubic-bezier(.22,.61,.36,1) both}
+.hn{animation:hmUp .7s .2s cubic-bezier(.22,.61,.36,1) both}
+.ha{animation:hmUp .7s .28s cubic-bezier(.22,.61,.36,1) both}
+@keyframes hmUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+/* ---------- appbar: ब्रांड + बटन ---------- */
+.appbar .logo{transition:transform .3s var(--hm-ease),box-shadow .3s}
+.appbar:hover .logo,.appbar .logo:hover{transform:rotate(-6deg) scale(1.06)}
+.appbar .logo::after{content:"";position:absolute}
+.appbar .brand-stack b{background-size:200% auto;animation:hmShine 9s linear infinite}
+@keyframes hmShine{to{background-position:200% center}}
+.appbar .pill,.appbar button.theme{transition:transform .2s var(--hm-ease),box-shadow .25s,background-color .3s,color .3s}
+.appbar .pill:hover{transform:translateY(-2px);box-shadow:0 8px 18px color-mix(in srgb,var(--accent) 26%,transparent)}
+.appbar button.theme:active{transform:scale(.94)}
+
+/* ---------- कार्ड पर hover: उठना + कर्सर-spotlight ---------- */
+.hm-glow{position:relative;transition:transform .22s var(--hm-ease),box-shadow .26s var(--hm-ease),border-color .26s}
+.hm-glow::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(220px circle at var(--hm-x,50%) var(--hm-y,0%),color-mix(in srgb,var(--accent) 18%,transparent),transparent 62%)}
+.hm-glow:hover{transform:translateY(-3px);box-shadow:0 18px 40px color-mix(in srgb,var(--fg) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.hm-glow:hover::after{opacity:1}
+
+/* ---------- ripple ---------- */
+.hm-rip{position:relative;overflow:hidden}
+.hm-rip span.hm-ripple{position:absolute;border-radius:50%;transform:scale(0);pointer-events:none;background:color-mix(in srgb,var(--accent) 45%,transparent);animation:hmRip .55s ease-out forwards}
+@keyframes hmRip{to{transform:scale(2.6);opacity:0}}
+
+/* ---------- scroll reveal ---------- */
+.hm-reveal{opacity:0;transform:translateY(18px)}
+.hm-in{opacity:1;transform:none;transition:opacity .55s var(--hm-ease),transform .55s var(--hm-ease)}
+
+/* ---------- gallery: फ़ोटो पर सिर्फ़ zoom, कभी छिपाया नहीं जाता ---------- */
+.v8-card{position:relative;overflow:hidden;transition:transform .25s var(--hm-ease),box-shadow .25s}
+.v8-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 16px 34px rgba(0,0,0,.22)}
+.v8-card img{transition:transform .45s var(--hm-ease)}
+.v8-card:hover img{transform:scale(1.07)}
+.v8-gal{border-radius:18px}
+.hm-gal-hint{display:flex;gap:7px;align-items:center;font-size:12px;font-weight:700;color:var(--muted);margin:2px 0 0}
+.hm-gal-hint i{font-style:normal}
+
+/* ---------- गति/एनिमेशन बंद ---------- */
+:root.hm-no-motion .hm-aurora{display:none}
+:root.hm-no-motion .home-hero h1,:root.hm-no-motion .home-hero .home-hero-sub,:root.hm-no-motion .hn,:root.hm-no-motion .ha,
+:root.hm-no-motion .home-hero::before,:root.hm-no-motion .appbar .brand-stack b{animation:none!important}
+:root.hm-no-motion .hm-glow:hover{transform:none}
+:root.hm-no-motion .v8-card:hover,:root.hm-no-motion .v8-card:hover img{transform:none}
+:root.hm-no-motion .hm-reveal{opacity:1;transform:none}
+:root.hm-no-motion .v8-gtrack,:root.hm-no-motion .v7-track,:root.hm-no-motion .v6-welcome h1,:root.hm-no-motion .v7-g{animation:none}
+:root.hm-no-motion .v8-gal{overflow-x:auto;overscroll-behavior-x:contain}
+:root.hm-no-motion .hm-rip span.hm-ripple{display:none}
+@media (prefers-reduced-motion:reduce){
+  .hm-aurora,.home-hero::before{display:none}
+  .home-hero h1,.home-hero .home-hero-sub,.hn,.ha,.appbar .brand-stack b{animation:none!important}
+  .hm-reveal{opacity:1!important;transform:none!important}
+  .hm-glow:hover,.v8-card:hover,.v8-card:hover img{transform:none!important}
+}
+@media print{.hm-aurora,.hm-panel,#hmThemeBtn,.hm-reveal{display:none!important}.hm-reveal{opacity:1!important;transform:none!important}}

@@ -1,0 +1,2487 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>कंप्यूटर असेंबली लैब · Computer Assembly Lab</title>
+<meta name="description" content="सारी कंपनियों के मदरबोर्ड, उनके कंपोनेंट की पूरी सूची और चरणबद्ध इंटरैक्टिव PC असेंबली — सही असेंबली पर विंडोज बूट।">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Noto+Sans+Devanagari:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#070b13; --bg2:#0c1220; --surface:#111a2c; --surface2:#16213420; --line:#233149;
+  --tx:#e7eefb; --muted:#93a6c7; --accent:#3b82f6; --accent2:#22d3ee; --good:#22c55e;
+  --warn:#f59e0b; --bad:#ef4444; --code:#0a0f1c; --purple:#a855f7;
+  --f-head:'Anek Devanagari','Noto Sans Devanagari',sans-serif;
+  --f-body:'Noto Sans Devanagari',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+body.light{
+  --bg:#eef2f9; --bg2:#ffffff; --surface:#ffffff; --surface2:#0f172a10; --line:#d6deee;
+  --tx:#0f1b33; --muted:#5b6b8c; --accent:#1d4ed8; --accent2:#0891b2; --good:#15a34a;
+  --warn:#c2740a; --bad:#dc2626; --code:#f4f7fe; --purple:#7c3aed;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:var(--f-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,h5{font-family:var(--f-head);margin:0}
+a{color:var(--accent2)}
+button{font-family:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+
+/* ---------- header ---------- */
+.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,var(--bg2),var(--bg));border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;padding:12px 16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:11px;margin-right:auto}
+.brand .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:23px}
+.brand b{font-family:var(--f-head);font-size:18px;display:block;line-height:1.15}
+.brand b i{font-style:normal;color:var(--accent2)}
+.brand small{color:var(--muted);font-size:12px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:5px 11px;font-size:12.5px}
+.stat b{color:var(--accent2);font-size:14px}
+.mini{background:var(--surface);border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:6px 11px;font-size:12.5px;cursor:pointer}
+.mini:hover{border-color:var(--accent2)}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 6px}
+.tabs button{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--f-head)}
+.tabs button.on{color:var(--tx);border-color:var(--accent);background:linear-gradient(180deg,var(--surface),var(--surface2));box-shadow:0 0 0 3px #3b82f61f}
+
+/* ---------- search box (सूची खोज) ---------- */
+.refsearch{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
+.refsearch input{flex:1;min-width:220px;background:var(--surface);border:1px solid var(--line);color:var(--tx);border-radius:11px;padding:10px 14px;font-size:14px;font-family:inherit}
+.refsearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b82f61f}
+.refsearch input::-webkit-search-cancel-button{cursor:pointer}
+.refcount{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.nores{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);font-size:13.5px}
+
+/* ---------- filter chips ---------- */
+.refchips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px}
+.chip{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.chip:hover{color:var(--tx);border-color:var(--accent)}
+.chip.on{color:#fff;background:linear-gradient(180deg,#3b82f6,#2563eb);border-color:#2563eb}
+.chip.clr{color:var(--warn);border-color:var(--warn)}
+
+/* ---------- generic ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.hint{font-size:12.8px;color:var(--muted);margin:0 0 10px}
+.grid{display:grid;gap:8px}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);color:var(--muted);margin:0 4px 4px 0}
+.pill.g{color:var(--good);border-color:#22c55e55}
+.pill.w{color:var(--warn);border-color:#f59e0b55}
+.pill.b{color:var(--accent2);border-color:#22d3ee55}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:right;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:12.5px;background:var(--surface2)}
+tbody tr:hover{background:var(--surface2)}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.tblwrap .ben{white-space:normal}
+body.lang-en .bhi,body.lang-en .bhi2{display:none!important}
+body.lang-hi .ben,body.lang-hi .ben2{display:none!important}
+h2.blk{font-size:20px;margin:22px 0 8px}
+h3.blk2{font-size:16px;margin:18px 0 8px;color:var(--accent2)}
+
+/* ---------- student gate ---------- */
+.gate{max-width:560px;margin:30px auto}
+.gate .card{padding:22px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;font-weight:600}
+input[type=text],input[type=date],input[type=number]{width:100%;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--tx);font-size:14.5px;font-family:inherit}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b82f62b}
+.btn{background:linear-gradient(135deg,var(--accent),#2563eb);color:#fff;border:0;border-radius:11px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--f-head)}
+.btn.g{background:linear-gradient(135deg,var(--good),#15803d)}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- lab layout ---------- */
+.lab{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
+.left{border:1px solid var(--line);border-radius:14px;padding:13px;background:var(--bg2);max-height:78vh;overflow-y:auto}
+.right{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec{margin-bottom:14px}
+.sec h5{font-size:14px;margin:0 0 7px;color:var(--tx)}
+.pick{display:grid;gap:6px}
+.opt{cursor:pointer;border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:var(--surface);transition:.13s}
+.opt:hover{border-color:var(--accent2);transform:translateX(3px)}
+.opt.on{border-color:var(--good);background:#22c55e14}
+.opt .t{font-weight:600;font-size:13.3px}
+.opt .d{font-size:11.6px;color:var(--muted)}
+.opt .p{font-size:11.6px;color:var(--accent2)}
+.opt.off{opacity:.42;cursor:not-allowed}
+.opt.off:hover{transform:none;border-color:var(--line)}
+.opt.bad{border-color:var(--bad);background:#ef44441f;animation:shk .4s}
+@keyframes shk{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}60%{transform:translateX(5px)}}
+
+/* ---------- पुर्ज़ा चयन (एक जगह) ---------- */
+.partbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 9px}
+.pchip{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:7px 10px;font-size:12.3px;font-weight:600;cursor:pointer;font-family:inherit}
+.pchip:hover{border-color:var(--accent2);color:var(--tx)}
+.pchip.on{color:#fff;background:linear-gradient(180deg,#3b82f6,#2563eb);border-color:#2563eb}
+.pchip.done{color:var(--good);border-color:#22c55e66}
+.partpend{font-size:12.3px;margin:0 0 9px;line-height:1.6}
+.partq{width:100%;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color:var(--tx);font-size:13.5px;font-family:inherit;margin-bottom:9px}
+.partq:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b82f61f}
+.picker{border:1px solid var(--bad);background:#ef444418;color:#fca5a5;border-radius:11px;padding:9px 12px;font-size:12.6px;line-height:1.6;margin:0 0 10px}
+.partcnt{font-size:11.8px;color:var(--muted);margin:0 0 6px}
+
+/* ---------- चरण accordion ---------- */
+.acc{border:1px solid var(--line);border-radius:11px;margin-bottom:8px;background:var(--surface);overflow:hidden}
+.acc>h5{margin:0;padding:10px 12px;font-size:13.4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface2);font-weight:700;color:var(--tx)}
+.acc>h5:hover{color:var(--accent2)}
+.acc>h5 .t::after{content:' ▾';font-size:10px;color:var(--muted)}
+.acc.open>h5{color:var(--accent2);border-bottom:1px solid var(--line)}
+.acc.open>h5 .t::after{content:' ▴'}
+.acc .sum{font-size:11.4px;font-weight:600;color:var(--muted);text-align:right;max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc.done .sum{color:var(--good)}
+.acc.done>h5 .t::before{content:'✔ ';color:var(--good)}
+.acc .accb{padding:10px 12px}
+.acc.next>h5{border-color:var(--accent);box-shadow:0 0 0 2px #3b82f633}
+.acc.next>h5 .t::before{content:'👉 '}
+
+.stage{background:#0a1020;border:1px solid var(--line);border-radius:14px;min-height:300px;overflow:hidden}
+.stage svg{display:block;width:100%;height:auto}
+.monitor{margin-top:2px}
+.screen{background:#050810;border:12px solid #0d1424;border-radius:16px;min-height:210px;display:grid;place-items:center;text-align:center;padding:16px;position:relative;overflow:hidden}
+.screen.off{color:#334155}
+.screen .scr-t{color:var(--muted);font-size:13px;font-family:var(--f-mono);text-align:left;width:100%;align-self:start}
+.screen .scr-t div{margin:2px 0}
+.winlogo{display:grid;grid-template-columns:repeat(2,40px);grid-template-rows:repeat(2,40px);gap:4px;transform:perspective(240px) rotateY(-8deg);margin:0 auto 14px}
+.winlogo i{display:block}
+.winlogo i:nth-child(1){background:#f25022}
+.winlogo i:nth-child(2){background:#7fba00}
+.winlogo i:nth-child(3){background:#00a4ef}
+.winlogo i:nth-child(4){background:#ffb900}
+.wintxt{font-family:var(--f-head);letter-spacing:.5px;font-size:22px;color:#dbe7ff;margin-bottom:6px}
+.smalltxt{color:#7d8db0;font-size:12.5px;font-family:var(--f-mono)}
+.spin{display:flex;gap:6px;justify-content:center;margin-top:14px}
+.spin i{width:7px;height:7px;border-radius:50%;background:#7d8db0;animation:sp 1.2s infinite}
+.spin i:nth-child(2){animation-delay:.15s}.spin i:nth-child(3){animation-delay:.3s}
+.spin i:nth-child(4){animation-delay:.45s}.spin i:nth-child(5){animation-delay:.6s}
+@keyframes sp{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-5px)}}
+.desk{width:100%}
+.desk .bar{display:flex;gap:10px;align-items:center;background:#0b1220;border:1px solid #1e293b;border-radius:10px;padding:8px 12px;font-size:12.5px;color:#9fb6d6}
+.desk .icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin-top:14px}
+.desk .icons div{background:#0b1220;border:1px solid #1e293b;border-radius:10px;padding:12px 6px;font-size:11.5px;color:#9fb6d6}
+.desk .icons span{display:block;font-size:22px;margin-bottom:4px}
+
+.log{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-family:var(--f-mono);font-size:12.4px;line-height:1.8;max-height:230px;overflow-y:auto}
+.log div.ok{color:var(--good)} .log div.no{color:var(--bad)}
+.log div.wr{color:var(--warn)} .log div.in{color:var(--accent2)}
+
+.report{border:1px solid var(--good);background:#22c55e10;border-radius:12px;padding:14px}
+.report h4{font-size:16px;color:var(--good);margin-bottom:8px}
+.report .kv{display:grid;grid-template-columns:150px 1fr;gap:4px 10px;font-size:13.5px}
+.report .kv b{color:var(--muted);font-weight:600}
+
+.cert{margin-top:12px;border:2px dashed var(--accent);border-radius:14px;padding:9px;background:linear-gradient(180deg,#3b82f60f,#22c55e0a)}
+.cert-in{border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center;break-inside:avoid}
+.cert-top{font-size:18px;font-weight:800;color:var(--accent2);letter-spacing:.5px}
+.cert-sub{font-size:12px;color:var(--muted);margin:2px 0 10px}
+.cert-name{font-size:22px;font-weight:800;margin:6px 0;color:var(--tx);border-bottom:2px solid var(--good);display:inline-block;padding:0 16px 3px}
+.cert-org{font-size:13px;color:var(--tx);margin-bottom:8px}
+.cert-txt{font-size:13px;color:var(--muted);max-width:540px;margin:0 auto 12px;line-height:1.7}
+.cert-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.cert .seal{width:46px;height:46px;border-radius:50%;background:#22c55e22;color:var(--good);border:2px solid var(--good);display:inline-flex;align-items:center;justify-content:center;font-size:21px;font-weight:800;flex:0 0 auto}
+
+/* ---------- OS इंस्टॉल (वर्चुअल) ---------- */
+.osscreen{background:#050810;border:12px solid #0d1424;border-radius:16px;overflow:hidden;position:relative;color:#cbd5e1;font-family:var(--f-mono);font-size:12.7px;min-height:384px}
+.osscreen .sc{padding:16px;min-height:360px;display:flex;flex-direction:column;justify-content:center;width:100%}
+.bios{width:100%;min-height:360px;display:flex;flex-direction:column;background:#0b1a3a;color:#dbe7ff}
+.bios-h{background:#0e2444;padding:8px 12px;font-weight:700;letter-spacing:.4px;border-bottom:1px solid #2a4a7a;font-size:13px}
+.bios-b{display:flex;flex:1}
+.bios-col{width:150px;border-right:1px solid #2a4a7a;padding:10px 8px;display:flex;flex-direction:column;gap:3px}
+.bios-col span{padding:4px 8px;border-radius:6px;color:#9fb6d6;font-size:12.3px}
+.bios-col span.on{background:#1d4ed8;color:#fff}
+.bios-main{flex:1;padding:12px 16px}
+.bios-t{color:#7dd3fc;font-weight:700;margin-bottom:8px;font-size:12.5px}
+.bios-main .row{padding:4px 0;color:#cbd5e1}
+.bios-main .hl{color:#fff;background:#1d4ed8;padding:1px 7px;border-radius:5px}
+.bios-f{background:#0e2444;padding:6px 12px;font-size:11.5px;color:#9fb6d6;border-top:1px solid #2a4a7a}
+.post{width:100%;color:#cbd5e1;line-height:2;font-size:13px}
+.post .blink{color:#fde047;font-weight:700}
+.blink{animation:bl 1.1s steps(2,end) infinite}
+@keyframes bl{50%{opacity:0}}
+.wset{width:100%;background:linear-gradient(160deg,#0b3a6b,#08243f);border-radius:10px;overflow:hidden;color:#e8f1ff}
+.wset-top{background:#0a4a8a;padding:9px 14px;font-weight:700;font-size:13.5px;font-family:var(--f-head);letter-spacing:.3px}
+.wset-b{padding:15px}
+.win-opt{display:block;width:100%;text-align:left;background:#ffffff10;border:1px solid #ffffff2e;color:#e8f1ff;border-radius:8px;padding:9px 12px;margin:6px 0;font-size:13px;cursor:pointer;font-family:inherit}
+.win-opt:hover{background:#ffffff22;border-color:#7dd3fc}
+.win-opt.on{background:#2563eb;border-color:#93c5fd}
+.win-blue{background:#1e40af;border:0;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--f-head)}
+.win-blue:hover{filter:brightness(1.1)}
+.winst{width:100%;text-align:center}
+.winlogo.sm{display:grid;grid-template-columns:repeat(2,26px);grid-template-rows:repeat(2,26px);gap:3px;margin:0 auto 16px}
+.winlogo.sm i{display:block}
+.winlogo.sm i:nth-child(1){background:#f25022}.winlogo.sm i:nth-child(2){background:#7fba00}
+.winlogo.sm i:nth-child(3){background:#00a4ef}.winlogo.sm i:nth-child(4){background:#ffb900}
+.bar{height:10px;border-radius:6px;background:#ffffff1c;overflow:hidden;margin:10px auto;max-width:460px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#22d3ee);transition:width .25s}
+.phase{color:#9fb6d6;font-size:12.4px;line-height:1.8}
+.wdesk{width:100%;min-height:360px;background:linear-gradient(160deg,#0b3a6b,#0a1f3a);position:relative;padding:12px;text-align:left}
+.wdesk .ic{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;color:#e8f1ff;font-size:11px}
+.wdesk .ic div{background:#ffffff12;border:1px solid #ffffff22;border-radius:8px;padding:8px 4px;text-align:center}
+.wdesk .ic span{display:block;font-size:20px;margin-bottom:3px}
+.wtask{position:absolute;left:0;right:0;bottom:0;background:#0b1220e6;border-top:1px solid #1e293b;padding:6px 12px;display:flex;gap:14px;align-items:center;color:#9fb6d6;font-size:13px}
+.wtask .clock{margin-left:auto;font-size:11.5px}
+.ldesk{width:100%;min-height:360px;background:linear-gradient(160deg,#2c001e,#3b0a2a);position:relative;padding:12px;text-align:left;color:#eee}
+.ldesk .lp{position:absolute;left:0;right:0;top:0;background:#00000059;padding:5px 12px;font-size:11.5px;display:flex;gap:12px}
+.ldesk .dock{position:absolute;left:8px;top:44px;width:52px;background:#0000004d;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0;font-size:19px}
+.ldesk .lic{position:absolute;left:76px;top:48px;display:flex;flex-wrap:wrap;gap:10px;font-size:11px}
+.ldesk .lic div{width:76px;text-align:center;background:#ffffff12;border-radius:8px;padding:8px 4px}
+.ldesk .lic span{display:block;font-size:20px}
+.ldesk .term{position:absolute;left:76px;right:16px;bottom:44px;background:#000000d0;border-radius:8px;padding:9px 12px;font-size:11.8px;color:#7dd3fc;line-height:1.7}
+/* ---- OS लैब: चरण ट्रैकर · द्विभाषी लेबल · डिस्क टेबल · BIOS कंट्रोल · रिपोर्ट ---- */
+.osteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:6px;margin:6px 0 14px}
+.ostep{display:flex;gap:7px;align-items:flex-start;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 9px;opacity:.5}
+.ostep i{font-style:normal;flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--fg);font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.ostep .bhi{font-size:11.6px;font-weight:700;line-height:1.3}
+.ostep .ben{font-size:10px}
+.ostep.on{opacity:1;border-color:var(--accent);box-shadow:0 0 0 2px #38bdf833}
+.ostep.on i{background:var(--accent);color:#04202b}
+.ostep.done{opacity:1}
+.ostep.done i{background:var(--good,#22c55e);color:#04240f}
+.bhi{display:block}
+.ben{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.2px}
+.bhi2{font-weight:700}
+.ben2{font-size:11.5px;color:var(--muted);font-weight:500}
+.lbl{display:block;margin:9px 0 4px;font-size:12.2px;font-weight:700}
+.bchip{font:inherit;cursor:pointer;background:#ffffff14;border:1px solid #ffffff2e;color:#dbe7ff;border-radius:7px;padding:4px 10px;font-size:11.8px;margin:0 5px 5px 0}
+.bchip.on{background:#1d4ed8;border-color:#93c5fd;color:#fff;font-weight:700}
+.bios-main .brow{display:flex;align-items:center;gap:7px;font-size:12.2px;color:#cbd5e1;padding:4px 0;border-bottom:1px dashed #ffffff1c}
+.bios-main .brow .bn{width:16px;color:#7dd3fc;font-weight:700}
+.bios-main .brow .bt{flex:1}
+.bmini{cursor:pointer;background:#1e3a6b;border:1px solid #2a4a7a;color:#dbe7ff;border-radius:5px;width:22px;height:20px;font-size:11px;line-height:1;padding:0}
+.bmini:disabled{opacity:.3;cursor:default}
+.bios-main .brow2{margin:0 0 4px}
+.ptbl{width:100%;border-collapse:collapse;font-size:11.8px;color:#dbe7ff;margin:6px 0}
+.ptbl th,.ptbl td{border:1px solid #2a4a7a;padding:5px 7px;text-align:left;vertical-align:top}
+.ptbl th{background:#0e2444;color:#7dd3fc;font-weight:700}
+.ptbl td.num{text-align:right;white-space:nowrap}
+.ptbl tbody tr{cursor:pointer}
+.ptbl tbody tr:hover{background:#ffffff0f}
+.ptbl tbody tr.on{background:#1d4ed8;color:#fff}
+.ptbl .bhi{font-size:12px}
+.ptbl .ben{font-size:10px;color:#9fb6d6}
+.ptbl tbody tr.on .ben{color:#dbe7ff}
+.ptsum{font-size:11.5px;color:#9fb6d6;margin:4px 0 8px}
+.ptacts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.ptb{display:flex;gap:7px;align-items:flex-start;cursor:pointer;font:inherit;text-align:left;background:#ffffff14;border:1px solid #ffffff30;color:#e8f1ff;border-radius:8px;padding:6px 10px;min-width:96px}
+.ptb:hover{background:#ffffff26;border-color:#7dd3fc}
+.ptb b{font-size:14px}
+.ptb .bhi{font-size:11.6px}
+.ptb .ben{font-size:10px;color:#9fb6d6}
+.wbtn{cursor:pointer;font:inherit;background:#1e40af;border:0;color:#fff;border-radius:7px;padding:6px 18px;font-size:12.5px;font-weight:700}
+.wbtn:hover{filter:brightness(1.12)}
+.wbtn.ghost{background:#ffffff1c;border:1px solid #ffffff33}
+.wmsg{margin-top:8px;background:#7f1d1d55;border:1px solid #f8717166;color:#fecaca;border-radius:8px;padding:7px 10px;font-size:11.8px;line-height:1.6}
+.wdlg{position:absolute;inset:0;background:#00000099;display:flex;align-items:center;justify-content:center;padding:12px;z-index:5}
+.wdlg-b{background:#0e1c33;border:1px solid #2a4a7a;border-radius:10px;width:100%;max-width:430px;color:#e8f1ff;overflow:hidden}
+.wdlg-t{background:#0a4a8a;padding:8px 12px;font-weight:700;font-size:12.6px;display:flex;gap:8px;align-items:flex-start}
+.wdlg-t .ben{color:#cfe4ff}
+.wdlg-x{margin-left:auto;cursor:pointer;background:transparent;border:0;color:#cfe4ff;font-size:14px}
+.wdlg-c{padding:12px;font-size:12.3px}
+.wdlg-f{padding:10px 12px;display:flex;gap:10px;justify-content:flex-end;background:#0b1728}
+.wdlg .partq{background:#081422;color:#e8f1ff;border:1px solid #2a4a7a}
+.wdlg .lbl{color:#cfe4ff}
+.lot{color:#64748b;font-size:10.5px;margin-right:5px}
+.log div.err{background:#7f1d1d44}
+.log div.warn{background:#78350f44}
+.log div.ok{color:#86efac}
+.log .ben{display:block;font-size:10.5px;color:#7f8ea3}
+.rep{margin:14px 0 10px}
+.rep-t{font-size:16px;margin:0 0 10px}
+.rsec{margin:0 0 14px}
+.rsec h4{font-size:13.4px;margin:0 0 6px;color:var(--accent)}
+.rtbl{width:100%;border-collapse:collapse;font-size:12.6px}
+.rtbl th,.rtbl td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.rtbl thead th{background:rgba(127,127,127,.14);font-weight:700}
+.rtbl tbody th{background:rgba(127,127,127,.08);width:200px}
+.rtbl.small{font-size:11.6px}
+.rtbl tr.er td{background:#7f1d1d26}
+.rtbl .bhi{font-size:12.3px}
+.rtbl .ben{font-size:10.5px}
+.mist{font-size:10.4px;color:var(--muted)}
+.rgood{background:rgba(34,197,94,.12);border:1px solid #22c55e66;border-radius:9px;padding:8px 11px;font-size:12.5px}
+.repbtns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+.osrep{margin-top:12px}
+@media(max-width:860px){ .lab{grid-template-columns:1fr} .left{max-height:none} }
+@media print{ .top,.tabs,.left,.monitor,.log,.refsearch,.refchips,.osscreen,.osteps,.repbtns,.sec,.ossteps,button{display:none!important} .cert{border-color:#999} .tblwrap .bhi,.tblwrap .ben,.rtbl .bhi,.rtbl .ben,.ptbl .bhi,.ptbl .ben{display:block!important} }
+</style>
+<link rel="stylesheet" href="../assets/modern-ui.css?v=2">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo">🖥️</span>
+      <span><b>कंप्यूटर असेंबली <i>लैब</i></b><small>Computer Assembly Lab · Theory + Practical</small></span>
+    </div>
+    <div class="stats" id="stats"></div>
+    <button class="mini" id="langBtn">🌐 हिंदी + EN</button>
+    <button class="mini" id="themeBtn">🌗 थीम</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="lab" class="on">🧪 असेंबली लैब</button>
+    <button data-tab="os">💿 OS इंस्टॉल</button>
+    <button data-tab="mb">🧩 मदरबोर्ड</button>
+    <button data-tab="cpu">🔲 प्रोसेसर</button>
+    <button data-tab="ram">📏 रैम</button>
+    <button data-tab="storage">💽 स्टोरेज</button>
+    <button data-tab="psu">🔌 SMPS</button>
+    <button data-tab="monitor">🖥️ मॉनिटर</button>
+    <button data-tab="gpu">🎮 ग्राफ़िक्स कार्ड</button>
+    <button data-tab="case">🗄️ कैबिनेट</button>
+    <button data-tab="misc">⌨️ अन्य उपकरण</button>
+  </nav>
+
+  <!-- ================= लैब ================= -->
+  <section id="view-lab">
+
+    <div class="gate" id="gate">
+      <div class="card">
+        <h2 class="blk" style="margin-top:0">स्टूडेंट प्रवेश फ़ॉर्म</h2>
+        <p class="hint">अपनी जानकारी भरिए — प्रयास (attempts) अपने आप गिने जाएँगे और रिपोर्ट बनेगी।</p>
+        <label for="stName">स्टूडेंट का नाम</label>
+        <input type="text" id="stName" placeholder="जैसे: राम कुमार">
+        <label for="stSchool">स्कूल / संस्थान का नाम</label>
+        <input type="text" id="stSchool" placeholder="जैसे: राजकीय आई.टी.आई., जयपुर">
+        <label for="stClass">कक्षा / बैच / रोल नंबर</label>
+        <input type="text" id="stClass" placeholder="जैसे: COPA-2 / बैच-B / रोल 14">
+        <label for="stDate">तारीख</label>
+        <input type="date" id="stDate">
+        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="startBtn">🚀 लैब शुरू करें</button>
+          <button class="mini" id="resumeBtn" hidden>↩ पिछला स्टूडेंट</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="labArea" hidden>
+      <p class="hint">बाएँ से एक-एक चरण करें। दाईं तरफ़ PC बनते दिखेगा और नीचे मॉनिटर पर परिणाम। सब सही होने पर <b>विंडोज बूट</b> होगा।</p>
+      <div class="lab">
+        <div class="left" id="panel"></div>
+        <div class="right">
+          <div class="stage" id="stage"></div>
+          <div class="monitor"><div class="screen off" id="screen">🖥️ मॉनिटर बंद है</div></div>
+          <div class="log" id="log"></div>
+          <div id="reportBox"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn g" id="bootBtn">⏻ पावर बटन</button>
+            <button class="mini" id="resetBtn">↺ पूरा रीसेट</button>
+            <button class="mini" id="logoutBtn">👤 स्टूडेंट बदलें</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= OS इंस्टॉल ================= -->
+  <section id="view-os" hidden>
+    <h2 class="blk" style="margin-top:0">💿 ऑपरेटिंग सिस्टम इंस्टॉलेशन (वर्चुअल)</h2>
+    <p class="hint">असली कंप्यूटर की तरह पूरी प्रक्रिया, <b>चरण-दर-चरण (step by step)</b> — <b>OS चुनना → ISO डाउनलोड → बूटेबल पेन ड्राइव → BIOS सेटिंग → USB से बूट → सेटअप के सवाल → डिस्क पार्टीशन → इंस्टॉल → पहला सेटअप (OOBE) → डेस्कटॉप</b>। हर कदम और हर ग़लती अपने आप दर्ज होती है, अंत में पूरी रिपोर्ट बनती है।</p>
+    <div class="ossteps" id="osSteps"></div>
+    <div class="lab">
+      <div class="left" id="osPanel"></div>
+      <div class="right">
+        <div class="osscreen" id="osScreen"></div>
+        <div class="log" id="osLog"></div>
+        <div class="osrep" id="osReport"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mini" id="osResetBtn">↺ इंस्टॉल रीसेट</button>
+          <button class="mini" id="osBackLab">🧪 असेंबली लैब पर जाएँ</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= संदर्भ सूचियाँ ================= -->
+  <section id="view-ref" hidden>
+    <h2 class="blk" id="refTitle"></h2>
+    <p class="hint" id="refHint"></p>
+    <div class="refsearch">
+      <input id="refSearch" type="search" autocomplete="off" placeholder="🔍 खोजें — नाम · ब्रांड · सॉकेट · टाइप · कोर · वाट ...">
+      <button class="mini" id="refClear" hidden>✕ हटाएँ</button>
+      <button class="mini" id="refPrint">🖨️ प्रिंट/PDF</button>
+      <span class="refcount" id="refCount"></span>
+    </div>
+    <div class="refchips" id="refChips" hidden></div>
+    <div id="refBody"></div>
+  </section>
+
+</main>
+
+<footer class="wrap" style="color:var(--muted);font-size:12.5px;padding:26px 16px 40px">
+  कंप्यूटर असेंबली लैब · शिक्षण हेतु · Future Instructor Group
+  <div style="margin-top:10px">
+    <a class="btn" style="font-size:13px;padding:8px 14px;display:inline-block;text-decoration:none;margin:3px 5px 0 0" href="02-basics.html">⬅ कंप्यूटर लैब</a>
+    <a class="btn" style="font-size:13px;padding:8px 14px;display:inline-block;text-decoration:none;margin:3px 5px 0 0" href="basic-office-lab.html">💻 बेसिक कंप्यूटर + MS Office लैब</a>
+    <a class="btn" style="font-size:13px;padding:8px 14px;display:inline-block;text-decoration:none;margin:3px 5px 0 0" href="basic-office-lab.html#fullforms">🔠 फुल फ़ॉर्म</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= helpers ================= */
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function el(t, c, h) { var e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  /* ================= डेटा ================= */
+  var MOTHERBOARDS = [
+    /* ---- LGA775 (पुराना, DDR3) ---- */
+    { id:'m1',  brand:'ASUS',     name:'ASUS P5G41T-M LX',        socket:'LGA775',  chip:'G41',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'8GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2010 },
+    { id:'m2',  brand:'Gigabyte', name:'Gigabyte GA-G41M-Combo',  socket:'LGA775',  chip:'G41',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'8GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2011 },
+    { id:'m3',  brand:'Intel',    name:'Intel DG41WV',            socket:'LGA775',  chip:'G41',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'8GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2010 },
+    { id:'m4',  brand:'ASRock',   name:'ASRock G41M-VS3',         socket:'LGA775',  chip:'G41',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'8GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2011 },
+    { id:'m5',  brand:'Biostar',  name:'Biostar G41D3C',          socket:'LGA775',  chip:'G41',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'8GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2011 },
+    { id:'m6',  brand:'Biostar',  name:'Biostar G31-M7 TE',       socket:'LGA775',  chip:'G31',  form:'mATX', rank:2, ddr:'DDR2', slots:2, max:'4GB',   m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2009 },
+    /* ---- LGA1155 (DDR3) ---- */
+    { id:'m7',  brand:'ASUS',     name:'ASUS P8H61-M LX',         socket:'LGA1155', chip:'H61',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2011 },
+    { id:'m8',  brand:'Gigabyte', name:'Gigabyte GA-B75M-D3H',    socket:'LGA1155', chip:'B75',  form:'mATX', rank:2, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:5, net:'1Gbps',    recPsu:350, year:2012 },
+    { id:'m9',  brand:'MSI',      name:'MSI H61M-P20',            socket:'LGA1155', chip:'H61',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2012 },
+    { id:'m10', brand:'Intel',    name:'Intel DH61WW',            socket:'LGA1155', chip:'H61',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2011 },
+    { id:'m11', brand:'ASRock',   name:'ASRock H61M-VS3',         socket:'LGA1155', chip:'H61',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'100Mbps',  recPsu:300, year:2012 },
+    /* ---- LGA1150 (DDR3) ---- */
+    { id:'m12', brand:'ASUS',     name:'ASUS H81M-E',             socket:'LGA1150', chip:'H81',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'1Gbps',    recPsu:350, year:2013 },
+    { id:'m13', brand:'Gigabyte', name:'Gigabyte GA-B85M-D3H',    socket:'LGA1150', chip:'B85',  form:'mATX', rank:2, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:6, net:'1Gbps',    recPsu:400, year:2013 },
+    { id:'m14', brand:'MSI',      name:'MSI H81M-P33',            socket:'LGA1150', chip:'H81',  form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'1Gbps',    recPsu:350, year:2013 },
+    { id:'m15', brand:'ASRock',   name:'ASRock B85M Pro4',        socket:'LGA1150', chip:'B85',  form:'mATX', rank:2, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:6, net:'1Gbps',    recPsu:400, year:2013 },
+    /* ---- LGA1151 (DDR4) ---- */
+    { id:'m16', brand:'ASUS',     name:'ASUS H110M-C',            socket:'LGA1151', chip:'H110', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'32GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2015 },
+    { id:'m17', brand:'Gigabyte', name:'Gigabyte H310M S2H',      socket:'LGA1151', chip:'H310', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'32GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2018 },
+    { id:'m18', brand:'MSI',      name:'MSI B250M PRO-VD',        socket:'LGA1151', chip:'B250', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'32GB',  m2:1, sata:6, net:'1Gbps',    recPsu:400, year:2017 },
+    { id:'m19', brand:'ASRock',   name:'ASRock B365M Pro4',       socket:'LGA1151', chip:'B365', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'64GB',  m2:2, sata:6, net:'1Gbps',    recPsu:450, year:2019 },
+    { id:'m20', brand:'Zotac',    name:'Zotac H310',              socket:'LGA1151', chip:'H310', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'32GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2018 },
+    { id:'m21', brand:'ASUS',     name:'ASUS PRIME Z390-A',       socket:'LGA1151', chip:'Z390', form:'ATX',  rank:3, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:6, net:'1Gbps',    recPsu:500, year:2018 },
+    /* ---- LGA1200 (DDR4) ---- */
+    { id:'m22', brand:'ASUS',     name:'ASUS PRIME H510M-E',      socket:'LGA1200', chip:'H510', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2021 },
+    { id:'m23', brand:'Gigabyte', name:'Gigabyte B560M DS3H',     socket:'LGA1200', chip:'B560', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:6, net:'2.5Gbps',  recPsu:500, year:2021 },
+    { id:'m24', brand:'MSI',      name:'MSI B460M PRO',           socket:'LGA1200', chip:'B460', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'128GB', m2:1, sata:6, net:'1Gbps',    recPsu:450, year:2020 },
+    { id:'m25', brand:'ASRock',   name:'ASRock H510M-HDV',        socket:'LGA1200', chip:'H510', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2021 },
+    { id:'m26', brand:'Biostar',  name:'Biostar H510MX/E',        socket:'LGA1200', chip:'H510', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2021 },
+    { id:'m27', brand:'Colorful', name:'Colorful H510M-K',        socket:'LGA1200', chip:'H510', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2021 },
+    { id:'m28', brand:'ASUS',     name:'ASUS ROG STRIX Z590-A',   socket:'LGA1200', chip:'Z590', form:'ATX',  rank:3, ddr:'DDR4', slots:4, max:'128GB', m2:3, sata:6, net:'2.5Gbps',  recPsu:650, year:2021 },
+    /* ---- LGA1700 (DDR4 / DDR5) ---- */
+    { id:'m29', brand:'ASUS',     name:'ASUS PRIME H610M-E D4',   socket:'LGA1700', chip:'H610', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2022 },
+    { id:'m30', brand:'ASUS',     name:'ASUS PRIME B660M-A D4',   socket:'LGA1700', chip:'B660', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:4, net:'1Gbps',    recPsu:500, year:2022 },
+    { id:'m31', brand:'ASUS',     name:'ASUS PRIME Z790-P WIFI',  socket:'LGA1700', chip:'Z790', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:3, sata:4, net:'2.5Gbps',  recPsu:650, year:2022 },
+    { id:'m32', brand:'Gigabyte', name:'Gigabyte B760M DS3H DDR4',socket:'LGA1700', chip:'B760', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:500, year:2023 },
+    { id:'m33', brand:'MSI',      name:'MSI PRO B660M-A DDR4',    socket:'LGA1700', chip:'B660', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:4, net:'1Gbps',    recPsu:500, year:2022 },
+    { id:'m34', brand:'MSI',      name:'MSI MAG Z790 TOMAHAWK',   socket:'LGA1700', chip:'Z790', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:4, sata:6, net:'2.5Gbps',  recPsu:650, year:2022 },
+    { id:'m35', brand:'ASRock',   name:'ASRock B760M PG Riptide', socket:'LGA1700', chip:'B760', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'192GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:550, year:2023 },
+    { id:'m36', brand:'Maxsun',   name:'Maxsun H610M',            socket:'LGA1700', chip:'H610', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2023 },
+    { id:'m37', brand:'Gigabyte', name:'Gigabyte B760M DS3H DDR5',socket:'LGA1700', chip:'B760', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'192GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:500, year:2023 },
+    /* ---- LGA1851 (DDR5, Core Ultra) ---- */
+    { id:'m38', brand:'ASUS',     name:'ASUS PRIME Z890-P',       socket:'LGA1851', chip:'Z890', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:4, sata:4, net:'2.5Gbps',  recPsu:700, year:2024 },
+    { id:'m39', brand:'Gigabyte', name:'Gigabyte Z890 AORUS ELITE',socket:'LGA1851',chip:'Z890', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:4, sata:4, net:'2.5Gbps',  recPsu:700, year:2024 },
+    { id:'m40', brand:'MSI',      name:'MSI MAG B860 TOMAHAWK',   socket:'LGA1851', chip:'B860', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:3, sata:4, net:'2.5Gbps',  recPsu:650, year:2025 },
+    { id:'m41', brand:'ASRock',   name:'ASRock Z890 Pro RS',      socket:'LGA1851', chip:'Z890', form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'192GB', m2:4, sata:4, net:'2.5Gbps',  recPsu:700, year:2024 },
+    /* ---- AM3+ (DDR3) ---- */
+    { id:'m42', brand:'ASUS',     name:'ASUS M5A78L-M LX3',       socket:'AM3+',    chip:'760G', form:'mATX', rank:2, ddr:'DDR3', slots:2, max:'16GB',  m2:0, sata:4, net:'100Mbps',  recPsu:350, year:2013 },
+    { id:'m43', brand:'Gigabyte', name:'Gigabyte GA-970A-DS3P',   socket:'AM3+',    chip:'970',  form:'ATX',  rank:3, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:6, net:'1Gbps',    recPsu:450, year:2013 },
+    { id:'m44', brand:'MSI',      name:'MSI 970A-G43',            socket:'AM3+',    chip:'970',  form:'ATX',  rank:3, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:6, net:'1Gbps',    recPsu:450, year:2013 },
+    { id:'m45', brand:'ASRock',   name:'ASRock 970 Pro3 R2.0',    socket:'AM3+',    chip:'970',  form:'ATX',  rank:3, ddr:'DDR3', slots:4, max:'32GB',  m2:0, sata:6, net:'1Gbps',    recPsu:450, year:2013 },
+    /* ---- AM4 (DDR4) ---- */
+    { id:'m46', brand:'ASUS',     name:'ASUS PRIME A320M-K',      socket:'AM4',     chip:'A320', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'32GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2017 },
+    { id:'m47', brand:'ASUS',     name:'ASUS TUF B450M-PLUS',     socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'64GB',  m2:1, sata:6, net:'1Gbps',    recPsu:450, year:2018 },
+    { id:'m48', brand:'Gigabyte', name:'Gigabyte B450M DS3H',     socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:450, year:2018 },
+    { id:'m49', brand:'Gigabyte', name:'Gigabyte X570 AORUS ELITE',socket:'AM4',    chip:'X570', form:'ATX',  rank:3, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:6, net:'1Gbps',    recPsu:650, year:2019 },
+    { id:'m50', brand:'MSI',      name:'MSI B450M PRO-VDH',       socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:450, year:2018 },
+    { id:'m51', brand:'MSI',      name:'MSI MAG B550 TOMAHAWK',   socket:'AM4',     chip:'B550', form:'ATX',  rank:3, ddr:'DDR4', slots:4, max:'128GB', m2:2, sata:6, net:'2.5Gbps',  recPsu:650, year:2020 },
+    { id:'m52', brand:'ASRock',   name:'ASRock B450M Pro4',       socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:4, max:'64GB',  m2:2, sata:4, net:'1Gbps',    recPsu:450, year:2018 },
+    { id:'m53', brand:'ASRock',   name:'ASRock X570 Taichi',      socket:'AM4',     chip:'X570', form:'ATX',  rank:3, ddr:'DDR4', slots:4, max:'128GB', m2:3, sata:8, net:'2.5Gbps',  recPsu:650, year:2019 },
+    { id:'m54', brand:'Biostar',  name:'Biostar B450MHP',         socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2019 },
+    { id:'m55', brand:'Colorful', name:'Colorful B450M-K',        socket:'AM4',     chip:'B450', form:'mATX', rank:2, ddr:'DDR4', slots:2, max:'64GB',  m2:1, sata:4, net:'1Gbps',    recPsu:400, year:2019 },
+    /* ---- AM5 (DDR5) ---- */
+    { id:'m56', brand:'ASUS',     name:'ASUS PRIME B650M-A',      socket:'AM5',     chip:'B650', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'128GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:600, year:2022 },
+    { id:'m57', brand:'Gigabyte', name:'Gigabyte B650M DS3H',     socket:'AM5',     chip:'B650', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'128GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:600, year:2022 },
+    { id:'m58', brand:'MSI',      name:'MSI PRO B650M-A WIFI',    socket:'AM5',     chip:'B650', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'128GB', m2:2, sata:4, net:'2.5Gbps',  recPsu:600, year:2022 },
+    { id:'m59', brand:'ASRock',   name:'ASRock B650M Pro RS',     socket:'AM5',     chip:'B650', form:'mATX', rank:2, ddr:'DDR5', slots:4, max:'128GB', m2:3, sata:4, net:'2.5Gbps',  recPsu:600, year:2022 },
+    { id:'m60', brand:'ASUS',     name:'ASUS ROG STRIX X670E-A',  socket:'AM5',     chip:'X670E',form:'ATX',  rank:3, ddr:'DDR5', slots:4, max:'128GB', m2:4, sata:6, net:'2.5Gbps',  recPsu:700, year:2022 }
+  ];
+
+  var CPUS = [
+    /* ---------- Intel · LGA775 ---------- */
+    { id:'c1',  name:'Intel Pentium Dual-Core E5300', brand:'Intel', socket:'LGA775',  cores:2,  threads:2,  tdp:65,  recPsu:300, igpu:false, year:2008 },
+    { id:'c2',  name:'Intel Core 2 Duo E7500',        brand:'Intel', socket:'LGA775',  cores:2,  threads:2,  tdp:65,  recPsu:300, igpu:false, year:2009 },
+    { id:'c3',  name:'Intel Core 2 Quad Q8400',       brand:'Intel', socket:'LGA775',  cores:4,  threads:4,  tdp:95,  recPsu:350, igpu:false, year:2009 },
+    { id:'c4',  name:'Intel Core 2 Extreme QX9770',   brand:'Intel', socket:'LGA775',  cores:4,  threads:4,  tdp:136, recPsu:450, igpu:false, year:2008 },
+    /* ---------- Intel · LGA1155 ---------- */
+    { id:'c5',  name:'Intel Celeron G530',            brand:'Intel', socket:'LGA1155', cores:2,  threads:2,  tdp:65,  recPsu:300, igpu:true,  year:2011 },
+    { id:'c6',  name:'Intel Pentium G2020',           brand:'Intel', socket:'LGA1155', cores:2,  threads:2,  tdp:55,  recPsu:300, igpu:true,  year:2013 },
+    { id:'c7',  name:'Intel Core i3-2100',            brand:'Intel', socket:'LGA1155', cores:2,  threads:4,  tdp:65,  recPsu:350, igpu:true,  year:2011 },
+    { id:'c8',  name:'Intel Core i5-2500K',           brand:'Intel', socket:'LGA1155', cores:4,  threads:4,  tdp:95,  recPsu:400, igpu:true,  year:2011 },
+    { id:'c9',  name:'Intel Core i7-2600K',           brand:'Intel', socket:'LGA1155', cores:4,  threads:8,  tdp:95,  recPsu:450, igpu:true,  year:2011 },
+    { id:'c10', name:'Intel Core i7-3770K',           brand:'Intel', socket:'LGA1155', cores:4,  threads:8,  tdp:77,  recPsu:400, igpu:true,  year:2012 },
+    { id:'c11', name:'Intel Xeon E3-1230 v2',         brand:'Intel', socket:'LGA1155', cores:4,  threads:8,  tdp:69,  recPsu:400, igpu:false, year:2012 },
+    /* ---------- Intel · LGA1150 ---------- */
+    { id:'c12', name:'Intel Pentium G3220',           brand:'Intel', socket:'LGA1150', cores:2,  threads:2,  tdp:54,  recPsu:300, igpu:true,  year:2013 },
+    { id:'c13', name:'Intel Core i3-4130',            brand:'Intel', socket:'LGA1150', cores:2,  threads:4,  tdp:54,  recPsu:350, igpu:true,  year:2013 },
+    { id:'c14', name:'Intel Core i5-4460',            brand:'Intel', socket:'LGA1150', cores:4,  threads:4,  tdp:84,  recPsu:400, igpu:true,  year:2014 },
+    { id:'c15', name:'Intel Core i5-4690K',           brand:'Intel', socket:'LGA1150', cores:4,  threads:4,  tdp:88,  recPsu:450, igpu:true,  year:2014 },
+    { id:'c16', name:'Intel Core i7-4790K',           brand:'Intel', socket:'LGA1150', cores:4,  threads:8,  tdp:88,  recPsu:500, igpu:true,  year:2014 },
+    { id:'c17', name:'Intel Xeon E3-1231 v3',         brand:'Intel', socket:'LGA1150', cores:4,  threads:8,  tdp:80,  recPsu:450, igpu:false, year:2014 },
+    /* ---------- Intel · LGA1151 ---------- */
+    { id:'c18', name:'Intel Pentium G4560',           brand:'Intel', socket:'LGA1151', cores:2,  threads:4,  tdp:54,  recPsu:300, igpu:true,  year:2017 },
+    { id:'c19', name:'Intel Core i3-7100',            brand:'Intel', socket:'LGA1151', cores:2,  threads:4,  tdp:51,  recPsu:350, igpu:true,  year:2017 },
+    { id:'c20', name:'Intel Core i3-8100',            brand:'Intel', socket:'LGA1151', cores:4,  threads:4,  tdp:65,  recPsu:400, igpu:true,  year:2017 },
+    { id:'c21', name:'Intel Core i5-7400',            brand:'Intel', socket:'LGA1151', cores:4,  threads:4,  tdp:65,  recPsu:400, igpu:true,  year:2017 },
+    { id:'c22', name:'Intel Core i5-8400',            brand:'Intel', socket:'LGA1151', cores:6,  threads:6,  tdp:65,  recPsu:450, igpu:true,  year:2017 },
+    { id:'c23', name:'Intel Core i5-9400F',           brand:'Intel', socket:'LGA1151', cores:6,  threads:6,  tdp:65,  recPsu:450, igpu:false, year:2019 },
+    { id:'c24', name:'Intel Core i7-7700',            brand:'Intel', socket:'LGA1151', cores:4,  threads:8,  tdp:65,  recPsu:450, igpu:true,  year:2017 },
+    { id:'c25', name:'Intel Core i7-8700K',           brand:'Intel', socket:'LGA1151', cores:6,  threads:12, tdp:95,  recPsu:500, igpu:true,  year:2017 },
+    { id:'c26', name:'Intel Core i7-9700K',           brand:'Intel', socket:'LGA1151', cores:8,  threads:8,  tdp:95,  recPsu:550, igpu:true,  year:2018 },
+    { id:'c27', name:'Intel Core i9-9900K',           brand:'Intel', socket:'LGA1151', cores:8,  threads:16, tdp:95,  recPsu:600, igpu:true,  year:2018 },
+    /* ---------- Intel · LGA1200 ---------- */
+    { id:'c28', name:'Intel Celeron G5905',           brand:'Intel', socket:'LGA1200', cores:2,  threads:2,  tdp:58,  recPsu:300, igpu:true,  year:2020 },
+    { id:'c29', name:'Intel Pentium Gold G6400',      brand:'Intel', socket:'LGA1200', cores:2,  threads:4,  tdp:58,  recPsu:300, igpu:true,  year:2020 },
+    { id:'c30', name:'Intel Core i3-10100',           brand:'Intel', socket:'LGA1200', cores:4,  threads:8,  tdp:65,  recPsu:400, igpu:true,  year:2020 },
+    { id:'c31', name:'Intel Core i3-10100F',          brand:'Intel', socket:'LGA1200', cores:4,  threads:8,  tdp:65,  recPsu:400, igpu:false, year:2020 },
+    { id:'c32', name:'Intel Core i5-10400',           brand:'Intel', socket:'LGA1200', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:true,  year:2020 },
+    { id:'c33', name:'Intel Core i5-10400F',          brand:'Intel', socket:'LGA1200', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2020 },
+    { id:'c34', name:'Intel Core i5-11400',           brand:'Intel', socket:'LGA1200', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:true,  year:2021 },
+    { id:'c35', name:'Intel Core i5-11400F',          brand:'Intel', socket:'LGA1200', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2021 },
+    { id:'c36', name:'Intel Core i7-10700K',          brand:'Intel', socket:'LGA1200', cores:8,  threads:16, tdp:125, recPsu:550, igpu:true,  year:2020 },
+    { id:'c37', name:'Intel Core i7-11700K',          brand:'Intel', socket:'LGA1200', cores:8,  threads:16, tdp:125, recPsu:600, igpu:true,  year:2021 },
+    { id:'c38', name:'Intel Core i9-10900K',          brand:'Intel', socket:'LGA1200', cores:10, threads:20, tdp:125, recPsu:650, igpu:true,  year:2020 },
+    { id:'c39', name:'Intel Core i9-11900K',          brand:'Intel', socket:'LGA1200', cores:8,  threads:16, tdp:125, recPsu:650, igpu:true,  year:2021 },
+    /* ---------- Intel · LGA1700 ---------- */
+    { id:'c40', name:'Intel Celeron G6900',           brand:'Intel', socket:'LGA1700', cores:2,  threads:2,  tdp:46,  recPsu:300, igpu:true,  year:2022 },
+    { id:'c41', name:'Intel Pentium Gold G7400',      brand:'Intel', socket:'LGA1700', cores:2,  threads:4,  tdp:46,  recPsu:300, igpu:true,  year:2022 },
+    { id:'c42', name:'Intel Core i3-12100',           brand:'Intel', socket:'LGA1700', cores:4,  threads:8,  tdp:60,  recPsu:400, igpu:true,  year:2022 },
+    { id:'c43', name:'Intel Core i3-12100F',          brand:'Intel', socket:'LGA1700', cores:4,  threads:8,  tdp:58,  recPsu:400, igpu:false, year:2022 },
+    { id:'c44', name:'Intel Core i3-13100F',          brand:'Intel', socket:'LGA1700', cores:4,  threads:8,  tdp:58,  recPsu:400, igpu:false, year:2023 },
+    { id:'c45', name:'Intel Core i5-12400',           brand:'Intel', socket:'LGA1700', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:true,  year:2022 },
+    { id:'c46', name:'Intel Core i5-12400F',          brand:'Intel', socket:'LGA1700', cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2022 },
+    { id:'c47', name:'Intel Core i5-12600K',          brand:'Intel', socket:'LGA1700', cores:10, threads:16, tdp:125, recPsu:550, igpu:true,  year:2021 },
+    { id:'c48', name:'Intel Core i5-13400F',          brand:'Intel', socket:'LGA1700', cores:10, threads:16, tdp:65,  recPsu:500, igpu:false, year:2023 },
+    { id:'c49', name:'Intel Core i5-13600K',          brand:'Intel', socket:'LGA1700', cores:14, threads:20, tdp:125, recPsu:600, igpu:true,  year:2022 },
+    { id:'c50', name:'Intel Core i5-14400F',          brand:'Intel', socket:'LGA1700', cores:10, threads:16, tdp:65,  recPsu:500, igpu:false, year:2024 },
+    { id:'c51', name:'Intel Core i7-12700K',          brand:'Intel', socket:'LGA1700', cores:12, threads:20, tdp:125, recPsu:600, igpu:true,  year:2021 },
+    { id:'c52', name:'Intel Core i7-13700K',          brand:'Intel', socket:'LGA1700', cores:16, threads:24, tdp:125, recPsu:650, igpu:true,  year:2022 },
+    { id:'c53', name:'Intel Core i7-14700K',          brand:'Intel', socket:'LGA1700', cores:20, threads:28, tdp:125, recPsu:700, igpu:true,  year:2023 },
+    { id:'c54', name:'Intel Core i9-12900K',          brand:'Intel', socket:'LGA1700', cores:16, threads:24, tdp:125, recPsu:750, igpu:true,  year:2021 },
+    { id:'c55', name:'Intel Core i9-13900K',          brand:'Intel', socket:'LGA1700', cores:24, threads:32, tdp:125, recPsu:750, igpu:true,  year:2022 },
+    { id:'c56', name:'Intel Core i9-14900K',          brand:'Intel', socket:'LGA1700', cores:24, threads:32, tdp:125, recPsu:850, igpu:true,  year:2023 },
+    /* ---------- Intel · LGA1851 (Core Ultra) ---------- */
+    { id:'c57', name:'Intel Core Ultra 5 245K',       brand:'Intel', socket:'LGA1851', cores:14, threads:14, tdp:125, recPsu:700, igpu:true,  year:2024 },
+    { id:'c58', name:'Intel Core Ultra 7 265K',       brand:'Intel', socket:'LGA1851', cores:20, threads:20, tdp:125, recPsu:750, igpu:true,  year:2024 },
+    { id:'c59', name:'Intel Core Ultra 9 285K',       brand:'Intel', socket:'LGA1851', cores:24, threads:24, tdp:125, recPsu:850, igpu:true,  year:2024 },
+    /* ---------- AMD · AM3+ ---------- */
+    { id:'c60', name:'AMD Athlon II X2 250',          brand:'AMD',   socket:'AM3+',    cores:2,  threads:2,  tdp:65,  recPsu:300, igpu:false, year:2009 },
+    { id:'c61', name:'AMD Phenom II X4 955',          brand:'AMD',   socket:'AM3+',    cores:4,  threads:4,  tdp:125, recPsu:450, igpu:false, year:2009 },
+    { id:'c62', name:'AMD FX-4300',                   brand:'AMD',   socket:'AM3+',    cores:4,  threads:4,  tdp:95,  recPsu:400, igpu:false, year:2012 },
+    { id:'c63', name:'AMD FX-6300',                   brand:'AMD',   socket:'AM3+',    cores:6,  threads:6,  tdp:95,  recPsu:450, igpu:false, year:2012 },
+    { id:'c64', name:'AMD FX-8350',                   brand:'AMD',   socket:'AM3+',    cores:8,  threads:8,  tdp:125, recPsu:500, igpu:false, year:2012 },
+    /* ---------- AMD · AM4 ---------- */
+    { id:'c65', name:'AMD Athlon 200GE',              brand:'AMD',   socket:'AM4',     cores:2,  threads:4,  tdp:35,  recPsu:300, igpu:true,  year:2018 },
+    { id:'c66', name:'AMD Ryzen 3 1200',              brand:'AMD',   socket:'AM4',     cores:4,  threads:4,  tdp:65,  recPsu:400, igpu:false, year:2017 },
+    { id:'c67', name:'AMD Ryzen 3 2200G',             brand:'AMD',   socket:'AM4',     cores:4,  threads:4,  tdp:65,  recPsu:400, igpu:true,  year:2018 },
+    { id:'c68', name:'AMD Ryzen 3 3200G',             brand:'AMD',   socket:'AM4',     cores:4,  threads:4,  tdp:65,  recPsu:400, igpu:true,  year:2019 },
+    { id:'c69', name:'AMD Ryzen 5 1600',              brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2017 },
+    { id:'c70', name:'AMD Ryzen 5 2600',              brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2018 },
+    { id:'c71', name:'AMD Ryzen 5 3600',              brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2019 },
+    { id:'c72', name:'AMD Ryzen 5 5500',              brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2022 },
+    { id:'c73', name:'AMD Ryzen 5 5600',              brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2022 },
+    { id:'c74', name:'AMD Ryzen 5 5600G',             brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:true,  year:2021 },
+    { id:'c75', name:'AMD Ryzen 5 5600X',             brand:'AMD',   socket:'AM4',     cores:6,  threads:12, tdp:65,  recPsu:450, igpu:false, year:2020 },
+    { id:'c76', name:'AMD Ryzen 7 1700',              brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:65,  recPsu:450, igpu:false, year:2017 },
+    { id:'c77', name:'AMD Ryzen 7 2700X',             brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:105, recPsu:500, igpu:false, year:2018 },
+    { id:'c78', name:'AMD Ryzen 7 3700X',             brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:65,  recPsu:500, igpu:false, year:2019 },
+    { id:'c79', name:'AMD Ryzen 7 5700G',             brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:65,  recPsu:500, igpu:true,  year:2021 },
+    { id:'c80', name:'AMD Ryzen 7 5700X',             brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:65,  recPsu:500, igpu:false, year:2022 },
+    { id:'c81', name:'AMD Ryzen 7 5800X',             brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:105, recPsu:550, igpu:false, year:2020 },
+    { id:'c82', name:'AMD Ryzen 7 5800X3D',           brand:'AMD',   socket:'AM4',     cores:8,  threads:16, tdp:105, recPsu:550, igpu:false, year:2022 },
+    { id:'c83', name:'AMD Ryzen 9 3900X',             brand:'AMD',   socket:'AM4',     cores:12, threads:24, tdp:105, recPsu:600, igpu:false, year:2019 },
+    { id:'c84', name:'AMD Ryzen 9 5900X',             brand:'AMD',   socket:'AM4',     cores:12, threads:24, tdp:105, recPsu:600, igpu:false, year:2020 },
+    { id:'c85', name:'AMD Ryzen 9 5950X',             brand:'AMD',   socket:'AM4',     cores:16, threads:32, tdp:105, recPsu:650, igpu:false, year:2020 },
+    /* ---------- AMD · AM5 ---------- */
+    { id:'c86', name:'AMD Ryzen 5 7500F',             brand:'AMD',   socket:'AM5',     cores:6,  threads:12, tdp:65,  recPsu:500, igpu:false, year:2023 },
+    { id:'c87', name:'AMD Ryzen 5 7600',              brand:'AMD',   socket:'AM5',     cores:6,  threads:12, tdp:65,  recPsu:500, igpu:true,  year:2023 },
+    { id:'c88', name:'AMD Ryzen 5 7600X',             brand:'AMD',   socket:'AM5',     cores:6,  threads:12, tdp:105, recPsu:550, igpu:true,  year:2022 },
+    { id:'c89', name:'AMD Ryzen 5 8600G',             brand:'AMD',   socket:'AM5',     cores:6,  threads:12, tdp:65,  recPsu:500, igpu:true,  year:2024 },
+    { id:'c90', name:'AMD Ryzen 7 7700',              brand:'AMD',   socket:'AM5',     cores:8,  threads:16, tdp:65,  recPsu:550, igpu:true,  year:2023 },
+    { id:'c91', name:'AMD Ryzen 7 7700X',             brand:'AMD',   socket:'AM5',     cores:8,  threads:16, tdp:105, recPsu:600, igpu:true,  year:2022 },
+    { id:'c92', name:'AMD Ryzen 7 7800X3D',           brand:'AMD',   socket:'AM5',     cores:8,  threads:16, tdp:120, recPsu:600, igpu:true,  year:2023 },
+    { id:'c93', name:'AMD Ryzen 7 9700X',             brand:'AMD',   socket:'AM5',     cores:8,  threads:16, tdp:65,  recPsu:550, igpu:true,  year:2024 },
+    { id:'c94', name:'AMD Ryzen 9 7900X',             brand:'AMD',   socket:'AM5',     cores:12, threads:24, tdp:170, recPsu:700, igpu:true,  year:2022 },
+    { id:'c95', name:'AMD Ryzen 9 7950X',             brand:'AMD',   socket:'AM5',     cores:16, threads:32, tdp:170, recPsu:750, igpu:true,  year:2022 },
+    { id:'c96', name:'AMD Ryzen 9 9950X',             brand:'AMD',   socket:'AM5',     cores:16, threads:32, tdp:170, recPsu:750, igpu:true,  year:2024 }
+  ];
+  function cpuIcon(c) { return c.igpu ? '🖼️' : '🔲'; }
+
+  var RAMS = [
+    { id:'r1',  name:'DDR2 1GB 667MHz',   ddr:'DDR2', size:'1GB',  speed:'667'  },
+    { id:'r2',  name:'DDR2 2GB 800MHz',   ddr:'DDR2', size:'2GB',  speed:'800'  },
+    { id:'r3',  name:'DDR2 4GB 800MHz',   ddr:'DDR2', size:'4GB',  speed:'800'  },
+    { id:'r4',  name:'DDR3 2GB 1333MHz',  ddr:'DDR3', size:'2GB',  speed:'1333' },
+    { id:'r5',  name:'DDR3 4GB 1600MHz',  ddr:'DDR3', size:'4GB',  speed:'1600' },
+    { id:'r6',  name:'DDR3 8GB 1600MHz',  ddr:'DDR3', size:'8GB',  speed:'1600' },
+    { id:'r7',  name:'DDR3 8GB 1866MHz',  ddr:'DDR3', size:'8GB',  speed:'1866' },
+    { id:'r8',  name:'DDR4 4GB 2400MHz',  ddr:'DDR4', size:'4GB',  speed:'2400' },
+    { id:'r9',  name:'DDR4 8GB 2666MHz',  ddr:'DDR4', size:'8GB',  speed:'2666' },
+    { id:'r10', name:'DDR4 8GB 3200MHz',  ddr:'DDR4', size:'8GB',  speed:'3200' },
+    { id:'r11', name:'DDR4 16GB 3200MHz', ddr:'DDR4', size:'16GB', speed:'3200' },
+    { id:'r12', name:'DDR4 16GB 3600MHz', ddr:'DDR4', size:'16GB', speed:'3600' },
+    { id:'r13', name:'DDR4 32GB 3600MHz', ddr:'DDR4', size:'32GB', speed:'3600' },
+    { id:'r14', name:'DDR5 8GB 4800MHz',  ddr:'DDR5', size:'8GB',  speed:'4800' },
+    { id:'r15', name:'DDR5 16GB 5200MHz', ddr:'DDR5', size:'16GB', speed:'5200' },
+    { id:'r16', name:'DDR5 16GB 5600MHz', ddr:'DDR5', size:'16GB', speed:'5600' },
+    { id:'r17', name:'DDR5 32GB 5600MHz', ddr:'DDR5', size:'32GB', speed:'5600' },
+    { id:'r18', name:'DDR5 32GB 6000MHz', ddr:'DDR5', size:'32GB', speed:'6000' },
+    { id:'r19', name:'DDR5 64GB 6000MHz', ddr:'DDR5', size:'64GB', speed:'6000' }
+  ];
+
+  var STORAGE = [
+    { id:'s1',  name:'HDD 160GB',            type:'SATA', cap:'160GB', iface:'SATA 3Gbps' },
+    { id:'s2',  name:'HDD 320GB',            type:'SATA', cap:'320GB', iface:'SATA 3Gbps' },
+    { id:'s3',  name:'HDD 500GB',            type:'SATA', cap:'500GB', iface:'SATA 6Gbps' },
+    { id:'s4',  name:'HDD 1TB (7200 RPM)',   type:'SATA', cap:'1TB',   iface:'SATA 6Gbps' },
+    { id:'s5',  name:'HDD 2TB (7200 RPM)',   type:'SATA', cap:'2TB',   iface:'SATA 6Gbps' },
+    { id:'s6',  name:'HDD 4TB (5400 RPM)',   type:'SATA', cap:'4TB',   iface:'SATA 6Gbps' },
+    { id:'s7',  name:'SSD 120GB',            type:'SATA', cap:'120GB', iface:'SATA 6Gbps' },
+    { id:'s8',  name:'SSD 240GB',            type:'SATA', cap:'240GB', iface:'SATA 6Gbps' },
+    { id:'s9',  name:'SSD 480GB',            type:'SATA', cap:'480GB', iface:'SATA 6Gbps' },
+    { id:'s10', name:'SSD 1TB',              type:'SATA', cap:'1TB',   iface:'SATA 6Gbps' },
+    { id:'s11', name:'M.2 NVMe SSD 256GB',   type:'M.2',  cap:'256GB', iface:'NVMe PCIe 3.0' },
+    { id:'s12', name:'M.2 NVMe SSD 500GB',   type:'M.2',  cap:'500GB', iface:'NVMe PCIe 3.0' },
+    { id:'s13', name:'M.2 NVMe SSD 1TB',     type:'M.2',  cap:'1TB',   iface:'NVMe PCIe 4.0' },
+    { id:'s14', name:'M.2 NVMe SSD 2TB',     type:'M.2',  cap:'2TB',   iface:'NVMe PCIe 4.0' },
+    { id:'s15', name:'M.2 NVMe SSD 2TB Gen5',type:'M.2',  cap:'2TB',   iface:'NVMe PCIe 5.0' }
+  ];
+
+  var CABINETS = [
+    { id:'k1', name:'मिनी टावर केस',            form:'mATX',  rank:2, fans:1 },
+    { id:'k2', name:'कॉम्पैक्ट केस (mATX)',      form:'mATX',  rank:2, fans:1 },
+    { id:'k3', name:'स्लिम केस (Slim)',          form:'mATX',  rank:2, fans:1 },
+    { id:'k4', name:'स्टैंडर्ड टावर (ATX)',      form:'ATX',   rank:3, fans:2 },
+    { id:'k5', name:'एयरफ़्लो मेश केस (ATX)',    form:'ATX',   rank:3, fans:3 },
+    { id:'k6', name:'गेमिंग केस RGB (ATX)',      form:'ATX',   rank:3, fans:4 },
+    { id:'k7', name:'फुल टावर (E-ATX)',          form:'E-ATX', rank:4, fans:5 },
+    { id:'k8', name:'प्रीमियम फुल टावर (E-ATX)', form:'E-ATX', rank:4, fans:6 }
+  ];
+
+  var PSUS = [
+    { id:'p1',  name:'SMPS 200W (बेसिक)',        watts:200,  cert:'—'      },
+    { id:'p2',  name:'SMPS 250W (बेसिक)',        watts:250,  cert:'—'      },
+    { id:'p3',  name:'SMPS 300W (साधारण)',       watts:300,  cert:'—'      },
+    { id:'p4',  name:'SMPS 400W 80+',            watts:400,  cert:'80+'    },
+    { id:'p5',  name:'SMPS 450W 80+ Bronze',     watts:450,  cert:'Bronze' },
+    { id:'p6',  name:'SMPS 500W 80+ Bronze',     watts:500,  cert:'Bronze' },
+    { id:'p7',  name:'SMPS 550W 80+ Bronze',     watts:550,  cert:'Bronze' },
+    { id:'p8',  name:'SMPS 650W 80+ Bronze',     watts:650,  cert:'Bronze' },
+    { id:'p9',  name:'SMPS 700W 80+ Gold',       watts:700,  cert:'Gold'   },
+    { id:'p10', name:'SMPS 750W 80+ Gold',       watts:750,  cert:'Gold'   },
+    { id:'p11', name:'SMPS 850W 80+ Gold',       watts:850,  cert:'Gold'   },
+    { id:'p12', name:'SMPS 1000W 80+ Platinum',  watts:1000, cert:'Platinum' }
+  ];
+
+  var CDS = [
+    { id:'d1', name:'DVD राइटर (SATA)',      type:'SATA', iface:'SATA 1.5Gbps' },
+    { id:'d2', name:'Blu-ray राइटर (SATA)',  type:'SATA', iface:'SATA 6Gbps'   },
+    { id:'d3', name:'कोई CD/DVD नहीं',       type:'none', iface:'—'            }
+  ];
+
+  var LANS = [
+    { id:'n1', name:'ऑनबोर्ड LAN (RJ45 100Mbps)'   },
+    { id:'n2', name:'PCIe LAN कार्ड 1Gbps'         },
+    { id:'n3', name:'PCIe Wi-Fi 6 + LAN'           },
+    { id:'n4', name:'PCIe Wi-Fi 6E + LAN 2.5Gbps'  },
+    { id:'n5', name:'USB Wi-Fi डोंगल'              }
+  ];
+
+  var GPUS = [
+    { id:'g1',  brand:'—',      name:'कोई अलग GPU नहीं (इंटीग्रेटेड ग्राफ़िक्स पर चलेगा)', vram:'—',    power:false, year:0    },
+    /* ---- NVIDIA ---- */
+    { id:'g2',  brand:'NVIDIA', name:'NVIDIA GT 710 2GB',        vram:'2GB',  power:false, year:2016 },
+    { id:'g3',  brand:'NVIDIA', name:'NVIDIA GT 1030 2GB',       vram:'2GB',  power:false, year:2017 },
+    { id:'g4',  brand:'NVIDIA', name:'NVIDIA GTX 750 Ti 2GB',    vram:'2GB',  power:false, year:2014 },
+    { id:'g5',  brand:'NVIDIA', name:'NVIDIA GTX 1050 Ti 4GB',   vram:'4GB',  power:false, year:2016 },
+    { id:'g6',  brand:'NVIDIA', name:'NVIDIA GTX 1650 4GB',      vram:'4GB',  power:false, year:2019 },
+    { id:'g7',  brand:'NVIDIA', name:'NVIDIA GTX 1660 Super 6GB',vram:'6GB',  power:true,  year:2019 },
+    { id:'g8',  brand:'NVIDIA', name:'NVIDIA RTX 2060 6GB',      vram:'6GB',  power:true,  year:2019 },
+    { id:'g9',  brand:'NVIDIA', name:'NVIDIA RTX 3050 8GB',      vram:'8GB',  power:true,  year:2022 },
+    { id:'g10', brand:'NVIDIA', name:'NVIDIA RTX 3060 12GB',     vram:'12GB', power:true,  year:2021 },
+    { id:'g11', brand:'NVIDIA', name:'NVIDIA RTX 3070 8GB',      vram:'8GB',  power:true,  year:2020 },
+    { id:'g12', brand:'NVIDIA', name:'NVIDIA RTX 4060 8GB',      vram:'8GB',  power:true,  year:2023 },
+    { id:'g13', brand:'NVIDIA', name:'NVIDIA RTX 4070 12GB',     vram:'12GB', power:true,  year:2023 },
+    { id:'g14', brand:'NVIDIA', name:'NVIDIA RTX 4080 16GB',     vram:'16GB', power:true,  year:2022 },
+    { id:'g15', brand:'NVIDIA', name:'NVIDIA RTX 4090 24GB',     vram:'24GB', power:true,  year:2022 },
+    /* ---- AMD Radeon ---- */
+    { id:'g16', brand:'AMD',    name:'AMD Radeon RX 550 4GB',    vram:'4GB',  power:false, year:2017 },
+    { id:'g17', brand:'AMD',    name:'AMD Radeon RX 570 4GB',    vram:'4GB',  power:true,  year:2017 },
+    { id:'g18', brand:'AMD',    name:'AMD Radeon RX 580 8GB',    vram:'8GB',  power:true,  year:2017 },
+    { id:'g19', brand:'AMD',    name:'AMD Radeon RX 6500 XT 4GB',vram:'4GB',  power:true,  year:2022 },
+    { id:'g20', brand:'AMD',    name:'AMD Radeon RX 6600 8GB',   vram:'8GB',  power:true,  year:2021 },
+    { id:'g21', brand:'AMD',    name:'AMD Radeon RX 6700 XT 12GB',vram:'12GB',power:true,  year:2021 },
+    { id:'g22', brand:'AMD',    name:'AMD Radeon RX 7600 8GB',   vram:'8GB',  power:true,  year:2023 },
+    { id:'g23', brand:'AMD',    name:'AMD Radeon RX 7800 XT 16GB',vram:'16GB',power:true,  year:2023 },
+    { id:'g24', brand:'AMD',    name:'AMD Radeon RX 7900 XTX 24GB',vram:'24GB',power:true, year:2022 },
+    /* ---- Intel Arc ---- */
+    { id:'g25', brand:'Intel',  name:'Intel Arc A380 6GB',       vram:'6GB',  power:true,  year:2022 },
+    { id:'g26', brand:'Intel',  name:'Intel Arc A750 8GB',       vram:'8GB',  power:true,  year:2022 },
+    { id:'g27', brand:'Intel',  name:'Intel Arc B580 12GB',      vram:'12GB', power:true,  year:2024 }
+  ];
+
+  var MONITORS = [
+    { id:'mn1', name:'15" LED मॉनिटर',        size:'15 इंच', res:'1024×768',  ports:'VGA'          },
+    { id:'mn2', name:'19" LED मॉनिटर',        size:'19 इंच', res:'1366×768',  ports:'HDMI + VGA'   },
+    { id:'mn3', name:'20" LED मॉनिटर',        size:'20 इंच', res:'1600×900',  ports:'HDMI + VGA'   },
+    { id:'mn4', name:'22" FHD LED मॉनिटर',    size:'22 इंच', res:'1920×1080', ports:'HDMI + VGA'   },
+    { id:'mn5', name:'24" FHD IPS मॉनिटर',    size:'24 इंच', res:'1920×1080', ports:'HDMI + DP'    },
+    { id:'mn6', name:'27" FHD IPS मॉनिटर',    size:'27 इंच', res:'1920×1080', ports:'HDMI + DP'    },
+    { id:'mn7', name:'27" QHD IPS मॉनिटर',    size:'27 इंच', res:'2560×1440', ports:'HDMI + DP'    },
+    { id:'mn8', name:'32" 4K UHD मॉनिटर',     size:'32 इंच', res:'3840×2160', ports:'HDMI + DP + Type-C' },
+    { id:'mn9', name:'34" अल्ट्रावाइड QHD',   size:'34 इंच', res:'3440×1440', ports:'HDMI + DP'    }
+  ];
+
+  var INPUTS = [
+    { id:'i1', name:'वायर्ड USB कीबोर्ड + माउस'            },
+    { id:'i2', name:'वायरलेस कीबोर्ड + माउस (कॉम्बो)'      },
+    { id:'i3', name:'मेकैनिकल गेमिंग कीबोर्ड + माउस'       },
+    { id:'i4', name:'कीबोर्ड + माउस + हेडसेट कॉम्बो'       },
+    { id:'i5', name:'टचपैड कीबोर्ड (कियोस्क/स्मार्ट TV)'   }
+  ];
+
+  var WIRES = [
+    { id:'w24',   name:'24-pin ATX पावर',        ico:'🟨', from:'SMPS',      to:'मदरबोर्ड',      color:'पीला/काला', need:function(){return true;} },
+    { id:'w8',    name:'8-pin CPU (EPS) पावर',   ico:'🟧', from:'SMPS',      to:'CPU पास',        color:'पीला/काला', need:function(){return true;} },
+    { id:'wfan',  name:'CPU कूलर फैन',           ico:'🌀', from:'मदरबोर्ड',   to:'CPU_FAN हेडर',   color:'काला',      need:function(){return true;} },
+    { id:'wfp',   name:'फ्रंट पैनल (PWR_SW/LED)',ico:'🎛️', from:'मदरबोर्ड',   to:'केस फ्रंट',      color:'हरा/लाल',   need:function(){return true;} },
+    { id:'wdisp', name:'डिस्प्ले केबल (HDMI/VGA)',ico:'📺', from:'मदरबोर्ड/GPU', to:'मॉनिटर',      color:'नीला/काला', need:function(){return true;} },
+    { id:'wmonpwr',name:'मॉनिटर पावर केबल',      ico:'🔌', from:'मॉनिटर',     to:'बिजली सॉकेट',    color:'काला',      need:function(){return true;} },
+    { id:'wsata', name:'SATA डेटा केबल',         ico:'🟦', from:'मदरबोर्ड',   to:'स्टोरेज/CD',     color:'नीला',      need:function(st){return (st.storage&&st.storage.type==='SATA')||(st.cd&&st.cd.type==='SATA');} },
+    { id:'wsatap',name:'SATA पावर केबल',         ico:'🟫', from:'SMPS',      to:'स्टोरेज/CD',     color:'काला',      need:function(st){return (st.storage&&st.storage.type==='SATA')||(st.cd&&st.cd.type==='SATA');} },
+    { id:'wpcie', name:'PCIe पावर (GPU 8-pin)',  ico:'🟪', from:'SMPS',      to:'GPU',            color:'पीला/काला', need:function(st){return !!(st.gpu&&st.gpu.power);} },
+    { id:'wcase', name:'केस फैन (SYS_FAN)',      ico:'💨', from:'मदरबोर्ड',   to:'केस फैन',        color:'काला',      need:function(){return false;} },
+    { id:'wlan',  name:'LAN केबल (RJ45)',        ico:'🌐', from:'LAN पोर्ट',  to:'राउटर',          color:'नीला',      need:function(){return false;} }
+  ];
+
+  /* ================= छोटे सहायक ================= */
+  function byId(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
+  function mb() { return byId(MOTHERBOARDS, S.mb); }
+  function cpu() { return byId(CPUS, S.cpu); }
+  function ram() { return byId(RAMS, S.ram); }
+  function storage() { return byId(STORAGE, S.storage); }
+  function cab() { return byId(CABINETS, S.caseId); }
+  function psu() { return byId(PSUS, S.psu); }
+  function cd() { return byId(CDS, S.cd); }
+  function lan() { return byId(LANS, S.lan); }
+  function gpu() { return byId(GPUS, S.gpu); }
+  function monitor() { return byId(MONITORS, S.monitor); }
+  function inputDev() { return byId(INPUTS, S.input); }
+
+  /* ================= स्टूडेंट ================= */
+  var LS = 'cl3dlab.v1';
+  var DB = load();
+  function load() { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } }
+  function save() { try { localStorage.setItem(LS, JSON.stringify(DB)); } catch (e) {} }
+  var S = {}; /* असेंबली की अवस्था */
+  var student = null;
+  function statsOf(name) { DB.stats = DB.stats || {}; if (!DB.stats[name]) DB.stats[name] = { attempts:0, success:0 }; return DB.stats[name]; }
+
+  var nameI = $('#stName'), schoolI = $('#stSchool'), classI = $('#stClass'), dateI = $('#stDate');
+  (function initGate() {
+    if (DB.last) { nameI.value = DB.last.name || ''; schoolI.value = DB.last.school || ''; classI.value = DB.last.klass || ''; }
+    dateI.value = new Date().toISOString().slice(0, 10);
+    if (DB.last) { $('#resumeBtn').hidden = false; }
+  })();
+  $('#resumeBtn').addEventListener('click', function () { if (DB.last) { nameI.value = DB.last.name; schoolI.value = DB.last.school; classI.value = DB.last.klass; } });
+
+  $('#startBtn').addEventListener('click', function () {
+    var nm = nameI.value.trim();
+    if (!nm) { alert('कृपया स्टूडेंट का नाम भरिए।'); nameI.focus(); return; }
+    student = { name: nm, school: schoolI.value.trim() || '—', klass: classI.value.trim() || '—', date: dateI.value || new Date().toISOString().slice(0,10) };
+    DB.last = student; save();
+    startLab();
+  });
+
+  function startLab() {
+    $('#gate').hidden = true;
+    $('#labArea').hidden = false;
+    renderStats();
+    resetAll(true);
+    log('स्वागत ' + student.name + '! पहले मदरबोर्ड चुनिए — बाक़ी सब उसी के हिसाब से मिलेगा।', 'in');
+  }
+
+  $('#logoutBtn').addEventListener('click', function () {
+    $('#labArea').hidden = true; $('#gate').hidden = false;
+    if (DB.last) { nameI.value = DB.last.name; schoolI.value = DB.last.school; classI.value = DB.last.klass; }
+    renderStats();
+  });
+
+  function renderStats() {
+    var box = $('#stats'); box.innerHTML = '';
+    if (!student && DB.last) student = null;
+    var nm = student ? student.name : (DB.last ? DB.last.name : null);
+    var wrap = el('div', 'stats');
+    function st(label, val) { return '<span class="stat">' + label + ' <b>' + esc(String(val)) + '</b></span>'; }
+    if (nm) {
+      var s = statsOf(nm);
+      box.innerHTML = st('👤', nm) + st('प्रयास', s.attempts) + st('सफल', s.success) + st('तारीख', (student ? student.date : (DB.last ? DB.last.date : '—')));
+    } else {
+      box.innerHTML = '<span class="stat">👤 स्टूडेंट दर्ज नहीं</span>';
+    }
+  }
+
+  /* ================= टैब + संदर्भ सूचियाँ ================= */
+  var REF = {
+    mb:      { t:'🧩 मदरबोर्ड — पूरी सूची', h:'सारी कंपनियों (ASUS · Gigabyte · MSI · ASRock · Biostar · Intel · Zotac · Colorful · Maxsun) के मदरबोर्ड — हर बोर्ड के साथ उसके कंपोनेंट।' },
+    cpu:     { t:'🔲 प्रोसेसर (CPU) — पूरी सूची', h:'Intel और AMD की लगभग हर पीढ़ी के प्रोसेसर — मदरबोर्ड के सॉकेट से मेल ज़रूरी है।' },
+    ram:     { t:'📏 रैम (RAM) — पूरी सूची', h:'मदरबोर्ड के DDR टाइप (DDR4/DDR5) से मेल खाने वाली RAM ही लगेगी।' },
+    storage: { t:'💽 स्टोरेज (HDD/SSD) — पूरी सूची', h:'SATA स्टोरेज हर बोर्ड पर चलेगा; M.2 NVMe के लिए बोर्ड में M.2 स्लॉट चाहिए।' },
+    psu:     { t:'🔌 SMPS — पूरी सूची', h:'CPU की सिफ़ारिश से कम वाट वाला SMPS मत लगाइए।' },
+    monitor: { t:'🖥️ मॉनिटर (डिस्प्ले) — पूरी सूची', h:'डिस्प्ले केबल (HDMI/VGA/DP) से मॉनिटर जोड़िए।' },
+    gpu:     { t:'🎮 ग्राफ़िक्स कार्ड (GPU) — पूरी सूची', h:'iGPU न होने पर (F सीरीज़) अलग GPU ज़रूरी है।' },
+    case:    { t:'🗄️ कैबिनेट — पूरी सूची', h:'केस का फ़ॉर्म फैक्टर मदरबोर्ड से छोटा न हो।' },
+    misc:    { t:'⌨️ अन्य उपकरण — CD/DVD · LAN · कीबोर्ड-माउस', h:'बाक़ी सहायक उपकरण।' }
+  };
+  /* ---------- टेबल: हिंदी + English ---------- */
+  var LAB_EN = {
+    'ब्रांड':'Brand','मॉडल':'Model','सॉकेट':'Socket','चिपसेट':'Chipset','फ़ॉर्म':'Form','स्लॉट':'Slots',
+    'सुझाया SMPS':'Suggested SMPS','वर्ष':'Year','प्रोसेसर':'Processor','कोर / थ्रेड':'Cores / threads',
+    'इंटीग्रेटेड ग्राफ़िक्स':'Integrated graphics','नाम':'Name','टाइप':'Type','क्षमता':'Capacity','स्पीड':'Speed',
+    'इंटरफ़ेस':'Interface','वाट':'Watts','सर्टिफ़िकेट':'Certificate','आकार':'Size','रिज़ॉल्यूशन':'Resolution',
+    'पोर्ट':'Port','कार्ड':'Card','अतिरिक्त PCIe पावर':'Extra PCIe power','फ़ॉर्म फैक्टर':'Form factor',
+    'फैन':'Fans','कहाँ से':'From','कहाँ तक':'To','रंग':'Colour','ज़रूरी?':'Required?',
+    'हाँ ✔':'Yes ✔','नहीं (अलग GPU चाहिए)':'No (a separate GPU is needed)','हाँ (8-pin)':'Yes (8-pin)',
+    'नहीं':'No','हाँ':'Yes','वैकल्पिक':'Optional'
+  };
+  function bi(s) { if (typeof s !== 'string') return s; var en = LAB_EN[s]; return en ? bl(s, en) : s; }
+  function table(head, rows) {
+    return '<div class="tblwrap"><table><thead><tr>' + head.map(function (h) { return '<th>' + bi(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + bi(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  }
+  var refCat = '', refQ = '', chipSel = '', chipDefs = [];
+  function chipsFor(cat) {
+    function uniq(arr) { var seen = {}, out = []; arr.forEach(function (v) { if (!seen[v]) { seen[v] = 1; out.push(v); } }); return out; }
+    var out = [];
+    if (cat === 'mb') {
+      uniq(MOTHERBOARDS.map(function (m) { return m.brand; })).forEach(function (b) { out.push({ id:'brand:'+b, label:b, fn:function (x) { return x.brand === b; } }); });
+      uniq(MOTHERBOARDS.map(function (m) { return m.socket; })).forEach(function (s) { out.push({ id:'sock:'+s, label:s, fn:function (x) { return x.socket === s; } }); });
+    } else if (cat === 'cpu') {
+      ['Intel','AMD'].forEach(function (b) { out.push({ id:'brand:'+b, label:b, fn:function (x) { return x.brand === b; } }); });
+      out.push({ id:'igpu:y', label:'iGPU वाले ✔', fn:function (x) { return !!x.igpu; } });
+      out.push({ id:'igpu:n', label:'बिना iGPU (F सीरीज़)', fn:function (x) { return !x.igpu; } });
+      uniq(CPUS.map(function (x) { return x.socket; })).forEach(function (s) { out.push({ id:'sock:'+s, label:s, fn:function (x) { return x.socket === s; } }); });
+    } else if (cat === 'ram') {
+      uniq(RAMS.map(function (x) { return x.ddr; })).forEach(function (d) { out.push({ id:'ddr:'+d, label:d, fn:function (x) { return x.ddr === d; } }); });
+    } else if (cat === 'storage') {
+      uniq(STORAGE.map(function (x) { return x.type; })).forEach(function (t) { out.push({ id:'type:'+t, label:(t === 'M.2' ? 'M.2 NVMe' : 'SATA HDD/SSD'), fn:function (x) { return x.type === t; } }); });
+    } else if (cat === 'psu') {
+      uniq(PSUS.map(function (x) { return x.cert; })).forEach(function (t) { out.push({ id:'cert:'+t, label:(t === '—' ? 'बिना सर्टिफ़िकेट' : t), fn:function (x) { return x.cert === t; } }); });
+    } else if (cat === 'monitor') {
+      out.push({ id:'sz:s', label:'छोटे (15–20 इंच)', fn:function (x) { return parseInt(x.size, 10) <= 20; } });
+      out.push({ id:'sz:m', label:'मध्यम (22–27 इंच)', fn:function (x) { var n = parseInt(x.size, 10); return n >= 22 && n <= 27; } });
+      out.push({ id:'sz:l', label:'बड़े (32 इंच+)', fn:function (x) { return parseInt(x.size, 10) >= 32; } });
+    } else if (cat === 'gpu') {
+      ['NVIDIA','AMD','Intel'].forEach(function (b) { out.push({ id:'brand:'+b, label:b, fn:function (x) { return x.brand === b; } }); });
+      out.push({ id:'pw:y', label:'8-pin पावर वाले', fn:function (x) { return !!x.power; } });
+      out.push({ id:'pw:n', label:'बिना अतिरिक्त पावर', fn:function (x) { return !x.power; } });
+    } else if (cat === 'case') {
+      uniq(CABINETS.map(function (x) { return x.form; })).forEach(function (t) { out.push({ id:'form:'+t, label:t, fn:function (x) { return x.form === t; } }); });
+    }
+    return out;
+  }
+  function chipOk(x) {
+    if (!chipSel) return true;
+    for (var i = 0; i < chipDefs.length; i++) if (chipDefs[i].id === chipSel) return !!chipDefs[i].fn(x);
+    return true;
+  }
+  function renderChips(cat) {
+    var box = $('#refChips'); if (!box) return;
+    chipDefs = chipsFor(cat);
+    if (!chipDefs.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    var h = '';
+    if (chipSel) h += '<button class="chip clr" data-chip="">✕ फ़िल्टर हटाएँ</button>';
+    chipDefs.forEach(function (c) { h += '<button class="chip' + (chipSel === c.id ? ' on' : '') + '" data-chip="' + esc(c.id) + '">' + c.label + '</button>'; });
+    box.innerHTML = h;
+  }
+  function matchQ(o, keys) {
+    if (!refQ) return true;
+    var s = '';
+    for (var i = 0; i < keys.length; i++) { var v = o[keys[i]]; if (v != null && v !== '') s += ' ' + v; }
+    return s.toLowerCase().indexOf(refQ) > -1;
+  }
+  $$('.tabs button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $$('.tabs button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      var cat = b.dataset.tab;
+      $('#view-lab').hidden = cat !== 'lab';
+      $('#view-os').hidden = cat !== 'os';
+      $('#view-ref').hidden = (cat === 'lab' || cat === 'os');
+      if (cat === 'os') { renderOS(); }
+      else if (cat !== 'lab') {
+        refCat = cat; chipSel = '';
+        var si = $('#refSearch'); if (si) si.value = '';
+        var sc = $('#refClear'); if (sc) sc.hidden = true;
+        renderRef(cat);
+      }
+      window.scrollTo(0, 0);
+    });
+  });
+  var searchI = $('#refSearch'), clearB = $('#refClear'), chipsB = $('#refChips');
+  if (searchI) searchI.addEventListener('input', function () {
+    if (clearB) clearB.hidden = !searchI.value;
+    if (refCat && refCat !== 'lab') renderRef(refCat);
+  });
+  if (clearB) clearB.addEventListener('click', function () {
+    if (searchI) { searchI.value = ''; searchI.focus(); }
+    clearB.hidden = true;
+    if (refCat && refCat !== 'lab') renderRef(refCat);
+  });
+  if (chipsB) chipsB.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-chip]'); if (!t) return;
+    var id = t.dataset.chip || '';
+    chipSel = (chipSel === id) ? '' : id;
+    if (refCat && refCat !== 'lab') renderRef(refCat);
+  });
+  var printB = $('#refPrint');
+  if (printB) printB.addEventListener('click', function () { window.print(); });
+
+  function renderRef(cat) {
+    var meta = REF[cat] || { t:'सूची', h:'' };
+    $('#refTitle').textContent = meta.t;
+    $('#refHint').textContent = meta.h;
+    var si0 = $('#refSearch'); refQ = si0 ? (si0.value || '').trim().toLowerCase() : '';
+    renderChips(cat);
+    var body = $('#refBody'); var html = ''; var total = 0;
+    function byBrandOf(arr) { var g = {}; arr.forEach(function (x) { (g[x.brand] = g[x.brand] || []).push(x); }); return g; }
+    if (cat === 'mb') {
+      var MBs = MOTHERBOARDS.filter(function (m) { return matchQ(m, ['brand','name','socket','chip','form','ddr','net','recPsu','year']) && chipOk(m); });
+      total = MBs.length;
+      html += '<div class="tblwrap" style="margin-bottom:16px"><table><thead><tr>' +
+        ['ब्रांड','मॉडल','सॉकेट','चिपसेट','फ़ॉर्म','RAM','स्लॉट','M.2','SATA','LAN','सुझाया SMPS','वर्ष'].map(function (h) { return '<th>' + bi(h) + '</th>'; }).join('') +
+        '</tr></thead><tbody>' + MBs.map(function (m) {
+          return '<tr><td><b>' + esc(m.brand) + '</b></td><td>' + esc(m.name.replace(m.brand + ' ', '')) + '</td><td>' + m.socket + '</td><td>' + m.chip + '</td><td>' + m.form + '</td><td>' + m.ddr + '</td><td>' + m.slots + '</td><td>' + m.m2 + '</td><td>' + m.sata + '</td><td>' + m.net + '</td><td>' + m.recPsu + 'W</td><td>' + m.year + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      var brands = {};
+      MBs.forEach(function (m) { (brands[m.brand] = brands[m.brand] || []).push(m); });
+      Object.keys(brands).forEach(function (brand) {
+        html += '<h3 class="blk2">🏢 ' + brand + ' — ' + brands[brand].length + ' मदरबोर्ड</h3>';
+        brands[brand].forEach(function (m) {
+          var cpuNames = CPUS.filter(function (c) { return c.socket === m.socket; }).map(function (c) { return c.name.replace('Intel ', '').replace('AMD ', ''); });
+          var ramNames = RAMS.filter(function (r) { return r.ddr === m.ddr; }).map(function (r) { return r.name; });
+          html += '<div class="card" style="margin-bottom:8px">' +
+            '<div style="font-weight:700;font-size:14.5px">🧩 ' + esc(m.name) + '</div>' +
+            '<div style="margin:6px 0"><span class="pill">सॉकेट: ' + m.socket + '</span><span class="pill">चिपसेट: ' + m.chip + '</span><span class="pill">फ़ॉर्म: ' + m.form + '</span><span class="pill">वर्ष: ' + m.year + '</span><span class="pill g">RAM: ' + m.ddr + ' · ' + m.slots + ' स्लॉट · ' + m.max + '</span><span class="pill">M.2: ' + m.m2 + '</span><span class="pill">SATA: ' + m.sata + '</span><span class="pill">LAN: ' + m.net + '</span><span class="pill w">सुझाया SMPS: ' + m.recPsu + 'W</span></div>' +
+            '<div style="font-size:12.8px;color:var(--muted)"><b style="color:var(--tx)">लगने वाले CPU (' + cpuNames.length + '):</b> ' + esc(cpuNames.join(' · ')) + '</div>' +
+            '<div style="font-size:12.8px;color:var(--muted);margin-top:4px"><b style="color:var(--tx)">लगने वाली RAM (' + ramNames.length + '):</b> ' + esc(ramNames.join(' · ')) + '</div>' +
+            '<div style="font-size:12.8px;color:var(--muted);margin-top:4px"><b style="color:var(--tx)">स्टोरेज:</b> SATA ' + (m.sata ? '✔ (' + m.sata + ' पोर्ट)' : '—') + (m.m2 ? ' · M.2 NVMe ✔ (' + m.m2 + ')' : ' · M.2 ✘') + '</div>' +
+            '<div style="font-size:12.8px;color:var(--muted);margin-top:4px"><b style="color:var(--tx)">केस:</b> ' + (m.rank <= 2 ? 'mATX / ATX / फुल टावर' : 'ATX / फुल टावर') + '</div></div>';
+        });
+      });
+    } else if (cat === 'cpu') {
+      var CPUf = CPUS.filter(function (c) { return matchQ(c, ['name','brand','socket','cores','threads','tdp','recPsu','year']) && chipOk(c); });
+      total = CPUf.length;
+      var cg = byBrandOf(CPUf);
+      Object.keys(cg).forEach(function (b) {
+        html += '<h3 class="blk2">' + (b === 'Intel' ? '🔵 Intel' : '🔴 AMD') + ' — ' + cg[b].length + ' प्रोसेसर</h3>' +
+          table(['प्रोसेसर','सॉकेट','कोर / थ्रेड','TDP','सुझाया SMPS','इंटीग्रेटेड ग्राफ़िक्स','वर्ष'],
+            cg[b].map(function (c) { return [esc(c.name), c.socket, c.cores + 'C / ' + c.threads + 'T', c.tdp + 'W', c.recPsu + 'W', c.igpu ? 'हाँ ✔' : 'नहीं (अलग GPU चाहिए)', c.year]; }));
+      });
+    } else if (cat === 'ram') {
+      var Rf = RAMS.filter(function (r) { return matchQ(r, ['name','ddr','size','speed']) && chipOk(r); }); total = Rf.length;
+      html = table(['नाम','टाइप','क्षमता','स्पीड'], Rf.map(function (r) { return [esc(r.name), r.ddr, r.size, r.speed + ' MHz']; }));
+    } else if (cat === 'storage') {
+      var Sf = STORAGE.filter(function (s) { return matchQ(s, ['name','type','iface','cap']) && chipOk(s); }); total = Sf.length;
+      html = table(['नाम','टाइप','इंटरफ़ेस','क्षमता'], Sf.map(function (s) { return [esc(s.name), s.type, s.iface, s.cap]; }));
+    } else if (cat === 'psu') {
+      var Pf = PSUS.filter(function (p) { return matchQ(p, ['name','watts','cert']) && chipOk(p); }); total = Pf.length;
+      html = table(['नाम','वाट','सर्टिफ़िकेट'], Pf.map(function (p) { return [esc(p.name), p.watts + 'W', p.cert]; }));
+    } else if (cat === 'monitor') {
+      var Mf = MONITORS.filter(function (x) { return matchQ(x, ['name','size','res','ports']) && chipOk(x); }); total = Mf.length;
+      html = table(['नाम','आकार','रिज़ॉल्यूशन','पोर्ट'], Mf.map(function (x) { return [esc(x.name), x.size, x.res, x.ports]; }));
+    } else if (cat === 'gpu') {
+      var Gf = GPUS.filter(function (g) { return matchQ(g, ['name','brand','vram','year']) && chipOk(g); }); total = Gf.length;
+      var gg = byBrandOf(Gf);
+      Object.keys(gg).forEach(function (b) {
+        var label = b === '—' ? '⚪ इंटीग्रेटेड (अलग कार्ड नहीं)' : (b === 'NVIDIA' ? '🟢 NVIDIA' : (b === 'AMD' ? '🔴 AMD Radeon' : '🔵 Intel Arc'));
+        html += '<h3 class="blk2">' + label + ' — ' + gg[b].length + '</h3>' +
+          table(['कार्ड','VRAM','अतिरिक्त PCIe पावर','वर्ष'], gg[b].map(function (g) { return [esc(g.name), g.vram, g.power ? 'हाँ (8-pin)' : 'नहीं', g.year || '—']; }));
+      });
+    } else if (cat === 'case') {
+      var Kf = CABINETS.filter(function (k) { return matchQ(k, ['name','form','fans']) && chipOk(k); }); total = Kf.length;
+      html = table(['नाम','फ़ॉर्म फैक्टर','फैन'], Kf.map(function (k) { return [esc(k.name), k.form, k.fans + 'x']; }));
+    } else if (cat === 'misc') {
+      var Df = CDS.filter(function (d) { return matchQ(d, ['name','type','iface']); });
+      var Nf = LANS.filter(function (n) { return matchQ(n, ['name']); });
+      var If = INPUTS.filter(function (i) { return matchQ(i, ['name']); });
+      var Wf = WIRES.filter(function (w) { return matchQ(w, ['name','from','to','color']); });
+      total = Df.length + Nf.length + If.length + Wf.length;
+      if (Df.length) html += '<h3 class="blk2">💿 CD/DVD / Blu-ray ड्राइव — ' + Df.length + '</h3>' + table(['नाम','इंटरफ़ेस'], Df.map(function (d) { return [esc(d.name), d.iface]; }));
+      if (Nf.length) html += '<h3 class="blk2">🌐 LAN / नेटवर्क — ' + Nf.length + '</h3>' + table(['नाम'], Nf.map(function (n) { return [esc(n.name)]; }));
+      if (If.length) html += '<h3 class="blk2">⌨️ कीबोर्ड + माउस — ' + If.length + '</h3>' + table(['नाम'], If.map(function (i) { return [esc(i.name)]; }));
+      if (Wf.length) html += '<h3 class="blk2">🔗 तार / केबल — ' + Wf.length + '</h3>' + table(['नाम','कहाँ से','कहाँ तक','रंग','ज़रूरी?'], Wf.map(function (w) { return [esc(w.name), w.from, w.to, w.color, w.need(S) ? 'हाँ' : 'वैकल्पिक']; }));
+    }
+    if (total === 0) html = '<div class="nores">🔍 "' + esc(refQ) + '" के लिए कोई नतीजा नहीं मिला — दूसरा शब्द आज़माइए।</div>';
+    body.innerHTML = html;
+    var cnt = $('#refCount');
+    if (cnt) cnt.textContent = refQ ? (total + ' नतीजे मिले') : ('कुल ' + total + ' आइटम');
+  }
+
+  /* ================= लैब: अवस्था ================= */
+  function resetAll(silent) {
+    S = { mb:null, caseId:null, cpu:null, ram:null, storage:null, cd:null, psu:null, gpu:null, lan:null,
+          monitor:null, input:null,
+          wires:{}, acPlug:false, psuSwitch:false, powered:false };
+    partTab = ''; partQ = ''; pickErr = ''; badId = ''; openSec = 1;
+    var rb = $('#reportBox'); if (rb) rb.innerHTML = '';
+    if (screen) { screen.className = 'screen off'; screen.innerHTML = '🖥️ मॉनिटर बंद है'; }
+    renderPanel(); drawStage();
+    if (!silent) log('रीसेट हो गया — फिर से शुरू कीजिए।', 'in');
+  }
+
+  function log(txt, k) {
+    var l = $('#log'); if (!l) return;
+    var d = el('div', k || ''); d.textContent = txt; l.appendChild(d); l.scrollTop = l.scrollHeight;
+  }
+
+  /* ================= लैब: पैनल ================= */
+  function option(parent, item, key, sub) {
+    var c = el('div', 'opt');
+    c.dataset.pick = key; c.dataset.id = item.id;
+    var on = S[key] === item.id;
+    if (on) c.classList.add('on');
+    if (badId && badId === item.id) c.classList.add('bad');
+    c.innerHTML = '<div class="t">' + item.name + (on ? ' <span style="color:var(--good);font-size:11px">✔ चुना</span>' : '') + '</div>' +
+      (sub ? '<div class="d">' + sub + '</div>' : '');
+    parent.appendChild(c);
+    return c;
+  }
+  function groupTitle(parent, txt) { var h = el('h4'); h.style.cssText = 'font-size:13px;color:var(--accent2);margin:11px 0 6px'; h.textContent = txt; parent.appendChild(h); }
+  function hint(parent, txt) { var p = el('p', 'hint'); p.textContent = txt; parent.appendChild(p); }
+
+  /* ---------- पुर्ज़ा चयन: हर पुर्ज़े की अलग पूरी सूची ---------- */
+  var PARTS = [
+    { k:'cpu',     t:'🔲 CPU',        d:'प्रोसेसर — सॉकेट मेल होना ज़रूरी' },
+    { k:'ram',     t:'📏 RAM',        d:'मेमोरी — DDR टाइप मेल होना ज़रूरी' },
+    { k:'storage', t:'💽 स्टोरेज',     d:'HDD / SSD / M.2 NVMe' },
+    { k:'cd',      t:'💿 CD/DVD',     d:'ऑप्टिकल ड्राइव (वैकल्पिक)' },
+    { k:'psu',     t:'🔌 SMPS',       d:'पावर सप्लाई — वाट पर्याप्त हो' },
+    { k:'gpu',     t:'🎮 GPU',        d:'ग्राफ़िक्स कार्ड' },
+    { k:'lan',     t:'🌐 LAN',        d:'नेटवर्क कार्ड' },
+    { k:'monitor', t:'🖥️ मॉनिटर',      d:'डिस्प्ले — सबके लिए ज़रूरी' },
+    { k:'input',   t:'⌨️ कीबोर्ड+माउस', d:'इनपुट डिवाइस' }
+  ];
+  var partTab = '', partQ = '', pickErr = '', badId = '', openSec = 1;
+
+  function partItems(k) {
+    if (k === 'cpu') return CPUS.map(function (c) { return { id:c.id, name:c.name, sub:c.socket + ' · ' + c.cores + 'C/' + c.threads + 'T · TDP ' + c.tdp + 'W · कम-से-कम ' + c.recPsu + 'W SMPS · ' + (c.igpu ? 'iGPU ✔' : 'iGPU नहीं') }; });
+    if (k === 'ram') return RAMS.map(function (x) { return { id:x.id, name:x.name, sub:x.ddr + ' · ' + x.size + ' · ' + x.speed + ' MHz' }; });
+    if (k === 'storage') return STORAGE.map(function (x) { return { id:x.id, name:x.name, sub:x.type + (x.type === 'M.2' ? ' NVMe' : '') + ' · ' + x.iface + ' · ' + x.cap }; });
+    if (k === 'cd') return CDS.map(function (x) { return { id:x.id, name:x.name, sub:(x.type === 'none' ? 'ऑप्टिकल ड्राइव नहीं' : x.type + ' · ' + x.iface) }; });
+    if (k === 'psu') return PSUS.map(function (x) { return { id:x.id, name:x.name, sub:x.watts + 'W · सर्टिफ़िकेट: ' + x.cert }; });
+    if (k === 'gpu') return GPUS.map(function (x) { return { id:x.id, name:x.name, sub:x.vram + (x.power ? ' · 8-pin पावर कनेक्टर' : '') }; });
+    if (k === 'lan') return LANS.map(function (x) { return { id:x.id, name:x.name, sub:'' }; });
+    if (k === 'monitor') return MONITORS.map(function (x) { return { id:x.id, name:x.name, sub:x.size + ' · ' + x.res + ' · ' + x.ports }; });
+    if (k === 'input') return INPUTS.map(function (x) { return { id:x.id, name:x.name, sub:'' }; });
+    return [];
+  }
+
+  /* ग़लत पुर्ज़ा = एरर संदेश; सही = null */
+  function validatePick(key, item) {
+    var m = mb(), c = cpu();
+    if (!item) return null;
+    if (key === 'caseId') {
+      if (m && item.rank < m.rank) return 'यह कैबिनेट छोटा है — बोर्ड ' + m.form + ' है और यह केस ' + item.form + '। बड़ा केस चुनिए।';
+    } else if (key === 'cpu') {
+      if (m && item.socket !== m.socket) return 'यह CPU इसमें नहीं लगेगा — CPU का सॉकेट ' + item.socket + ' है, बोर्ड का ' + m.socket + '। ' + m.socket + ' वाला CPU चुनिए।';
+    } else if (key === 'ram') {
+      if (m && item.ddr !== m.ddr) return 'RAM का टाइप ग़लत है — यह बोर्ड ' + m.ddr + ' माँगता है, आपने ' + item.ddr + ' चुनी। स्लॉट में फिट नहीं होगी।';
+    } else if (key === 'storage') {
+      if (m && item.type === 'M.2' && !m.m2) return 'इस बोर्ड में M.2 स्लॉट नहीं है — SATA वाला HDD/SSD चुनिए।';
+    } else if (key === 'psu') {
+      if (c && item.watts < c.recPsu) return 'यह SMPS कमज़ोर है — ' + c.name + ' के लिए कम-से-कम ' + c.recPsu + 'W चाहिए, आपने ' + item.watts + 'W चुना।';
+    } else if (key === 'gpu') {
+      if (c && !c.igpu && item.id === 'g1') return 'इस CPU (' + c.name + ') में इंटीग्रेटेड ग्राफ़िक्स नहीं हैं — अलग ग्राफ़िक्स कार्ड ज़रूरी है।';
+    }
+    return null;
+  }
+
+  function renderPartList() {
+    var g = $('#partList'); if (!g) return;
+    if (!mb()) { g.innerHTML = ''; return; }
+    var q = (partQ || '').trim().toLowerCase();
+    var items = partItems(partTab);
+    var shown = items.filter(function (it) { return !q || (it.name + ' ' + (it.sub || '')).toLowerCase().indexOf(q) > -1; });
+    g.innerHTML = '';
+    if (!shown.length) { g.innerHTML = '<div class="nores">🔍 "' + esc(partQ) + '" के लिए कुछ नहीं मिला — दूसरा शब्द आज़माइए।</div>'; return; }
+    var cnt = el('div', 'partcnt');
+    cnt.textContent = shown.length + ' में से एक चुनिए' + (q ? ' (कुल ' + items.length + ')' : '');
+    g.appendChild(cnt);
+    shown.forEach(function (it) {
+      var on = S[partTab] === it.id;
+      var c = el('div', 'opt' + (on ? ' on' : '') + (badId === it.id ? ' bad' : ''));
+      c.dataset.pick = partTab; c.dataset.id = it.id;
+      c.innerHTML = '<div class="t">' + esc(it.name) + (on ? ' <span style="color:var(--good);font-size:11px">✔ चुना</span>' : '') + '</div>' +
+        (it.sub ? '<div class="d">' + esc(it.sub) + '</div>' : '');
+      g.appendChild(c);
+    });
+  }
+
+  /* ---------- चरण-सारांश ---------- */
+  function stepDone(n) {
+    if (n === 1) return !!mb();
+    if (n === 2) return !!S.caseId;
+    if (n === 3) { for (var i = 0; i < PARTS.length; i++) if (!S[PARTS[i].k]) return false; return true; }
+    if (n === 4) { var ok = true; WIRES.forEach(function (w) { if (w.need(S) && !S.wires[w.id]) ok = false; }); return ok; }
+    if (n === 5) return S.acPlug && S.psuSwitch;
+    if (n === 6) return S.powered;
+    return false;
+  }
+  function secSum(n) {
+    var m = mb();
+    if (n === 1) return m ? m.name : '— चुनें';
+    if (n === 2) return S.caseId ? cab().name : (m ? '— चुनें' : 'पहले मदरबोर्ड');
+    if (n === 3) { var c = PARTS.filter(function (p) { return S[p.k]; }).length; return c + ' / ' + PARTS.length + ' चुने'; }
+    if (n === 4) { var need = 0, have = 0; WIRES.forEach(function (w) { if (w.need(S)) { need++; if (S.wires[w.id]) have++; } }); return have + ' / ' + need + ' ज़रूरी तार'; }
+    if (n === 5) return (S.acPlug ? 'AC ✔' : 'AC ✘') + ' · ' + (S.psuSwitch ? 'स्विच ON' : 'स्विच OFF');
+    if (n === 6) return S.powered ? 'चालू ✔' : 'पावर बटन';
+    return '';
+  }
+
+  function nextSec() { for (var n = 1; n <= 6; n++) if (!stepDone(n)) return n; return 0; }
+
+  function renderPanel() {
+    var panel = $('#panel'); var sv = panel.scrollTop; panel.innerHTML = '';
+    var m = mb();
+
+    if (pickErr) { var e0 = el('div', 'picker'); e0.textContent = pickErr; panel.appendChild(e0); }
+
+    /* एक खुलने वाला खाना (accordion) */
+    function acc(n, title, body) {
+      var d = el('div', 'acc' + (openSec === n ? ' open' : '') + (stepDone(n) ? ' done' : '') + (openSec !== n && nextSec() === n ? ' next' : ''));
+      var h = el('h5'); h.dataset.sec = String(n);
+      h.innerHTML = '<span class="t">' + title + '</span><span class="sum">' + esc(secSum(n)) + '</span>';
+      d.appendChild(h);
+      panel.appendChild(d);
+      if (openSec === n) { var b = el('div', 'accb'); d.appendChild(b); body(b); }
+    }
+
+    /* 1 मदरबोर्ड */
+    acc(1, 'चरण 1 · मदरबोर्ड', function (b) {
+      hint(b, 'किसी भी कंपनी का बोर्ड चुन सकते हैं — ASUS · Gigabyte · MSI · ASRock · Biostar · Intel · Zotac · Colorful · Maxsun।');
+      var g = el('div', 'pick');
+      MOTHERBOARDS.forEach(function (x) { option(g, x, 'mb', x.brand + ' · ' + x.socket + ' · ' + x.chip + ' · ' + x.form + ' · ' + x.ddr); });
+      b.appendChild(g);
+    });
+
+    /* 2 कैबिनेट */
+    acc(2, 'चरण 2 · कैबिनेट', function (b) {
+      if (!m) { hint(b, 'पहले मदरबोर्ड चुनिए।'); return; }
+      hint(b, 'इस बोर्ड (' + m.form + ') के लिए ' + m.form + ' या बड़ा केस चाहिए।');
+      var g = el('div', 'pick');
+      CABINETS.forEach(function (x) {
+        var c = option(g, x, 'caseId', x.form + ' · ' + x.fans + 'x फैन' + (x.rank >= m.rank ? '' : ' · ❌ छोटा केस'));
+        if (x.rank < m.rank) c.classList.add('off');
+      });
+      b.appendChild(g);
+    });
+
+    /* 3 पुर्ज़े */
+    acc(3, 'चरण 3 · पुर्ज़े', function (b) {
+      if (!m) { hint(b, 'पहले मदरबोर्ड चुनिए।'); return; }
+      hint(b, 'नीचे पुर्ज़े पर क्लिक कीजिए — उसकी पूरी सूची खुलेगी। किसी एक पर क्लिक करते ही लग जाएगा और सूची बंद हो जाएगी। ग़लत पर एरर मिलेगा।');
+
+      var bar = el('div', 'partbar');
+      PARTS.forEach(function (p) {
+        var btn = el('button', 'pchip' + (partTab === p.k ? ' on' : '') + (S[p.k] ? ' done' : ''), p.t + (S[p.k] ? ' ✔' : ''));
+        btn.type = 'button'; btn.dataset.part = p.k; bar.appendChild(btn);
+      });
+      b.appendChild(bar);
+
+      var pend = PARTS.filter(function (p) { return !S[p.k]; });
+      var pl = el('div', 'partpend');
+      pl.style.color = pend.length ? 'var(--warn)' : 'var(--good)';
+      pl.textContent = pend.length
+        ? ('⚠️ बाक़ी पुर्ज़े: ' + pend.map(function (p) { return p.t; }).join(' · '))
+        : '✅ सारे पुर्ज़े लग गए — अब तार जोड़िए (चरण 4)।';
+      b.appendChild(pl);
+
+      if (partTab) {
+        var pt = PARTS.filter(function (p) { return p.k === partTab; })[0];
+        var pi = el('input', 'partq'); pi.id = 'partQ'; pi.type = 'search'; pi.autocomplete = 'off';
+        pi.value = partQ; pi.placeholder = '🔍 ' + pt.t + ' में खोजें — नाम · ब्रांड · सॉकेट · क्षमता…';
+        b.appendChild(pi);
+        groupTitle(b, '⬇ ' + pt.t + ' — ' + pt.d);
+        var g = el('div', 'pick'); g.id = 'partList';
+        b.appendChild(g);
+      } else {
+        var tip = el('div', 'partpend'); tip.style.color = 'var(--muted)';
+        tip.textContent = '👆 ऊपर से कोई पुर्ज़ा चुनिए…';
+        b.appendChild(tip);
+      }
+
+      /* पावर जाँच */
+      var c1 = cpu(), p1 = psu();
+      if (c1 && p1) {
+        var okP = p1.watts >= c1.recPsu;
+        var inf = el('div', 'opt ' + (okP ? 'on' : ''));
+        inf.style.cursor = 'default';
+        inf.innerHTML = '<div class="t">⚡ पावर जाँच: ' + (okP ? 'पर्याप्त ✔' : 'कम है ❌') + '</div>' +
+          '<div class="d">' + esc(c1.name) + ' के लिए कम-से-कम <b>' + c1.recPsu + 'W</b> चाहिए। आपका SMPS: <b>' + p1.watts + 'W</b></div>';
+        b.appendChild(inf);
+      }
+      renderPartList();
+    });
+
+    /* 4 तार */
+    acc(4, 'चरण 4 · तार जोड़िए', function (b) {
+      hint(b, 'हर केबल पर क्लिक कीजिए। ज़रूरी तार लाल, वैकल्पिक हरे निशान में।');
+      var g = el('div', 'pick');
+      WIRES.forEach(function (w) {
+        var need = w.need(S), on = !!S.wires[w.id];
+        var c = el('div', 'opt'); c.dataset.wire = w.id; if (on) c.classList.add('on');
+        c.innerHTML = '<div class="t">' + (on ? '✅' : w.ico) + ' ' + w.name + '</div>' +
+          '<div class="d">' + w.from + ' → ' + w.to + ' · ' + w.color + ' · ' + (need ? '<span style="color:var(--bad)">ज़रूरी</span>' : '<span style="color:var(--good)">वैकल्पिक</span>') + '</div>';
+        g.appendChild(c);
+      });
+      b.appendChild(g);
+    });
+
+    /* 5 पावर */
+    acc(5, 'चरण 5 · SMPS को पावर', function (b) {
+      var b1 = el('button', 'btn' + (S.acPlug ? ' g' : ''), S.acPlug ? '🔌 AC प्लग लगा है' : '🔌 AC प्लग लगाइए');
+      b1.style.cssText = 'width:100%;margin-bottom:8px'; b1.dataset.act = 'plug';
+      var b2 = el('button', 'btn' + (S.psuSwitch ? ' g' : ''), S.psuSwitch ? '⏻ SMPS स्विच: ON' : '⏻ SMPS स्विच: OFF');
+      b2.style.cssText = 'width:100%'; b2.dataset.act = 'switch';
+      b.appendChild(b1); b.appendChild(b2);
+    });
+
+    /* 6 पावर ऑन */
+    acc(6, 'चरण 6 · पावर ऑन', function (b) {
+      hint(b, 'सब सही होने पर नीचे स्क्रीन के नीचे पावर बटन दबाइए — POST होकर विंडोज बूट होगा।');
+    });
+
+    panel.scrollTop = sv;
+  }
+
+  /* ================= लैब: दृश्य ================= */
+  function drawStage() {
+    var m = mb(), c = cpu(), r = ram(), st = storage(), p = psu(), g = gpu();
+    var C = { line:'#2a3b57', ac:'#38bdf8', good:'#22c55e', mut:'#475569', tx:'#cbd5e1', dim:'#7c8aa3' };
+    function rct(x,y,w,h,f,s,d){ return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="6" fill="'+f+'" stroke="'+s+'" stroke-width="1.6"'+(d?' stroke-dasharray="5 4"':'')+'/>'; }
+    function tx(x,y,s,f,sz,an){ return '<text x="'+x+'" y="'+y+'" fill="'+(f||C.tx)+'" font-size="'+(sz||11)+'" text-anchor="'+(an||'start')+'" font-family="Noto Sans Devanagari, sans-serif">'+s+'</text>'; }
+    function dot(x,y,col){ return '<circle cx="'+x+'" cy="'+y+'" r="3.2" fill="'+col+'"/>'; }
+    var s = [];
+    s.push('<svg viewBox="0 0 520 350" xmlns="http://www.w3.org/2000/svg">');
+    s.push(rct(0,0,520,350,'#0a1020','none'));
+    s.push(rct(20,18,320,314,'#0d1729', S.caseId?C.ac:C.line, !S.caseId));
+    s.push(tx(32,38, S.caseId? '🗄️ '+cab().name : 'कैबिनेट — चुनिए', S.caseId?C.tx:C.dim, 11));
+    s.push(rct(30,150,70,150,'#0b1424',C.line));
+    s.push(rct(36,176,58,34, st?'#12361f':'#0b1424', st?C.good:C.line, !st));
+    s.push(tx(65,197,'स्टोरेज', st?C.good:C.dim, 9,'middle'));
+    s.push(rct(36,246,58,24, S.wires.wfp?'#12361f':'#0b1424', S.wires.wfp?C.good:C.line, !S.wires.wfp));
+    s.push(tx(65,262,'PWR_SW', S.wires.wfp?C.good:C.dim, 8,'middle'));
+    s.push(rct(120,44,200,160, m?'#10233b':'#0b1424', m?C.ac:C.line, !m));
+    s.push(tx(220,62, m? ('🧩 '+m.socket+' · '+m.ddr) : 'मदरबोर्ड — चुनिए', m?C.tx:C.dim, 10.5,'middle'));
+    s.push(rct(140,74,54,52, c?'#12361f':'#0b1424', c?C.good:C.line, !c));
+    s.push(tx(167,104, c?'CPU ✔':'CPU', c?C.good:C.dim, 10,'middle'));
+    var slots = m ? m.slots : 4;
+    for (var i=0;i<slots;i++){ var fl = r && i<2; s.push(rct(212+i*22,74,14,74, fl?'#12361f':'#0b1424', fl?C.good:C.line, !fl)); }
+    s.push(tx(258,160, r? (r.ddr+' '+r.size) : 'RAM', r?C.good:C.dim, 9.5,'middle'));
+    s.push(rct(140,138,120,13, (st&&st.type==='M.2')?'#12361f':'#0b1424', (st&&st.type==='M.2')?C.good:C.line, !(st&&st.type==='M.2')));
+    s.push(tx(220,170, st? ('💽 '+st.name) : 'स्टोरेज — चुनिए', st?C.tx:C.dim, 9.5,'middle'));
+    s.push(rct(150,184,130,15, g&&g.id!=='g1' ? '#221a33':'#0b1424', g&&g.id!=='g1' ? '#a855f7':C.line, !(g&&g.id!=='g1')));
+    s.push(rct(150,244,150,60, S.psuSwitch?'#16281a':'#0b1424', p?C.ac:C.line, !p));
+    s.push(tx(225,266, p? ('🔌 '+p.watts+'W SMPS') : 'SMPS — चुनिए', p?C.tx:C.dim, 10,'middle'));
+    s.push(tx(225,284, S.psuSwitch?'⏻ स्विच ON':(S.acPlug?'AC लगा · स्विच OFF':'AC नहीं लगा'), S.psuSwitch?C.good:C.dim, 9.5,'middle'));
+    s.push(rct(310,252,24,20, S.acPlug?'#12361f':'#0b1424', S.acPlug?C.good:C.line, !S.acPlug));
+    s.push(tx(322,266, S.acPlug?'⚡':'AC', S.acPlug?C.good:C.dim, 9,'middle'));
+    var WCOL = { w24:'#eab308', w8:'#f97316', wsata:'#3b82f6', wsatap:'#9ca3af', wfan:'#22c55e', wfp:'#22d3ee', wpcie:'#a855f7', wcase:'#94a3b8', wlan:'#06b6d4', wdisp:'#38bdf8', wmonpwr:'#64748b' };
+    function wire(x1,y1,x2,y2,id){
+      var on = !!S.wires[id], col = on?WCOL[id]:C.mut;
+      var cx=(x1+x2)/2, cy=(y1+y2)/2+20;
+      s.push('<path d="M'+x1+' '+y1+' Q'+cx+' '+cy+' '+x2+' '+y2+'" fill="none" stroke="'+col+'" stroke-width="'+(on?2.6:1.5)+'"'+(on?'':' stroke-dasharray="4 4" opacity="0.5"')+'/>');
+      if (on){ s.push(dot(x1,y1,col)); s.push(dot(x2,y2,col)); }
+    }
+    wire(180,250,230,210,'w24');
+    wire(165,250,170,102,'w8');
+    wire(167,100,167,128,'wfan');
+    wire(215,152,100,195,'wsata');
+    wire(160,262,100,262,'wsatap');
+    wire(200,250,205,200,'wpcie');
+    wire(140,190,95,252,'wfp');
+    wire(305,92,350,74,'wlan');
+    wire(300,210,340,300,'wcase');
+    s.push(rct(340,82,72,26, S.wires.wlan?'#12361f':'#0b1424', S.wires.wlan?C.good:C.line, !S.wires.wlan));
+    s.push(tx(376,99,'🌐 LAN', S.wires.wlan?C.good:C.dim, 9.5,'middle'));
+    /* मॉनिटर */
+    var mon = monitor();
+    s.push(rct(398,168,104,78, mon?'#101f33':'#0b1424', mon?C.ac:C.line, !mon));
+    s.push('<rect x="407" y="177" width="86" height="50" rx="3" fill="' + (S.powered ? '#0b1a2e' : '#050810') + '" stroke="' + (S.powered ? C.ac : C.line) + '"/>');
+    if (S.powered) {
+      s.push('<rect x="430" y="192" width="11" height="11" fill="#f25022"/><rect x="443" y="192" width="11" height="11" fill="#7fba00"/>' +
+             '<rect x="430" y="205" width="11" height="11" fill="#00a4ef"/><rect x="443" y="205" width="11" height="11" fill="#ffb900"/>');
+    }
+    s.push(tx(450,262, mon ? mon.size : 'मॉनिटर', mon?C.tx:C.dim, 9.5,'middle'));
+    s.push(rct(470,300,34,24, S.wires.wmonpwr?'#12361f':'#0b1424', S.wires.wmonpwr?C.good:C.line, !S.wires.wmonpwr));
+    s.push(tx(487,316,'⚡', S.wires.wmonpwr?C.good:C.dim, 10,'middle'));
+    wire(320,120,398,200,'wdisp');
+    wire(450,246,487,300,'wmonpwr');
+    if (S.powered) {
+      s.push('<circle cx="330" cy="42" r="6" fill="'+C.good+'"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></circle>');
+      s.push(tx(344,46,'चालू', C.good, 11));
+    }
+    s.push('</svg>');
+    stage.innerHTML = s.join('');
+  }
+
+  /* ================= मॉनिटर ================= */
+  var screen = $('#screen'), stage = $('#stage');
+  function monOff() { screen.className = 'screen off'; screen.innerHTML = '🖥️ मॉनिटर बंद है'; }
+  function monPost() {
+    screen.className = 'screen';
+    screen.innerHTML = '<div class="scr-t" id="scrT"><div>[POST] CPU जाँच… ✔</div><div>[POST] RAM जाँच… ✔</div><div>[POST] डिस्क जाँच… ✔</div><div>[POST] POST पास ✔</div></div>';
+  }
+  function monWindows() {
+    screen.className = 'screen';
+    screen.innerHTML =
+      '<div><div class="winlogo"><i></i><i></i><i></i><i></i></div>' +
+      '<div class="wintxt">Windows</div>' +
+      '<div class="smalltxt">विंडोज शुरू हो रहा है…</div>' +
+      '<div class="spin"><i></i><i></i><i></i><i></i><i></i></div></div>';
+  }
+  function monWelcome() {
+    screen.className = 'screen';
+    screen.innerHTML =
+      '<div class="desk"><div class="bar">🪟 <b>Windows 11</b> &nbsp;·&nbsp; ' + esc(student ? student.name : 'स्टूडेंट') + ' &nbsp;·&nbsp; स्वागत है ✔</div>' +
+      '<div class="icons">' +
+      '<div><span>📁</span>This PC</div><div><span>🗑️</span>Recycle Bin</div><div><span>🌐</span>Edge</div>' +
+      '<div><span>📝</span>Notepad</div><div><span>⚙️</span>Settings</div><div><span>📊</span>Task Manager</div>' +
+      '</div>' +
+      '<div class="smalltxt" style="margin-top:12px;color:#5fd68a">✔ कंप्यूटर सफलतापूर्वक असेंबल हो गया और विंडोज बूट हो गया!</div></div>';
+  }
+  function monError(probs) {
+    screen.className = 'screen';
+    screen.innerHTML = '<div class="scr-t" style="color:#f87171"><div>⛔ POST विफल — PC चालू नहीं हो सका</div>' +
+      probs.slice(0, 6).map(function (p) { return '<div>• ' + esc(p) + '</div>'; }).join('') + '</div>';
+  }
+
+  /* ================= जाँच + बूट ================= */
+  function problems() {
+    var out = [];
+    var m = mb(), c = cpu(), r = ram(), st = storage(), p = psu(), g = gpu(), cb = cab();
+    if (!m) out.push('मदरबोर्ड नहीं चुना');
+    if (!cb) out.push('कैबिनेट नहीं चुना');
+    if (!c) out.push('CPU नहीं चुना');
+    if (!r) out.push('RAM नहीं चुनी');
+    if (!st) out.push('स्टोरेज (HDD/SSD) नहीं चुना');
+    if (!p) out.push('SMPS नहीं चुना');
+    if (!S.monitor) out.push('मॉनिटर नहीं चुना');
+    if (m && cb && cb.rank < m.rank) out.push('कैबिनेट छोटा है (' + cb.form + ') — बोर्ड ' + m.form + ' है');
+    if (m && c && c.socket !== m.socket) out.push('CPU का सॉकेट मेल नहीं (CPU ' + c.socket + ' vs बोर्ड ' + m.socket + ')');
+    if (m && r && r.ddr !== m.ddr) out.push('RAM टाइप मेल नहीं (' + r.ddr + ' vs ' + m.ddr + ')');
+    if (m && st && st.type === 'M.2' && m.m2 === 0) out.push('इस बोर्ड में M.2 स्लॉट नहीं — SATA स्टोरेज चुनिए');
+    if (c && !c.igpu && (!g || g.id === 'g1')) out.push('इस CPU में इंटीग्रेटेड ग्राफ़िक्स नहीं — अलग GPU लगाइए');
+    if (c && p && p.watts < c.recPsu) out.push('SMPS कमज़ोर (' + p.watts + 'W < ' + c.recPsu + 'W)');
+    if (!S.acPlug) out.push('AC प्लग नहीं लगा');
+    if (!S.psuSwitch) out.push('SMPS स्विच OFF है');
+    WIRES.forEach(function (w) { if (w.need(S) && !S.wires[w.id]) out.push(w.name + ' नहीं जुड़ा'); });
+    return out;
+  }
+
+  function boot() {
+    if (!student) return;
+    var stt = statsOf(student.name);
+    stt.attempts++; save(); renderStats();
+    log('⏻ पावर बटन दबाया (प्रयास #' + stt.attempts + ')', 'in');
+    var pr = problems();
+    if (pr.length) {
+      S.powered = false; drawStage(); monError(pr);
+      log('❌ PC चालू नहीं हो सका — ये बाक़ी/ग़लत हैं:', 'no');
+      pr.forEach(function (x) { log('  • ' + x, 'wr'); });
+      return;
+    }
+    var c = cpu();
+    S.powered = true; drawStage();
+    monPost();
+    log('🧠 POST पास — CPU: ' + c.name, 'ok');
+    log('🧠 RAM: ' + ram().name + ' ✔ · डिस्क: ' + storage().name + ' ✔', 'ok');
+    log('🔊 बीप! मदरबोर्ड सही से बूट हो रहा है', 'ok');
+    setTimeout(function () { monWindows(); log('🪟 विंडोज बूट लोडर शुरू…', 'in'); }, 900);
+    setTimeout(function () {
+      monWelcome();
+      stt.success++; save(); renderStats();
+      log('🎉 विंडोज बूट हो गया — PC पूरी तरह तैयार है!', 'ok');
+      S.powered = true; renderPanel();
+      showReport(stt);
+    }, 3000);
+  }
+
+  function cfgRow(label, item) {
+    if (!item) return '';
+    return '<b>' + label + '</b><span>' + esc(item.name) + '</span>';
+  }
+  function showReport(stt) {
+    var box = $('#reportBox');
+    var build = cfgRow('मदरबोर्ड', mb()) + cfgRow('कैबिनेट', cab()) + cfgRow('CPU', cpu()) + cfgRow('RAM', ram()) +
+      cfgRow('स्टोरेज', storage()) + cfgRow('CD/DVD', cd()) + cfgRow('SMPS', psu()) + cfgRow('ग्राफ़िक्स कार्ड', gpu()) +
+      cfgRow('LAN', lan()) + cfgRow('मॉनिटर', monitor()) + cfgRow('कीबोर्ड/माउस', inputDev());
+    box.innerHTML =
+      '<div class="report"><h4>✅ असेंबली रिपोर्ट</h4><div class="kv">' +
+        '<b>नाम</b><span>' + esc(student.name) + '</span>' +
+        '<b>स्कूल</b><span>' + esc(student.school) + '</span>' +
+        '<b>कक्षा/बैच</b><span>' + esc(student.klass) + '</span>' +
+        '<b>तारीख</b><span>' + esc(student.date) + '</span>' +
+        '<b>कुल प्रयास</b><span>' + stt.attempts + '</span>' +
+        '<b>सफल बूट</b><span>' + stt.success + '</span>' +
+      '</div><h4 style="margin-top:14px;font-size:14px">🔧 चुना गया बिल्ड</h4><div class="kv">' + build + '</div>' +
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="mini" id="printBtn">🖨️ रिपोर्ट + प्रमाण-पत्र प्रिंट / PDF</button><button class="mini" id="toOsBtn">💿 अब OS इंस्टॉल करें →</button></div></div>' +
+      '<div class="cert"><div class="cert-in">' +
+        '<div class="cert-top">🎓 प्रमाण-पत्र</div>' +
+        '<div class="cert-sub">सफल कंप्यूटर असेंबली हेतु</div>' +
+        '<div class="cert-name">' + esc(student.name) + '</div>' +
+        '<div class="cert-org">' + esc(student.school) + ' &nbsp;·&nbsp; ' + esc(student.klass) + '</div>' +
+        '<div class="cert-txt">ने स्वयं कंप्यूटर के सभी पुर्ज़े (मदरबोर्ड, CPU, RAM, स्टोरेज, SMPS, तार, मॉनिटर) सही-सही लगाकर <b>विंडोज सफलतापूर्वक बूट</b> किया।</div>' +
+        '<div class="cert-foot"><span>तारीख: ' + esc(student.date) + '</span><span class="seal">✔</span><span>कुल प्रयास: ' + stt.attempts + '</span></div>' +
+      '</div></div>';
+    $('#printBtn').addEventListener('click', function () { window.print(); });
+    var tb = $('#toOsBtn');
+    if (tb) tb.addEventListener('click', function () { var z = $('.tabs button[data-tab="os"]'); if (z) z.click(); });
+  }
+
+  /* ================= इवेंट डेलिगेशन ================= */
+  $('#panel').addEventListener('click', function (e) {
+    var sec = e.target.closest('[data-sec]');
+    if (sec) {
+      var n = +sec.dataset.sec;
+      openSec = (openSec === n) ? 0 : n;
+      if (openSec !== 3) partTab = '';
+      pickErr = '';
+      renderPanel();
+      return;
+    }
+    var pbtn = e.target.closest('[data-part]');
+    if (pbtn) {
+      var k = pbtn.dataset.part;
+      partTab = (partTab === k) ? '' : k;
+      partQ = ''; pickErr = '';
+      renderPanel();
+      return;
+    }
+    var t = e.target.closest('[data-pick],[data-wire],[data-act]');
+    if (!t) return;
+    if (t.dataset.pick) {
+      var key = t.dataset.pick, id = t.dataset.id;
+      var arr = key === 'mb' ? MOTHERBOARDS : key === 'caseId' ? CABINETS : key === 'cpu' ? CPUS : key === 'ram' ? RAMS :
+        key === 'storage' ? STORAGE : key === 'cd' ? CDS : key === 'psu' ? PSUS : key === 'gpu' ? GPUS :
+        key === 'monitor' ? MONITORS : key === 'input' ? INPUTS : LANS;
+      var item = byId(arr, id);
+      var err = validatePick(key, item);
+      if (err) {
+        pickErr = err; badId = id;
+        log('❌ ' + err, 'no');
+        renderPanel();
+        window.setTimeout(function () { if (badId) { badId = ''; renderPanel(); } }, 750);
+        return;
+      }
+      pickErr = ''; badId = '';
+      S[key] = id;
+      if (key === 'mb') { S.cpu = null; S.ram = null; S.storage = null; S.psu = null; S.gpu = null; S.lan = null; S.caseId = null; S.wires = {}; }
+      S.powered = false;
+      log('✅ ' + (item ? item.name : id) + ' चुना गया', 'ok');
+      /* चुनी हुई सूची बंद — अगला चरण खुद खुल जाएगा */
+      partTab = '';
+      if (key === 'mb') openSec = 2;
+      else if (key === 'caseId') openSec = 3;
+      else if (stepDone(3)) openSec = 4;
+      renderPanel(); drawStage();
+    } else if (t.dataset.wire) {
+      var wid = t.dataset.wire;
+      if (S.wires[wid]) { log('ℹ️ यह तार पहले ही जुड़ा है', 'in'); return; }
+      S.wires[wid] = true;
+      var w = byId(WIRES, wid);
+      log('🔗 ' + (w ? w.name : wid) + ' जोड़ा गया', 'ok');
+      if (stepDone(4)) openSec = 5;
+      renderPanel(); drawStage();
+    } else if (t.dataset.act) {
+      var a = t.dataset.act;
+      if (a === 'plug') { S.acPlug = !S.acPlug; log(S.acPlug ? '🔌 AC प्लग लग गया — SMPS को 220V मिल रहा है' : '🔌 AC प्लग निकाल दिया', S.acPlug ? 'ok' : 'wr'); }
+      else if (a === 'switch') {
+        if (!S.acPlug) { log('⚠️ पहले AC प्लग लगाइए — बिना 220V के स्विच काम नहीं करेगा', 'wr'); return; }
+        S.psuSwitch = !S.psuSwitch; log(S.psuSwitch ? '⏻ SMPS चालू — 5VSB स्टैंडबाय रेल आ गई' : '⏻ SMPS बंद', S.psuSwitch ? 'ok' : 'wr');
+      }
+      if (stepDone(5)) openSec = 6;
+      renderPanel(); drawStage();
+    }
+  });
+
+  $('#panel').addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'partQ') { partQ = e.target.value; renderPartList(); }
+  });
+
+  $('#bootBtn').addEventListener('click', boot);
+  $('#resetBtn').addEventListener('click', function () { resetAll(false); });
+  $('#themeBtn').addEventListener('click', function () { document.body.classList.toggle('light'); try { localStorage.setItem('cl3dlab.theme', document.body.classList.contains('light') ? 'light' : 'dark'); } catch (e) {} });
+  (function () { try { if (localStorage.getItem('cl3dlab.theme') === 'light') document.body.classList.add('light'); } catch (e) {} })();
+  /* भाषा: हिंदी + English (डिफ़ॉल्ट) → सिर्फ़ English → सिर्फ़ हिंदी → वापस */
+  var LANG3 = ['both', 'en', 'hi'];
+  var LTXT3 = { both:'🌐 हिंदी + EN', en:'🌐 English only', hi:'🌐 सिर्फ़ हिंदी' };
+  var lang3 = 'both';
+  try { var lv3 = localStorage.getItem('cl3dlab.lang'); if (lv3 && LANG3.indexOf(lv3) > -1) lang3 = lv3; } catch (e) {}
+  function applyLang3() {
+    document.body.classList.remove('lang-en', 'lang-hi');
+    if (lang3 === 'en') document.body.classList.add('lang-en');
+    if (lang3 === 'hi') document.body.classList.add('lang-hi');
+    var lb = $('#langBtn'); if (lb) lb.textContent = LTXT3[lang3];
+  }
+  applyLang3();
+  if ($('#langBtn')) $('#langBtn').addEventListener('click', function () {
+    lang3 = LANG3[(LANG3.indexOf(lang3) + 1) % 3];
+    try { localStorage.setItem('cl3dlab.lang', lang3); } catch (e) {}
+    applyLang3();
+  });
+
+  /* ================= OS इंस्टॉलेशन (वर्चुअल) — चरण-दर-चरण ================= */
+  var OSLIST = [
+    { id:'win11',  fam:'Windows', name:'Windows 11',  ver:'24H2',      mb:5600, minUsb:8, ram:4, disk:64, uefiOnly:true,  tpm:true,  eds:['Home','Pro','Education'], note:'UEFI + GPT + TPM 2.0 + Secure Boot ज़रूरी / required' },
+    { id:'win10',  fam:'Windows', name:'Windows 10',  ver:'22H2',      mb:4800, minUsb:8, ram:2, disk:32, uefiOnly:false, tpm:false, eds:['Home','Pro','Education'], note:'UEFI या लेगेसी — दोनों चलेंगे / both work' },
+    { id:'win81',  fam:'Windows', name:'Windows 8.1', ver:'',          mb:3800, minUsb:8, ram:1, disk:16, uefiOnly:false, tpm:false, eds:['Core','Pro'], note:'UEFI या लेगेसी / UEFI or Legacy' },
+    { id:'win7',   fam:'Windows', name:'Windows 7',   ver:'SP1',       mb:3100, minUsb:4, ram:1, disk:16, uefiOnly:false, tpm:false, eds:['Home Basic','Professional','Ultimate'], note:'लेगेसी BIOS + MBR' },
+    { id:'ubuntu', fam:'Linux',   name:'Ubuntu',      ver:'24.04 LTS', mb:5300, minUsb:8, ram:4, disk:25, uefiOnly:false, tpm:false, note:'GNOME डेस्कटॉप / desktop' },
+    { id:'mint',   fam:'Linux',   name:'Linux Mint',  ver:'22',        mb:2900, minUsb:4, ram:2, disk:20, uefiOnly:false, tpm:false, note:'Cinnamon · नए सीखने वालों के लिए आसान / beginner friendly' },
+    { id:'fedora', fam:'Linux',   name:'Fedora',      ver:'40',        mb:2100, minUsb:4, ram:4, disk:20, uefiOnly:false, tpm:false, note:'नवीनतम GNOME / latest GNOME' },
+    { id:'debian', fam:'Linux',   name:'Debian',      ver:'12',        mb:3700, minUsb:8, ram:2, disk:20, uefiOnly:false, tpm:false, note:'स्टेबल · डेस्कटॉप व सर्वर / stable' },
+    { id:'kali',   fam:'Linux',   name:'Kali Linux',  ver:'2024.3',    mb:4000, minUsb:8, ram:4, disk:25, uefiOnly:false, tpm:false, note:'साइबर सुरक्षा अभ्यास / cyber security practice' }
+  ];
+  var USBSIZES = [4, 8, 16, 32, 64], FSS = ['FAT32', 'NTFS', 'exFAT'];
+  var OSS = null, osTimer = null;
+
+  function osInit() {
+    OSS = {
+      stage:'pick', osId:null, iso:0, running:false,
+      usb:{ drv:null, scheme:null, target:null, fs:null }, usbPct:0, usbPhase:'', usbRunning:false,
+      bios:{ order:['hdd', 'cd', 'usb', 'net'], mode:null, secure:null, tpm:null, sata:null },
+      step:0, pct:0, phase:'',
+      win:{ lang:null, tz:null, kbd:null, key:null, edition:null, lic:false, type:null,
+            disk:{ parts:[], sel:null, unalloc:0, dlg:null, size:0, msg:'' } },
+      lin:{ lang:null, kbd:null, upd:null, type:null, tz:null, user:'', pass:'', pcname:'',
+            mnt:'/', disk:{ parts:[], sel:null, unalloc:0, dlg:null, size:0, msg:'' } },
+      oobe:{ region:null, kbd:null, net:null, user:null, priv:null, bypass:false, acct:null },
+      err:'', done:false, log:[]
+    };
+  }
+  osInit();
+
+  function osObj() { return OSLIST.filter(function (o) { return o.id === OSS.osId; })[0]; }
+  function osFam() { var o = osObj(); return o ? o.fam : 'Windows'; }
+  function osSteps() { return osFam() === 'Linux' ? ['lang', 'kbd', 'upd', 'type', 'tz', 'user', 'copy'] : ['lang', 'key', 'edition', 'lic', 'type', 'disk', 'copy']; }
+  function osStep() { return osSteps()[OSS.step]; }
+  function osOobe() { return osFam() === 'Linux' ? ['login'] : ['region', 'kbd', 'net', 'acct', 'priv']; }
+  function osOobeId() { return osOobe()[OSS.step]; }
+  function osGb(cap) { return cap.indexOf('TB') > -1 ? parseFloat(cap) * 1024 : parseInt(cap, 10); }
+  function osClearTimer() { if (osTimer) { window.clearInterval(osTimer); osTimer = null; } }
+  function osDiskCap() { var st = storage(); return st ? osGb(st.cap) : 500; }
+  function osDiskName() { var st = storage(); return st ? st.name : 'SATA HDD/SSD'; }
+
+  /* द्विभाषी लेबल */
+  function bl(hi, en) { return '<span class="bhi">' + esc(hi) + '</span><span class="ben">' + esc(en) + '</span>'; }
+  function blx(hi, en) { return '<span class="bhi2">' + esc(hi) + '</span> <span class="ben2">' + esc(en) + '</span>'; }
+  function osec(t, sub, body) {
+    return '<div class="sec"><h5>' + bl(t, sub || '') + '</h5>' + body + '</div>';
+  }
+  function ochip(attr, label, on, en) { return '<button type="button" class="pchip' + (on ? ' on' : '') + '" ' + attr + '>' + esc(label) + (en ? '<span class="ben">' + esc(en) + '</span>' : '') + '</button>'; }
+  function oPendBar(html) { return '<div class="partbar">' + html + '</div>'; }
+  function errBox() { return OSS.err ? '<div class="picker">' + bl(OSS.err, OSS.errEn || '') + '</div>' : ''; }
+  function lgl(t) { return '<label class="lbl">' + t + '</label>'; }
+
+  /* ---------- बड़े चरणों का ट्रैकर ---------- */
+  function osMacro() {
+    return [
+      { k:'pick', hi:'OS चुनना',        en:'Choose OS' },
+      { k:'iso',  hi:'ISO डाउनलोड',     en:'Download ISO' },
+      { k:'usb',  hi:'बूटेबल पेन ड्राइव', en:'Bootable USB' },
+      { k:'bios', hi:'BIOS सेटिंग',      en:'BIOS settings' },
+      { k:'boot', hi:'USB से बूट',       en:'Boot from USB' },
+      { k:'setup', hi:'सेटअप के सवाल',    en:'Setup questions' },
+      { k:'disk', hi:'डिस्क पार्टीशन',    en:'Disk partitioning' },
+      { k:'inst', hi:'इंस्टॉल हो रहा है',   en:'Installing' },
+      { k:'oobe', hi:'पहला सेटअप',       en:'First run (OOBE)' },
+      { k:'done', hi:'डेस्कटॉप',         en:'Desktop' }
+    ];
+  }
+  function osMacroIdx() {
+    var st = OSS.stage;
+    if (st === 'pick') return 0;
+    if (st === 'iso') return 1;
+    if (st === 'usb') return 2;
+    if (st === 'bios') return 3;
+    if (st === 'bootkey') return 4;
+    if (st === 'setup') return (osStep() === 'disk') ? 6 : 5;
+    if (st === 'install' || st === 'reboot') return 7;
+    if (st === 'oobe') return 8;
+    if (st === 'done') return 9;
+    return 0;
+  }
+  function renderOSSteps() {
+    var box = $('#osSteps'); if (!box) return;
+    var cur = osMacroIdx(), h = '';
+    osMacro().forEach(function (m, i) {
+      h += '<div class="ostep' + (i < cur ? ' done' : '') + (i === cur ? ' on' : '') + '">' +
+        '<i>' + (i < cur ? '✔' : (i + 1)) + '</i><span>' + bl(m.hi, m.en) + '</span></div>';
+    });
+    box.innerHTML = h;
+  }
+  function osStepLabel() {
+    var m = osMacro()[osMacroIdx()];
+    var n = osMacroIdx() + 1;
+    return { hi: 'चरण ' + n + ' · ' + m.hi, en: 'Step ' + n + ' · ' + m.en };
+  }
+
+  /* ---------- लॉग (हर कदम और हर ग़लती दर्ज) ---------- */
+  function osClock() { var d = new Date(); function p(n) { return (n < 10 ? '0' : '') + n; } return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function osNote(hi, kind, en, fixHi, fixEn) {
+    var s = osStepLabel();
+    OSS.log.push({ ts: osClock(), kind: kind || 'info', step: s.hi, stepEn: s.en, hi: hi, en: en || '', fixHi: fixHi || '', fixEn: fixEn || '' });
+    var l = $('#osLog');
+    if (l) {
+      var d = el('div', kind || 'info');
+      d.innerHTML = '<span class="lot">' + osClock() + '</span>' + esc(hi) + (en ? '<span class="ben">' + esc(en) + '</span>' : '');
+      l.appendChild(d); l.scrollTop = l.scrollHeight;
+    }
+  }
+  function osLog(hi, kind, en) { osNote(hi, kind, en); }
+  function osErr(hi, en, fixHi, fixEn) {
+    OSS.err = hi; OSS.errEn = en || '';
+    osNote('❌ ' + hi, 'err', en, fixHi, fixEn);
+  }
+  function osMistakes() { return OSS.log.filter(function (x) { return x.kind === 'err'; }); }
+
+  /* ---------- ज़रूरीत (requirements) की जाँच ---------- */
+  function osReqErr(o) {
+    var r = ram(), st = storage();
+    if (r && parseInt(r.size, 10) < o.ram) {
+      return { hi: o.name + ' के लिए कम-से-कम ' + o.ram + 'GB RAM चाहिए — इस PC में ' + r.size + ' है।',
+               en: 'Requires at least ' + o.ram + 'GB RAM — this PC has ' + r.size + '.' };
+    }
+    if (st && osGb(st.cap) < o.disk) {
+      return { hi: o.name + ' के लिए कम-से-कम ' + o.disk + 'GB स्टोरेज चाहिए — इस PC में ' + st.cap + ' है।',
+               en: 'Requires at least ' + o.disk + 'GB storage — this PC has ' + st.cap + '.' };
+    }
+    return null;
+  }
+  function usbErr() {
+    var o = osObj(), u = OSS.usb;
+    if (!u.drv) return { hi: 'पहले पेन ड्राइव का साइज़ चुनिए।', en: 'Choose the pen-drive size first.' };
+    if (!u.scheme) return { hi: 'पार्टीशन स्कीम चुनिए (GPT या MBR)।', en: 'Choose the partition scheme (GPT or MBR).' };
+    if (!u.target) return { hi: 'टार्गेट सिस्टम चुनिए (UEFI या लेगेसी BIOS)।', en: 'Choose the target system (UEFI or Legacy BIOS).' };
+    if (!u.fs) return { hi: 'फ़ाइल सिस्टम चुनिए (FAT32 / NTFS / exFAT)।', en: 'Choose the file system (FAT32 / NTFS / exFAT).' };
+    if (u.drv < o.minUsb) return { hi: 'पेन ड्राइव छोटी है — ' + o.name + ' के लिए ' + o.minUsb + 'GB+ चाहिए, आपने ' + u.drv + 'GB चुनी।', en: 'Pen drive too small — ' + o.name + ' needs ' + o.minUsb + 'GB+, you picked ' + u.drv + 'GB.' };
+    if (o.uefiOnly && (u.target !== 'UEFI' || u.scheme !== 'GPT')) return { hi: o.name + ' में UEFI + GPT ज़रूरी है' + (u.target !== 'UEFI' ? ' — टार्गेट "UEFI" चुनिए।' : '') + (u.scheme !== 'GPT' ? ' — स्कीम "GPT" चुनिए।' : '') + ' (TPM 2.0 + Secure Boot भी चालू करें)', en: o.name + ' needs UEFI + GPT (also enable TPM 2.0 + Secure Boot).' };
+    if (u.target === 'UEFI' && u.scheme !== 'GPT') return { hi: 'UEFI बूट के लिए GPT स्कीम चाहिए — MBR लेगेसी के लिए होती है।', en: 'UEFI boot needs GPT — MBR is for Legacy.' };
+    if (u.target === 'BIOS' && u.scheme !== 'MBR') return { hi: 'लेगेसी BIOS के लिए MBR स्कीम चुनिए।', en: 'Legacy BIOS needs MBR.' };
+    if (u.target === 'UEFI' && u.fs !== 'FAT32') return { hi: 'UEFI बूट के लिए FAT32 फ़ाइल सिस्टम चाहिए (4GB से बड़ी install.wim के लिए NTFS+UEFI:NTFS)।', en: 'UEFI boot needs FAT32 (or NTFS + UEFI:NTFS for large install.wim).' };
+    return null;
+  }
+  function biosErr() {
+    var o = osObj(), b = OSS.bios;
+    if (b.order[0] !== 'usb') return { hi: 'बूट प्राथमिकता में USB पहले नहीं है — PC हार्ड डिस्क से बूट करेगा और सेटअप नहीं खुलेगा।', en: 'USB is not first in boot order — the PC will boot from HDD and setup will not open.', fixHi: 'Boot → Boot Priority में USB को #1 पर लाएँ (↑ बटन)।', fixEn: 'Boot → Boot Priority: move USB to #1 with the ↑ button.' };
+    if (!b.mode) return { hi: 'बूट मोड चुनिए (UEFI या Legacy)।', en: 'Choose boot mode (UEFI or Legacy).' };
+    if (!b.secure) return { hi: 'Secure Boot की सेटिंग चुनिए (Enabled/Disabled)।', en: 'Choose the Secure Boot setting (Enabled/Disabled).' };
+    if (!b.tpm) return { hi: 'TPM 2.0 की सेटिंग चुनिए (Enabled/Disabled)।', en: 'Choose the TPM 2.0 setting (Enabled/Disabled).' };
+    if (!b.sata) return { hi: 'SATA मोड चुनिए (AHCI या IDE)।', en: 'Choose SATA mode (AHCI or IDE).' };
+    if (o.id === 'win11') {
+      if (b.mode !== 'UEFI') return { hi: 'Windows 11 केवल UEFI मोड में इंस्टॉल होता है।', en: 'Windows 11 installs only in UEFI mode.', fixHi: 'Boot Mode को "UEFI" कीजिए।', fixEn: 'Set Boot Mode to "UEFI".' };
+      if (b.secure !== 'on') return { hi: 'Windows 11 की शर्त (requirement) Secure Boot है — इसे ON कीजिए।', en: 'Windows 11 requires Secure Boot — turn it ON.', fixHi: 'Security → Secure Boot = Enabled।', fixEn: 'Security → Secure Boot = Enabled.' };
+      if (b.tpm !== 'on') return { hi: 'Windows 11 की शर्त TPM 2.0 है — इसे ON कीजिए।', en: 'Windows 11 requires TPM 2.0 — turn it ON.', fixHi: 'Security → TPM 2.0 = Enabled।', fixEn: 'Security → TPM 2.0 = Enabled.' };
+    }
+    if (b.sata === 'IDE') return { hi: 'चेतावनी: SATA मोड IDE है — SSD/NVMe की रफ़्तार कम मिलेगी।', en: 'Warning: SATA mode is IDE — SSD/NVMe speed will be reduced.', fixHi: 'Advanced → SATA Mode = AHCI।', fixEn: 'Advanced → SATA Mode = AHCI.', warn: true };
+    return null;
+  }
+
+  /* ---------- बायाँ पैनल ---------- */
+  function renderOSPanel() {
+    var p = $('#osPanel'); if (!p) return;
+    var o = osObj(), st = OSS.stage, h = '', L = osStepLabel();
+    if (!o && st !== 'pick') st = 'pick';
+
+    if (st === 'pick') {
+      var body = '<p class="hint">' + blx('Windows या Linux — कोई भी चुन सकते हैं। चुनते ही ISO डाउनलोड शुरू होगा।', 'Pick Windows or Linux. The ISO download starts at once.') + '</p>' + errBox();
+      OSLIST.forEach(function (x) {
+        var req = osReqErr(x);
+        body += '<div class="opt" data-os="' + x.id + '"><div class="t">' + (x.fam === 'Linux' ? '🐧 ' : '🪟 ') + esc(x.name) + (x.ver ? ' ' + x.ver : '') + '</div>' +
+          '<div class="d">' + esc(x.fam) + ' · ISO ' + (x.mb / 1024).toFixed(1) + 'GB · ' + blx('पेन ड्राइव', 'USB') + ' ' + x.minUsb + 'GB+ · RAM ' + x.ram + 'GB · ' + blx('डिस्क', 'Disk') + ' ' + x.disk + 'GB<br>' +
+          esc(x.note) + (req ? '<br><span style="color:var(--bad)">⚠️ ' + esc(req.hi) + '</span><span class="ben">' + esc(req.en) + '</span>' : '') + '</div></div>';
+      });
+      h += osec('चरण 1 · ऑपरेटिंग सिस्टम चुनिए', 'Step 1 · Choose the operating system', body);
+
+    } else if (st === 'iso') {
+      h += osec('चरण 2 · ISO डाउनलोड', 'Step 2 · Download the ISO',
+        '<div class="card">' + (osFam() === 'Linux' ? '🐧' : '🪟') + ' <b>' + esc(o.name) + '</b><br>' +
+        '<div class="phase">' + (o.mb / 1024).toFixed(1) + ' GB · ' + OSS.iso + '%</div><div class="bar"><i style="width:' + OSS.iso + '%"></i></div></div>' +
+        '<p class="hint">' + blx('ISO = OS की इंस्टॉलेशन इमेज फ़ाइल। यह पूरी होने पर बूटेबल पेन ड्राइव बनाएँगे।', 'ISO = the OS installation image file. When it finishes we make a bootable pen drive.') + '</p>');
+
+    } else if (st === 'usb') {
+      var u = OSS.usb;
+      h += osec('चरण 3 · बूटेबल पेन ड्राइव बनाइए', 'Step 3 · Create the bootable pen drive',
+        '<p class="hint">' + blx('ठीक वैसे जैसे Rufus में करते हैं — डिवाइस, पार्टीशन स्कीम, टार्गेट और फ़ाइल सिस्टम चुनकर START दबाइए।', 'Exactly like Rufus — pick device, partition scheme, target and file system, then press START.') + '</p>' +
+        lgl(bl('पेन ड्राइव (डिवाइस)', 'Pen drive (device)')) + oPendBar(USBSIZES.map(function (n) { return ochip('data-usb="drv" data-id="' + n + '"', n + ' GB', u.drv === n); }).join('')) +
+        lgl(bl('पार्टीशन स्कीम', 'Partition scheme')) + oPendBar(['GPT', 'MBR'].map(function (n) { return ochip('data-usb="scheme" data-id="' + n + '"', n, u.scheme === n, n === 'GPT' ? 'नया / modern' : 'पुराना / legacy'); }).join('')) +
+        lgl(bl('टार्गेट सिस्टम', 'Target system')) + oPendBar(ochip('data-usb="target" data-id="UEFI"', 'UEFI', u.target === 'UEFI', 'आधुनिक / modern') + ochip('data-usb="target" data-id="BIOS"', 'लेगेसी BIOS', u.target === 'BIOS', 'Legacy')) +
+        lgl(bl('फ़ाइल सिस्टम', 'File system')) + oPendBar(FSS.map(function (n) { return ochip('data-usb="fs" data-id="' + n + '"', n, u.fs === n); }).join('')) +
+        errBox() +
+        '<button type="button" class="btn" style="width:100%;margin-top:6px" data-osact="startusb"' + (OSS.usbRunning ? ' disabled' : '') + '>' + blx('🟢 START — बूटेबल बनाइए', '🟢 START — make bootable') + '</button>' +
+        '<p class="hint" style="margin-top:8px">' + blx('संकेत: Windows 11 → UEFI + GPT + FAT32; पुराने Windows 7 → लेगेसी BIOS + MBR।', 'Tip: Windows 11 → UEFI + GPT + FAT32; old Windows 7 → Legacy BIOS + MBR.') + '</p>');
+
+    } else if (st === 'bios') {
+      var b = OSS.bios;
+      h += osec('चरण 4 · BIOS / UEFI सेटिंग', 'Step 4 · BIOS / UEFI settings',
+        '<p class="hint">' + blx('PC चालू करते समय Del / F2 दबाकर BIOS खोलते हैं। दाईं स्क्रीन पर टैब चुनकर सेटिंग बदलिए, फिर F10 दबाइए।', 'Press Del / F2 at power-on to open BIOS. Change settings on the right screen, then press F10.') + '</p>' +
+        '<div class="card" style="font-size:12.4px">' +
+        '<b>' + bl('बूट क्रम', 'Boot order') + '</b><div class="phase">' + b.order.map(function (k, i) { return (i + 1) + '. ' + osDevName(k); }).join(' · ') + '</div>' +
+        '<b>' + bl('बूट मोड', 'Boot mode') + '</b><div class="phase">' + esc(b.mode || '—') + '</div>' +
+        '<b>' + bl('Secure Boot', 'Secure Boot') + '</b><div class="phase">' + (b.secure || '—') + '</div>' +
+        '<b>' + bl('TPM 2.0', 'TPM 2.0') + '</b><div class="phase">' + (b.tpm || '—') + '</div>' +
+        '<b>' + bl('SATA मोड', 'SATA mode') + '</b><div class="phase">' + esc(b.sata || '—') + '</div></div>' +
+        errBox() +
+        '<button type="button" class="btn" style="width:100%;margin-top:6px" data-osact="saveexit">' + blx('💾 F10 — सेव करके बाहर निकलें', '💾 F10 — Save & Exit') + '</button>');
+
+    } else if (st === 'bootkey') {
+      h += osec('चरण 5 · USB से बूट कीजिए', 'Step 5 · Boot from USB',
+        '<p class="hint">' + blx('अब PC USB से बूट हो रहा है। स्क्रीन पर लिखा आया है — कोई भी कुंजी दबाइए।', 'The PC is booting from USB. The screen asks for it — press any key.') + '</p>' +
+        '<button type="button" class="btn" style="width:100%" data-osact="bootkey">' + blx('⌨️ कोई भी कुंजी दबाइए', '⌨️ Press any key') + '</button>');
+
+    } else if (st === 'setup') {
+      h += errBox();
+      var id = osStep();
+      if (osFam() === 'Linux') {
+        var l = OSS.lin;
+        if (id === 'lang') h += osec('भाषा चुनिए', 'Choose language', oPendBar(ochip('data-lin="lang:hi"', 'हिन्दी', l.lang === 'hi', 'Hindi') + ochip('data-lin="lang:en"', 'English', l.lang === 'en')));
+        else if (id === 'kbd') h += osec('कीबोर्ड लेआउट', 'Keyboard layout', oPendBar(ochip('data-lin="kbd:us"', 'English (US)', l.kbd === 'us') + ochip('data-lin="kbd:hi"', 'हिन्दी (देवनागरी)', l.kbd === 'hi', 'Hindi (Devanagari)')) + '<p class="hint">' + blx('"Detect keyboard layout" दबाकर भी पता लगा सकते हैं।', 'You can also press "Detect keyboard layout".') + '</p>');
+        else if (id === 'upd') h += osec('अपडेट और सॉफ़्टवेयर', 'Updates and software', oPendBar(ochip('data-lin="upd:normal"', 'सामान्य इंस्टॉल', l.upd === 'normal', 'Normal install') + ochip('data-lin="upd:minimal"', 'न्यूनतम इंस्टॉल', l.upd === 'minimal', 'Minimal install')) + '<p class="hint">' + blx('सामान्य में ऑफ़िस, ब्राउज़र, मीडिया प्लेयर भी आते हैं।', 'Normal also installs office, browser and media player.') + '</p>');
+        else if (id === 'type') {
+          h += osec('इंस्टॉलेशन का प्रकार', 'Installation type',
+            oPendBar(ochip('data-lin="type:erase"', 'डिस्क मिटाकर इंस्टॉल करें', l.type === 'erase', 'Erase disk and install') + ochip('data-lin="type:else"', 'कुछ और (Something else)', l.type === 'else', 'Manual partitioning')) +
+            '<p class="hint">' + blx('नई खाली डिस्क पर "डिस्क मिटाकर" सबसे आसान है। "कुछ और" में हम स्वयं पार्टीशन बनाएँगे।', 'On an empty disk "Erase disk" is easiest. "Something else" lets us build partitions ourselves.') + '</p>' +
+            (l.type === 'else' ? '<p class="hint" style="color:var(--warn)">👉 ' + blx('दाईं स्क्रीन पर पार्टीशन टेबल खुल गई है — वहीं पार्टीशन बनाइए।', 'The partition table is open on the right screen — create partitions there.') + '</p>' : ''));
+        }
+        else if (id === 'tz') h += osec('समय क्षेत्र', 'Time zone', oPendBar(ochip('data-lin="tz:ist"', 'Asia/Kolkata (IST +5:30)', l.tz === 'ist') + ochip('data-lin="tz:utc"', 'UTC', l.tz === 'utc')));
+        else if (id === 'user') h += osec('यूज़र खाता बनाइए', 'Create your account',
+          lgl(bl('आपका नाम', 'Your name')) + '<input class="partq" data-osfield="linuser" placeholder="' + blx('नाम', 'name') + '" value="' + esc(l.user) + '">' +
+          lgl(bl('कंप्यूटर का नाम', 'Computer name')) + '<input class="partq" data-osfield="linpc" placeholder="pc-lab" value="' + esc(l.pcname) + '">' +
+          lgl(bl('पासवर्ड', 'Password')) + '<input class="partq" type="password" data-osfield="linpass" placeholder="•••••">' +
+          '<button type="button" class="btn" style="width:100%" data-lin="user-next">' + blx('आगे बढ़ें', 'Next') + '</button>');
+      } else {
+        var w = OSS.win;
+        if (id === 'lang') h += osec('भाषा, समय और कीबोर्ड', 'Language, time and keyboard',
+          lgl(bl('इंस्टॉल करने के लिए भाषा', 'Language to install')) + oPendBar(ochip('data-win="lang:hi"', 'हिन्दी', w.lang === 'hi', 'Hindi') + ochip('data-win="lang:en"', 'English (India)', w.lang === 'en')) +
+          lgl(bl('समय और मुद्रा का प्रारूप', 'Time and currency format')) + oPendBar(ochip('data-win="tz:ist"', '(UTC+05:30) नई दिल्ली', w.tz === 'ist') + ochip('data-win="tz:utc"', '(UTC) Dublin', w.tz === 'utc')) +
+          lgl(bl('कीबोर्ड या इनपुट विधि', 'Keyboard or input method')) + oPendBar(ochip('data-win="kbd:hi"', 'हिन्दी देवनागरी', w.kbd === 'hi') + ochip('data-win="kbd:us"', 'US QWERTY', w.kbd === 'us')) +
+          '<button type="button" class="btn" style="width:100%;margin-top:8px" data-win="lang-next">' + blx('अगला', 'Next') + '</button>');
+        else if (id === 'key') h += osec('उत्पाद कुंजी दर्ज कीजिए', 'Enter the product key',
+          lgl(bl('25 अक्षरों की प्रोडक्ट की', '25-character product key')) + '<input class="partq" data-osfield="winkey" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" value="' + esc(OSS.win.keyTxt || '') + '">' +
+          '<button type="button" class="btn" style="width:100%" data-win="key-have">' + blx('🔑 कुंजी दर्ज करके आगे बढ़ें', '🔑 Use this key') + '</button>' +
+          '<button type="button" class="mini" style="width:100%;margin-top:8px" data-win="key-skip">' + blx('मेरे पास प्रोडक्ट की नहीं है', "I don't have a product key") + '</button>');
+        else if (id === 'edition') h += osec('संस्करण चुनिए', 'Choose an edition',
+          '<div class="card" style="font-size:12.4px">' + bl('Windows का संस्करण = कौन-कौन से फ़ीचर मिलेंगे।', 'The Windows edition decides which features you get.') + '</div>' +
+          oPendBar((o.eds || ['Home', 'Pro']).map(function (e) { return ochip('data-win="edition:' + e + '"', e, w.edition === e, e === 'Home' ? 'घर / home' : e === 'Pro' ? 'दफ़्तर + BitLocker' : e === 'Education' ? 'स्कूल / school' : ''); }).join('')));
+        else if (id === 'lic') h += osec('लाइसेंस की शर्तें', 'License terms',
+          '<div class="card" style="font-size:12.3px;max-height:150px;overflow:auto">' + blx('Microsoft सॉफ़्टवेयर लाइसेंस की शर्तें पढ़िए। आगे बढ़ने के लिए इन्हें स्वीकार करना ज़रूरी है।', 'Read the Microsoft Software License Terms. You must accept them to continue.') + '</div>' +
+          '<label class="hint" style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="licChk"' + (w.lic ? ' checked' : '') + '> <span>' + blx('मैं शर्तें स्वीकार करता/करती हूँ', 'I accept the license terms') + '</span></label>' +
+          '<button type="button" class="btn" style="width:100%" data-win="lic">' + blx('आगे बढ़ें', 'Next') + '</button>');
+        else if (id === 'type') h += osec('किस प्रकार का इंस्टॉलेशन?', 'Which type of installation?',
+          oPendBar(ochip('data-win="type-upgrade"', 'अपग्रेड (फ़ाइलें रखते हुए)', false, 'Upgrade: keep files') + ochip('data-win="type-custom"', 'कस्टम (सिर्फ़ Windows इंस्टॉल)', w.type === 'custom', 'Custom: Windows only')) +
+          '<p class="hint">' + blx('नई खाली डिस्क पर "कस्टम" चुनिए।', 'On a new empty disk choose "Custom".') + '</p>');
+        else if (id === 'disk') h += osec('डिस्क कहाँ इंस्टॉल करें? (Drive 0)', 'Where do you want to install Windows? (Drive 0)',
+          '<p class="hint">' + blx('दाईं स्क्रीन पर Drive 0 की टेबल है। वहाँ ➕ नया दबाकर पार्टीशन बनाइए (GPT में Windows खुद Recovery + EFI + MSR बनाता है), Primary चुनिए और Next दबाइए।', 'The Drive 0 table is on the right screen. Press ➕ New to create a partition (Windows creates Recovery + EFI + MSR itself on GPT), select Primary and press Next.') + '</p>' +
+          '<div class="card" style="font-size:12.2px">' + bl('अभ्यास: ग़लत पार्टीशन चुनने पर भी संदेश मिलेगा — वही असली Windows में आता है।', 'Practice: picking a wrong partition gives the same message real Windows shows.') + '</div>');
+      }
+
+    } else if (st === 'install' || st === 'reboot') {
+      h += osec('इंस्टॉल हो रहा है…', 'Installing…',
+        '<div class="card"><b>' + esc(o.name) + '</b><div class="phase">' + OSS.pct + '% · ' + esc(OSS.phase) + '</div><div class="bar"><i style="width:' + OSS.pct + '%"></i></div></div>' +
+        '<p class="hint">' + blx('इंस्टॉल के दौरान PC को बंद न कीजिए। पूरा होने पर अपने आप रीस्टार्ट होगा।', 'Do not power off during install. It restarts automatically when done.') + '</p>');
+
+    } else if (st === 'oobe') {
+      h += errBox();
+      var oid = osOobeId();
+      if (osFam() === 'Linux') {
+        h += osec('लॉगिन', 'Login', '<p class="hint">' + blx('इंस्टॉलेशन हो गया — अब यूज़र खाते से लॉगिन कीजिए।', 'Installation done — log in with your account.') + '</p>' +
+          '<button type="button" class="btn" style="width:100%" data-oobe="login">' + blx('🔓 लॉगिन कीजिए', '🔓 Log in') + '</button>');
+      } else {
+        var ob = OSS.oobe;
+        if (oid === 'region') h += osec('क्या आप इस क्षेत्र में हैं?', 'Is this the right region?', oPendBar(ochip('data-oobe="region:in"', '🇮🇳 भारत', ob.region === 'in', 'India') + ochip('data-oobe="region:other"', 'अन्य', ob.region === 'other', 'Other')));
+        else if (oid === 'kbd') h += osec('कीबोर्ड लेआउट', 'Keyboard layout', oPendBar(ochip('data-oobe="okbd:us"', 'US', ob.kbd === 'us') + ochip('data-oobe="okbd:hi"', 'हिन्दी', ob.kbd === 'hi', 'Hindi')));
+        else if (oid === 'net') h += osec('नेटवर्क से जोड़िए', 'Connect to a network',
+          oPendBar(ochip('data-oobe="net-add"', '📶 Wi-Fi जोड़ें', ob.net === 'wifi', 'Add Wi-Fi') + ochip('data-oobe="net-skip"', 'इस समय नहीं', ob.net === null, 'Skip for now')) +
+          (OSS.osId === 'win11' ? '<p class="hint">' + blx('Windows 11 Home में इंटरनेट ज़रूरी है — छोड़ेंगे तो एरर मिलेगा (और उसका असली हल भी सीखेंगे)।', 'Windows 11 Home needs internet — skipping shows an error (and we learn the real fix).') + '</p>' +
+            (ob.bypass ? '<p class="hint" style="color:var(--good)">✔ oobe\\bypassnro चल चुका है — अब नेट छोड़ने पर "I have no internet" विकल्प मिलेगा।</p>'
+                       : '<button type="button" class="mini" style="width:100%" data-oobe="bypass">' + blx('🛠️ Shift+F10 → oobe\\bypassnro चलाइए', '🛠️ Shift+F10 → run oobe\\bypassnro') + '</button>') : ''));
+        else if (oid === 'acct') h += osec('अपना खाता बनाइए', 'Create your account',
+          lgl(bl('अकाउंट का प्रकार', 'Account type')) + oPendBar(ochip('data-oobe="acct:ms"', 'Microsoft खाता', ob.acct === 'ms', 'Microsoft account') + ochip('data-oobe="acct:local"', 'ऑफ़लाइन खाता', ob.acct === 'local', 'Local/offline account')) +
+          lgl(bl('आपका नाम', 'Your name')) + '<input class="partq" data-osfield="oobeuser" placeholder="' + blx('नाम', 'name') + '" value="' + esc(ob.user || '') + '">' +
+          '<button type="button" class="btn" style="width:100%" data-oobe="acct-next">' + blx('आगे बढ़ें', 'Next') + '</button>' +
+          ((OSS.osId === 'win11' && !ob.bypass) ? '<button type="button" class="mini" style="width:100%;margin-top:8px" data-oobe="bypass">' + blx('🛠️ ऑफ़लाइन खाते के लिए oobe\\bypassnro चलाइए', '🛠️ Run oobe\\bypassnro for a local account') + '</button>' : ''));
+        else if (oid === 'priv') h += osec('गोपनीयता सेटिंग', 'Privacy settings', oPendBar(ochip('data-oobe="priv:skip"', 'सब बंद रखें', ob.priv === 'skip', 'Turn all off') + ochip('data-oobe="priv:ok"', 'डिफ़ॉल्ट स्वीकारें', ob.priv === 'ok', 'Accept defaults')) +
+          '<div class="card" style="font-size:12.2px">' + bl('जो पसंद न हों, उनके टॉगल बंद रखें — बाद में Settings → Privacy में कभी भी बदल सकते हैं।', 'Keep unwanted toggles off — you can change them later in Settings → Privacy.') + '</div>');
+      }
+
+    } else if (st === 'done') {
+      h += osec('🎉 इंस्टॉलेशन पूरा', '🎉 Installation complete',
+        '<p class="hint">' + blx('बधाई! नीचे रिपोर्ट, ग़लतियों की सूची और प्रमाण-पत्र देखिए।', 'Well done! See the report, mistake list and certificate below.') + '</p>' +
+        '<button type="button" class="btn" style="width:100%" data-osact="print">' + blx('🖨️ रिपोर्ट + प्रमाण-पत्र प्रिंट / PDF', '🖨️ Print report + certificate / PDF') + '</button>' +
+        '<button type="button" class="mini" style="width:100%;margin-top:8px" data-osact="reset">' + blx('↺ दूसरी OS इंस्टॉल करें', '↺ Install another OS') + '</button>');
+    }
+    p.innerHTML = h;
+  }
+
+  /* ---------- मॉनिटर स्क्रीनें ---------- */
+  function osDevName(k) {
+    var u = OSS.usb;
+    if (k === 'usb') return 'USB: SanDisk ' + (u.drv || 8) + 'GB';
+    if (k === 'hdd') return 'HDD: ' + osDiskName();
+    if (k === 'cd') return 'CD/DVD: HL-DT-ST DVDRAM';
+    return 'Network: PXE (LAN)';
+  }
+  function setupShell(body, titleHi, titleEn) {
+    return '<div class="wset"><div class="wset-top">' + (osFam() === 'Linux' ? '🐧 ' : '🪟 ') +
+      (titleHi || bl('Windows Setup', 'Windows Setup')) + (titleEn ? '<span class="ben">' + esc(titleEn) + '</span>' : '') +
+      '</div><div class="wset-b">' + body + '</div></div>';
+  }
+  function bchip(attr, label, on) { return '<button type="button" class="bchip' + (on ? ' on' : '') + '" ' + attr + '>' + esc(label) + '</button>'; }
+  function biosScreen() {
+    var b = OSS.bios, o = osObj();
+    var order = b.order.map(function (k, i) {
+      return '<div class="brow"><span class="bn">' + (i + 1) + '</span><span class="bt">' + esc(osDevName(k)) + (i === 0 ? ' <b class="hl">#1</b>' : '') + '</span>' +
+        '<button type="button" class="bmini" data-bmove="' + i + ':up"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="bmini" data-bmove="' + i + ':down"' + (i === b.order.length - 1 ? ' disabled' : '') + '>↓</button></div>';
+    }).join('');
+    return '<div class="bios"><div class="bios-h">' + bl('BIOS Setup Utility — Aptio Setup (UEFI)', 'BIOS Setup Utility — Aptio Setup') + '</div>' +
+      '<div class="bios-b"><div class="bios-col"><span>Main</span><span class="on">Boot</span><span>Security</span><span>Advanced</span><span>Save &amp; Exit</span></div>' +
+      '<div class="bios-main">' +
+      '<div class="bios-t">' + bl('बूट प्राथमिकता (Boot Priority)', 'Boot Priority — ↑ ↓ से क्रम बदलिए') + '</div>' + order +
+      '<div class="bios-t">' + bl('बूट मोड', 'Boot Mode') + '</div><div class="brow2">' +
+        bchip('data-bios="mode:UEFI"', 'UEFI', b.mode === 'UEFI') + bchip('data-bios="mode:Legacy"', 'Legacy (CSM)', b.mode === 'Legacy') + '</div>' +
+      '<div class="bios-t">' + bl('सुरक्षा', 'Security') + '</div><div class="brow2">' +
+        bchip('data-bios="secure:on"', 'Secure Boot: ON', b.secure === 'on') + bchip('data-bios="secure:off"', 'Secure Boot: OFF', b.secure === 'off') +
+        bchip('data-bios="tpm:on"', 'TPM 2.0: ON', b.tpm === 'on') + bchip('data-bios="tpm:off"', 'TPM 2.0: OFF', b.tpm === 'off') + '</div>' +
+      '<div class="bios-t">' + bl('स्टोरेज', 'Storage') + '</div><div class="brow2">' +
+        bchip('data-bios="sata:AHCI"', 'SATA: AHCI', b.sata === 'AHCI') + bchip('data-bios="sata:IDE"', 'SATA: IDE', b.sata === 'IDE') + '</div>' +
+      '<div class="bios-t">' + bl('इस OS की शर्तें', 'Requirements for this OS') + '</div>' +
+      '<div class="brow2" style="font-size:11.4px;color:#9fb6d6">' + (o && o.id === 'win11' ? 'Windows 11: UEFI + Secure Boot ON + TPM 2.0 ON + GPT' : 'कोई ख़ास शर्त नहीं / no special requirement') + '</div>' +
+      '</div></div><div class="bios-f">↑↓ = ' + blx('चुनें', 'select') + ' · Enter = ' + blx('बदलें', 'change') + ' · F10 = Save &amp; Exit · Del = BIOS</div></div>';
+  }
+  function postScreen() {
+    return '<div class="post"><div>AMI BIOS v2.19 — POST ✔</div>' +
+      '<div>CPU: ' + (cpu() ? esc(cpu().name) : '—') + ' · RAM: ' + (ram() ? esc(ram().size) : '—') + ' · ' + blx('डिस्क', 'Disk') + ': ' + (storage() ? esc(storage().cap) : '—') + '</div>' +
+      '<div style="color:#f87171">⛔ ' + blx('बूट करने योग्य डिवाइस नहीं मिला — डिस्क खाली है, कोई OS इंस्टॉल नहीं है।', 'No bootable device found — the disk is empty, no OS installed.') + '</div>' +
+      '<div class="blink">Reboot and Select proper Boot device or Insert Boot Media…</div></div>';
+  }
+  function deskScreen() {
+    var o = osObj();
+    if (osFam() === 'Linux') {
+      return '<div class="ldesk"><div class="lp"><span>Activities</span><span>Files</span><span>Terminal</span><span style="margin-left:auto">🕙 10:24 · 🔋 · 🔊</span></div>' +
+        '<div class="dock"><span>🌐</span><span>📁</span><span>⌨️</span><span>⚙️</span><span>🗑️</span></div>' +
+        '<div class="lic"><div><span>📁</span>Home</div><div><span>💽</span>Disk</div><div><span>🌐</span>Firefox</div><div><span>📄</span>Text Editor</div></div>' +
+        '<div class="term">' + esc(OSS.lin.user || 'student') + '@' + esc(OSS.lin.pcname || 'pc') + ':~$ uname -a<br>' +
+        'Linux <b>' + esc(o.name) + '</b> 6.8.0-generic #1 SMP x86_64 GNU/Linux<br>' +
+        esc(OSS.lin.user || 'student') + '@' + esc(OSS.lin.pcname || 'pc') + ':~$ <span class="blink">▌</span></div></div>';
+    }
+    return '<div class="wdesk"><div class="ic">' +
+      '<div><span>🖥️</span>This PC</div><div><span>🗑️</span>Recycle Bin</div><div><span>🌐</span>Edge</div>' +
+      '<div><span>📁</span>Documents</div><div><span>⚙️</span>Settings</div><div><span>📝</span>Notepad</div>' +
+      '<div><span>🎵</span>Media Player</div><div><span>🛡️</span>Security</div></div>' +
+      '<div class="wtask"><span>🪟</span><span>🔍</span><span>📁</span><span>🌐</span><span>⚙️</span>' +
+      '<span class="clock">10:24 AM · ' + esc(o.name) + ' ' + esc(OSS.win.edition || '') + ' · ' + esc((OSS.oobe.user || (student ? student.name : 'User'))) + '</span></div></div>';
+  }
+
+  /* ---------- डिस्क पार्टीशन टेबल ---------- */
+  function ptTable(d, linux) {
+    var rows = '', tot = 0, free = d.unalloc;
+    d.parts.forEach(function (pt) {
+      tot += pt.size;
+      rows += '<tr class="' + (d.sel === pt.id ? 'on' : '') + '" data-diskrow="' + pt.id + '">' +
+        '<td>' + bl(pt.name, pt.en) + '</td>' +
+        (linux ? '<td>' + esc(pt.mnt || '—') + '</td>' : '') +
+        '<td class="num">' + (pt.size < 1 ? Math.round(pt.size * 1024) + ' MB' : pt.size.toFixed(1) + ' GB') + '</td>' +
+        '<td class="num">' + esc(pt.fs || '—') + '</td>' +
+        '<td>' + bl(pt.type, pt.typeEn) + '</td></tr>';
+    });
+    if (!d.parts.length || free > 0.01) {
+      rows += '<tr class="' + (d.sel === '__un' ? 'on' : '') + '" data-diskrow="__un"><td>' + bl('ड्राइव 0 अविभाजित जगह', 'Drive 0 Unallocated Space') + '</td>' +
+        (linux ? '<td>—</td>' : '') + '<td class="num">' + free.toFixed(1) + ' GB</td><td class="num">—</td><td>' + bl('अविभाजित', 'Unallocated') + '</td></tr>';
+    }
+    return '<table class="ptbl"><thead><tr><th>' + bl('नाम', 'Name') + '</th>' + (linux ? '<th>Mount</th>' : '') +
+      '<th>' + bl('कुल साइज़', 'Total size') + '</th><th>' + bl('फ़ाइल सिस्टम', 'File system') + '</th><th>' + bl('प्रकार', 'Type') + '</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>' +
+      '<div class="ptsum">' + blx('कुल डिस्क', 'Total') + ': ' + (tot + free).toFixed(1) + ' GB · ' + blx('पार्टीशन', 'partitions') + ': ' + d.parts.length + '</div>';
+  }
+  function ptBtn(act, ico, hi, en, off) {
+    return '<button type="button" class="ptb' + (off ? ' off' : '') + '" data-diskact="' + act + '"><b>' + ico + '</b>' + bl(hi, en) + '</button>';
+  }
+  function ptDialog(d, linux) {
+    if (!d.dlg) return '';
+    var t = d.dlg === 'size'
+      ? (linux ? ['नया पार्टीशन बनाइए', 'Create a new partition'] : ['नया साधारण वॉल्यूम', 'New Simple Volume'])
+      : ['पुष्टि कीजिए', 'Confirm'];
+    var body;
+    if (d.dlg === 'size') {
+      body = (linux
+        ? lgl(bl('माउंट पॉइंट', 'Mount point')) + oPendBar(ochip('data-linmnt="/"', '/ (root)', OSS.lin.mnt === '/', 'system') + ochip('data-linmnt="/home"', '/home', OSS.lin.mnt === '/home', 'user files') + ochip('data-linmnt="swap"', 'swap', OSS.lin.mnt === 'swap', 'virtual memory')) +
+          lgl(bl('फ़ाइल सिस्टम', 'File system')) + oPendBar(ochip('data-linfs="ext4"', 'ext4', (d.fs || 'ext4') === 'ext4') + ochip('data-linfs="swap"', 'swap area', d.fs === 'swap'))
+        : '') +
+        lgl(bl('साइज़ (GB)', 'Size (GB)')) + '<input class="partq" id="ptSize" type="number" min="1" step="1" value="' + (d.size || Math.floor(d.unalloc)) + '">' +
+        '<div class="hint">' + blx('कुल अविभाजित जगह', 'Unallocated space') + ': ' + d.unalloc.toFixed(1) + ' GB</div>';
+    } else {
+      body = '<div class="phase">' + bl('Windows सिस्टम फ़ाइलों के लिए अतिरिक्त पार्टीशन बना सकता है। सभी सूचीबद्ध पार्टीशन बनाए जाएँगे।', 'Windows might create additional partitions for system files. All listed partitions will be created.') + '</div>';
+    }
+    return '<div class="wdlg"><div class="wdlg-b"><div class="wdlg-t">' + bl(t[0], t[1]) + '<button type="button" class="wdlg-x" data-dlg="cancel">✕</button></div>' +
+      '<div class="wdlg-c">' + body + (d.dlgMsg ? '<div class="wmsg">' + d.dlgMsg + '</div>' : '') + '</div>' +
+      '<div class="wdlg-f"><button type="button" class="wbtn" data-dlg="ok">' + blx('ठीक है', 'OK') + '</button>' +
+      '<button type="button" class="wbtn ghost" data-dlg="cancel">' + blx('रद्द करें', 'Cancel') + '</button></div></div></div>';
+  }
+  function diskScreen(linux) {
+    var d = linux ? OSS.lin.disk : OSS.win.disk;
+    var title = linux ? bl('Ubuntu — इंस्टॉलेशन का प्रकार', 'Something else — partition the disk')
+                     : bl('Windows Setup — डिस्क कहाँ इंस्टॉल करें?', 'Where do you want to install Windows?');
+    var h = '<div class="wset"><div class="wset-top">' + (linux ? '🐧 ' : '🪟 ') + title + '</div><div class="wset-b">';
+    h += '<div class="phase">' + blx('ड्राइव 0', 'Drive 0') + ' · ' + esc(osDiskName()) + ' · ' + blx('कुल', 'total') + ' ' + osDiskCap().toFixed(1) + ' GB · ' + (linux ? 'ext4 / swap' : (OSS.usb.target === 'UEFI' ? 'GPT (UEFI)' : 'MBR (Legacy)')) + '</div>';
+    h += ptTable(d, linux);
+    h += '<div class="ptacts">' +
+      ptBtn('new', '➕', 'नया', 'New') + ptBtn('delete', '🗑️', 'डिलीट', 'Delete') +
+      (linux ? '' : ptBtn('format', '🖌️', 'फ़ॉर्मेट', 'Format')) + ptBtn('refresh', '🔄', 'रीफ़्रेश', 'Refresh') + '</div>';
+    h += '<div style="text-align:right;margin-top:6px"><button type="button" class="wbtn" data-diskact="next">' + blx('आगे बढ़ें', 'Next') + '</button></div>';
+    if (d.msg) h += '<div class="wmsg">' + d.msg + '</div>';
+    h += ptDialog(d, linux) + '</div></div>';
+    return h;
+  }
+
+  function renderOSScreen() {
+    var sc = $('#osScreen'); if (!sc) return;
+    var o = osObj(), st = OSS.stage, h = '';
+    if (st === 'pick') h = postScreen();
+    else if (st === 'iso') h = setupShell('<div class="phase">' + blx('फ़ाइल', 'File') + ': ' + esc(o.name.replace(/ /g, '-')) + '.iso · ' + blx('साइज़', 'size') + ': ' + (o.mb / 1024).toFixed(1) + ' GB</div>' +
+      '<div class="bar"><i style="width:' + OSS.iso + '%"></i></div>' +
+      '<div class="phase">' + OSS.iso + '% — ' + blx('डाउनलोड हो रहा है…', 'downloading…') + (OSS.iso >= 100 ? ' ✔' : '') + '</div>',
+      bl('🌐 ISO डाउनलोड', 'ISO download'), '');
+    else if (st === 'usb') {
+      var u = OSS.usb;
+      h = setupShell('<div class="phase">' + blx('डिवाइस', 'Device') + ': SanDisk Cruzer Blade (' + (u.drv || '—') + ' GB)</div>' +
+        '<div class="phase">ISO: ' + esc(o.name) + '.iso</div>' +
+        '<div class="phase">GPT/MBR: <b>' + (u.scheme || '—') + '</b> · ' + blx('टार्गेट', 'Target') + ': <b>' + (u.target || '—') + '</b> · ' + blx('फ़ाइल सिस्टम', 'FS') + ': <b>' + (u.fs || '—') + '</b></div>' +
+        '<div class="bar"><i style="width:' + OSS.usbPct + '%"></i></div>' +
+        '<div class="phase">' + OSS.usbPct + '% — ' + esc(OSS.usbPhase || 'START दबाने की प्रतीक्षा…') + '</div>',
+        bl('💾 बूटेबल USB बनाया जा रहा है', 'Creating bootable USB'), '');
+    }
+    else if (st === 'bios') h = biosScreen();
+    else if (st === 'bootkey') h = '<div class="post"><div>' + blx('BIOS: USB Storage Device से बूट किया जा रहा है…', 'BIOS: booting from USB Storage Device…') + '</div><div>Starting from USB device…</div><div class="blink">Press any key to boot from USB…</div></div>';
+    else if (st === 'setup') {
+      var id = osStep();
+      if (id === 'disk' || (osFam() === 'Linux' && id === 'type' && OSS.lin.type === 'else')) h = diskScreen(osFam() === 'Linux');
+      else h = setupShell(setupStepScreen(id), null, '');
+    }
+    else if (st === 'install' || st === 'reboot') {
+      h = '<div class="winst"><div class="winlogo sm"><i></i><i></i><i></i><i></i></div>' +
+        (st === 'reboot' ? '<div class="wintxt">' + blx('रीस्टार्ट हो रहा है…', 'Restarting…') + '</div><div class="phase">' + blx('इंस्टॉलेशन पूरा — प्रतीक्षा कीजिए', 'Installation complete — please wait') + '</div>'
+          : '<div class="wintxt">' + esc(o.name) + ' ' + blx('इंस्टॉल हो रहा है', 'is being installed') + '</div>' +
+            '<div class="bar" style="max-width:520px"><i style="width:' + OSS.pct + '%"></i></div>' +
+            '<div class="phase">' + OSS.pct + '% — ' + esc(OSS.phase) + '</div>') +
+        '<div class="spin"><i></i><i></i><i></i><i></i><i></i></div></div>';
+    }
+    else if (st === 'oobe') {
+      var oid = osOobeId();
+      if (osFam() === 'Linux') h = '<div class="ldesk"><div class="lp"><span>' + esc(o.name) + '</span><span style="margin-left:auto">10:24</span></div>' +
+        '<div class="term" style="top:90px;bottom:auto">' + esc(o.name) + ' ' + esc(o.ver) + '<br>' + esc(OSS.lin.user || 'student') + '@' + esc(OSS.lin.pcname || 'pc') + ':~$ ' + blx('लॉगिन कीजिए…', 'please log in…') + '</div></div>';
+      else if (oid === 'region') h = setupShell('<div class="phase">🌍 ' + blx('क्या आप इस क्षेत्र में हैं?', 'Is this the right region?') + ' — ' + blx('भारत', 'India') + '</div>', null, '');
+      else if (oid === 'kbd') h = setupShell('<div class="phase">⌨️ ' + blx('कीबोर्ड लेआउट चुनिए…', 'choose keyboard layout…') + '</div>', null, '');
+      else if (oid === 'net') h = setupShell('<div class="phase">📶 ' + blx('नेटवर्क से जोड़िए…', 'connect to a network…') + '</div>', null, '');
+      else if (oid === 'acct') h = setupShell('<div class="phase">👤 ' + blx('अपना खाता बनाइए…', 'create your account…') + '</div>', null, '');
+      else if (oid === 'priv') h = setupShell('<div class="phase">🔒 ' + blx('गोपनीयता सेटिंग…', 'privacy settings…') + '</div>', null, '');
+    }
+    else if (st === 'done') h = deskScreen();
+    sc.innerHTML = h;
+    renderOSSteps();
+  }
+  function setupStepScreen(id) {
+    var w = OSS.win, l = OSS.lin, o = osObj();
+    if (id === 'lang') return '<div class="phase">' + blx('भाषा, समय और कीबोर्ड चुनिए…', 'Choose language, time and keyboard…') + '</div>' +
+      (osFam() === 'Linux' ? '' : '<div class="phase">' + blx('भाषा', 'Language') + ': <b>' + (w.lang === 'hi' ? 'हिन्दी' : w.lang === 'en' ? 'English (India)' : '—') + '</b> · ' + blx('समय', 'Time') + ': <b>' + (w.tz === 'ist' ? '(UTC+05:30) New Delhi' : w.tz === 'utc' ? '(UTC) Dublin' : '—') + '</b> · ' + blx('कीबोर्ड', 'Keyboard') + ': <b>' + (w.kbd === 'hi' ? 'हिन्दी देवनागरी' : w.kbd === 'us' ? 'US QWERTY' : '—') + '</b></div>');
+    if (id === 'kbd') return '<div class="phase">⌨️ ' + blx('कीबोर्ड लेआउट चुनिए…', 'Choose keyboard layout…') + '</div>';
+    if (id === 'upd') return '<div class="phase">🔄 ' + blx('अपडेट और अतिरिक्त सॉफ़्टवेयर चुनिए…', 'Choose updates and extra software…') + '</div>';
+    if (id === 'key') return '<div class="phase">🔑 ' + blx('25 अक्षरों की प्रोडक्ट की दर्ज कीजिए, या "मेरे पास नहीं है" दबाइए।', 'Enter the 25-character product key, or press "I don\'t have a product key".') + '</div>';
+    if (id === 'edition') return '<div class="phase">' + blx('संस्करण', 'Edition') + ': <b>' + esc(w.edition || '—') + '</b></div>';
+    if (id === 'lic') return '<div class="phase">' + blx('Microsoft सॉफ़्टवेयर लाइसेंस की शर्तें…', 'Microsoft Software License Terms…') + '</div>';
+    if (id === 'type') return '<div class="phase">' + blx('"अपग्रेड" या "कस्टम" में से चुनिए…', 'Choose "Upgrade" or "Custom"…') + '</div>';
+    if (id === 'tz') return '<div class="phase">🗺️ ' + blx('समय क्षेत्र चुनिए…', 'Choose the time zone…') + '</div>';
+    if (id === 'user') return '<div class="phase">👤 ' + blx('यूज़र का नाम और पासवर्ड भरिए…', 'Enter the user name and password…') + '</div>';
+    return '';
+  }
+
+  /* ---------- डिस्क पार्टीशन मॉडल ---------- */
+  function initWinDisk() {
+    OSS.win.disk = { parts:[], sel:null, unalloc: osDiskCap(), dlg:null, size:0, msg:'' };
+  }
+  function initLinDisk() {
+    OSS.lin.disk = { parts:[], sel:null, unalloc: osDiskCap(), dlg:null, size:0, msg:'', fs:'ext4' };
+  }
+  function newId(p) { return p + (OSS.win.disk.parts.length + OSS.lin.disk.parts.length + 1) + '-' + Math.floor(Math.random() * 999); }
+  function applyWinParts(sizeGb) {
+    var d = OSS.win.disk, uefi = OSS.usb.target === 'UEFI';
+    var overhead = uefi ? 0.645 : 0.5;
+    var prim = sizeGb - overhead;
+    if (uefi) {
+      d.parts.push({ id:'rp' + d.parts.length, name:'रिकवरी', en:'Recovery', type:'रिकवरी', typeEn:'Recovery', size:0.529, fs:'NTFS' });
+      d.parts.push({ id:'ef' + d.parts.length, name:'EFI सिस्टम', en:'EFI System', type:'सिस्टम', typeEn:'System', size:0.100, fs:'FAT32' });
+      d.parts.push({ id:'ms' + d.parts.length, name:'MSR (आरक्षित)', en:'MSR (Reserved)', type:'आरक्षित', typeEn:'Reserved', size:0.016, fs:'' });
+    } else {
+      d.parts.push({ id:'sr' + d.parts.length, name:'सिस्टम आरक्षित', en:'System Reserved', type:'सिस्टम', typeEn:'System', size:0.5, fs:'NTFS' });
+    }
+    d.parts.push({ id:'pr' + d.parts.length, name:'Primary', en:'Primary', type:'प्राइमरी', typeEn:'Primary', size:prim, fs:'NTFS' });
+    d.unalloc = Math.max(0, d.unalloc - sizeGb);
+    osNote('➕ ' + (uefi ? 'GPT' : 'MBR') + ' डिस्क पर ' + prim.toFixed(1) + ' GB का Primary पार्टीशन बना (' + (uefi ? 'Recovery 529MB + EFI 100MB + MSR 16MB' : 'System Reserved 500MB') + ')', 'ok',
+      'Created a ' + prim.toFixed(1) + ' GB Primary partition (' + (uefi ? 'Recovery 529MB + EFI 100MB + MSR 16MB' : 'System Reserved 500MB') + ')');
+  }
+  function winDiskErr(hi, en, fixHi, fixEn) { OSS.win.disk.msg = bl(hi, en); osErr(hi, en, fixHi, fixEn); }
+  function linDiskErr(hi, en, fixHi, fixEn) { OSS.lin.disk.msg = bl(hi, en); osErr(hi, en, fixHi, fixEn); }
+
+  /* ---------- OS क्रियाएँ ---------- */
+  function pickOs(id, quiet) {
+    var o = OSLIST.filter(function (x) { return x.id === id; })[0]; if (!o) return;
+    var req = osReqErr(o);
+    if (req) { osErr(req.hi, req.en, 'कम RAM/स्टोरेज वाला हल्का OS चुनिए (जैसे Linux Mint, Windows 10)।', 'Choose a lighter OS (e.g. Linux Mint, Windows 10).'); renderOS(); return; }
+    OSS.err = ''; OSS.errEn = ''; OSS.osId = id;
+    if (!quiet) osNote('💿 ' + o.name + (o.ver ? ' ' + o.ver : '') + ' चुना गया — ISO डाउनलोड शुरू', 'in', 'Selected ' + o.name + ' — ISO download started');
+    OSS.stage = 'iso'; startIso();
+  }
+  function startIso() {
+    osClearTimer(); OSS.iso = 0; OSS.running = true; renderOS();
+    osTimer = window.setInterval(function () {
+      OSS.iso += 5;
+      if (OSS.iso >= 100) {
+        OSS.iso = 100; OSS.running = false; osClearTimer();
+        osNote('✅ ISO डाउनलोड पूरा (' + (osObj().mb / 1024).toFixed(1) + ' GB)', 'ok', 'ISO download finished');
+        OSS.stage = 'usb';
+        osNote('🔧 अब बूटेबल पेन ड्राइव बनाइए (Rufus जैसा)।', 'in', 'Now create the bootable pen drive (like Rufus).');
+      }
+      renderOS();
+    }, 120);
+  }
+  function startUsb() {
+    var e = usbErr();
+    if (e) { osErr(e.hi, e.en, 'पेन ड्राइव, स्कीम, टार्गेट और फ़ाइल सिस्टम — चारों सही चुनिए।', 'Pick all four: drive, scheme, target and file system.'); renderOSPanel(); return; }
+    OSS.err = ''; OSS.errEn = '';
+    osClearTimer(); OSS.usbPct = 0; OSS.usbRunning = true;
+    osNote('🟢 बूटेबल USB बनाना शुरू — ' + osObj().name + ' · ' + OSS.usb.drv + 'GB · ' + OSS.usb.scheme + ' · ' + OSS.usb.target + ' · ' + OSS.usb.fs, 'in', 'Creating bootable USB…');
+    renderOS();
+    osTimer = window.setInterval(function () {
+      OSS.usbPct += 2; var p = OSS.usbPct;
+      OSS.usbPhase = p < 18 ? 'डिवाइस फ़ॉर्मेट हो रही है…' : p < 36 ? 'पार्टीशन टेबल (' + OSS.usb.scheme + ') बन रही है…' : p < 56 ? 'बूटलोडर लिखा जा रहा है…' : p < 92 ? 'ISO की फ़ाइलें कॉपी हो रही हैं…' : 'बूटेबल USB तैयार ✔';
+      if (p >= 100) {
+        OSS.usbPct = 100; OSS.usbRunning = false; osClearTimer();
+        OSS.stage = 'bios';
+        osNote('✅ बूटेबल USB तैयार ✔ — अब BIOS में जाकर USB को बूट प्राथमिकता में पहले रखिए।', 'ok', 'Bootable USB ready — now set USB first in BIOS boot order.');
+      }
+      renderOS();
+    }, 110);
+  }
+  function biosSave() {
+    var e = biosErr();
+    if (e && e.warn) { osNote('⚠️ ' + e.hi, 'warn', e.en, e.fixHi, e.fixEn); e = null; }
+    if (e) { osErr(e.hi, e.en, e.fixHi, e.fixEn); renderOS(); return; }
+    OSS.err = ''; OSS.errEn = '';
+    osNote('💾 F10 — सेटिंग सेव हुई, PC रीस्टार्ट हो रहा है…', 'ok', 'F10 — settings saved, restarting…');
+    OSS.stage = 'bootkey'; renderOS();
+  }
+  function nextStep() {
+    OSS.err = ''; OSS.errEn = '';
+    OSS.step++;
+    var id = osSteps()[OSS.step];
+    if (id === 'copy') { startInstall(); return; }
+    if (id === 'disk') initWinDisk();
+    if (id === 'type' && osFam() === 'Linux') initLinDisk();
+    renderOS();
+  }
+  function winAct(a) {
+    var w = OSS.win;
+    if (a.indexOf('lang:') === 0) { w.lang = a.slice(5); renderOS(); }
+    else if (a.indexOf('tz:') === 0) { w.tz = a.slice(3); renderOS(); }
+    else if (a.indexOf('kbd:') === 0) { w.kbd = a.slice(4); renderOS(); }
+    else if (a === 'lang-next') {
+      if (!w.lang || !w.tz || !w.kbd) { osErr('भाषा, समय प्रारूप और कीबोर्ड — तीनों चुनिए, फिर "अगला" दबाइए।', 'Choose language, time format and keyboard, then press Next.', 'तीनों पंक्तियों में से एक-एक विकल्प चुनिए।', 'Pick one option in each of the three rows.'); renderOS(); return; }
+      w.lang2 = true; osNote('✔ भाषा: ' + (w.lang === 'hi' ? 'हिन्दी' : 'English') + ' · समय: ' + w.tz + ' · कीबोर्ड: ' + w.kbd, 'ok', 'Language, time and keyboard chosen'); nextStep();
+    }
+    else if (a === 'key-have') {
+      var k = (w.keyTxt || '').replace(/[^A-Za-z0-9]/g, '');
+      if (k.length !== 25) { osErr('प्रोडक्ट की ठीक 25 अक्षरों की होती है (5 समूह × 5 अक्षर)। उदाहरण: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX', 'A product key has exactly 25 characters (5 groups of 5).', '25 अक्षर भरिए, या "मेरे पास प्रोडक्ट की नहीं है" चुनिए।', 'Enter 25 characters, or choose "I don\'t have a product key".'); renderOS(); return; }
+      w.key = 'given'; osNote('🔑 प्रोडक्ट की दर्ज की गई', 'in', 'Product key entered'); nextStep();
+    }
+    else if (a === 'key-skip') { w.key = 'skip'; osNote('ℹ️ प्रोडक्ट की बाद में डालेंगे (Windows बिना सक्रिय हुए भी चलता है)', 'in', 'Will add the product key later'); nextStep(); }
+    else if (a.indexOf('edition:') === 0) { w.edition = a.slice(8); osNote('✔ संस्करण चुना: ' + w.edition, 'ok', 'Edition: ' + w.edition); nextStep(); }
+    else if (a === 'lic') {
+      var ck = $('#licChk');
+      if (!ck || !ck.checked) { osErr('शर्तें स्वीकार किए बिना आगे नहीं बढ़ सकते — टिक लगाइए।', 'You must accept the license terms to continue.', 'चेकबॉक्स पर टिक कीजिए, फिर आगे बढ़िए।', 'Tick the checkbox, then press Next.'); renderOS(); return; }
+      w.lic = true; osNote('✔ लाइसेंस शर्तें स्वीकार कीं', 'ok', 'License terms accepted'); nextStep();
+    }
+    else if (a === 'type-upgrade') { osErr('यह डिस्क खाली है — "अपग्रेड" तभी चलता है जब पहले से Windows चल रहा हो। "कस्टम" चुनिए।', 'This disk is empty — "Upgrade" works only if Windows is already running. Choose "Custom".', '"कस्टम: सिर्फ़ Windows इंस्टॉल करें" चुनिए।', 'Choose "Custom: Install Windows only".'); renderOS(); return; }
+    else if (a === 'type-custom') { w.type = 'custom'; osNote('✔ "कस्टम: सिर्फ़ Windows इंस्टॉल" चुना', 'ok', 'Chose "Custom"'); nextStep(); }
+  }
+  function linAct(a) {
+    var l = OSS.lin;
+    if (a.indexOf('lang:') === 0) { l.lang = a.slice(5); nextStep(); }
+    else if (a.indexOf('kbd:') === 0) { l.kbd = a.slice(4); nextStep(); }
+    else if (a.indexOf('upd:') === 0) { l.upd = a.slice(4); nextStep(); }
+    else if (a === 'type:erase') { l.type = 'erase'; osNote('✔ "डिस्क मिटाकर इंस्टॉल" चुना', 'ok', 'Chose "Erase disk and install"'); nextStep(); }
+    else if (a === 'type:else') { l.type = 'else'; if (!l.disk.parts.length && !l.disk.unalloc) initLinDisk(); osNote('ℹ️ "कुछ और" — अब स्वयं पार्टीशन बनाइए (दाईं स्क्रीन पर)', 'in', 'Manual partitioning — create partitions on the right screen'); renderOS(); }
+    else if (a.indexOf('tz:') === 0) { l.tz = a.slice(3); nextStep(); }
+    else if (a === 'user-next') {
+      if (!l.user.trim()) { osErr('कृपया यूज़र का नाम भरिए।', 'Please enter the user name.', 'नाम के बॉक्स में अपना नाम लिखिए।', 'Type your name in the Name box.'); renderOS(); return; }
+      osNote('👤 यूज़र बनाया: ' + l.user + ' · कंप्यूटर: ' + (l.pcname || 'pc'), 'ok', 'User created'); nextStep();
+    }
+  }
+  function nextOobe() {
+    OSS.err = ''; OSS.errEn = '';
+    OSS.step++;
+    if (OSS.step >= osOobe().length) { finishInstall(); return; }
+    renderOS();
+  }
+  function oobeAct(a) {
+    var ob = OSS.oobe;
+    if (a.indexOf('region:') === 0) { ob.region = a.slice(7); nextOobe(); }
+    else if (a.indexOf('okbd:') === 0) { ob.kbd = a.slice(5); nextOobe(); }
+    else if (a === 'net-add') { ob.net = 'wifi'; osNote('📶 Wi-Fi से जोड़ दिया (इंटरनेट ✔)', 'ok', 'Connected to Wi-Fi'); nextOobe(); }
+    else if (a === 'net-skip') {
+      if (OSS.osId === 'win11' && !ob.bypass) {
+        osErr('Windows 11 में इंटरनेट से जुड़ना ज़रूरी है — बिना नेट के आगे नहीं बढ़ सकते।', 'Windows 11 requires an internet connection — you cannot continue without it.',
+          'असली हल: Shift+F10 दबाकर कमांड खोलें → oobe\\bypassnro चलाएँ → PC रीस्टार्ट होगा → "I have no internet" मिलेगा। नीचे वही बटन दिया है।',
+          'Real fix: press Shift+F10 → run oobe\\bypassnro → the PC restarts → "I have no internet" appears. Use the button below.');
+        renderOS(); return;
+      }
+      ob.net = null; osNote('ℹ️ नेटवर्क इस समय नहीं जोड़ा (सीमित सेटअप)', 'in', 'Skipped network (limited setup)'); nextOobe();
+    }
+    else if (a === 'acct-next') {
+      if (!ob.user || !ob.user.trim()) { osErr('कृपया अपना नाम भरिए।', 'Please enter your name.', 'नाम के बॉक्स में नाम लिखिए।', 'Type your name in the box.'); renderOS(); return; }
+      if (ob.acct === 'local' && OSS.osId === 'win11' && !ob.bypass) {
+        osErr('Windows 11 Home में सामान्य तरीक़े से ऑफ़लाइन खाता नहीं बनता — यह भी bypassnro से ही बनता है।', 'Windows 11 Home normally will not create a local account — this too needs bypassnro.',
+          'पहले "🛠️ oobe\\bypassnro चलाइए" दबाइए, फिर ऑफ़लाइन खाता बनेगा।', 'Press "🛠️ Run oobe\\bypassnro" first, then the local account works.');
+        renderOS(); return;
+      }
+      osNote('👤 खाता बनाया: ' + ob.user + ' (' + (ob.acct === 'local' ? 'ऑफ़लाइन' : 'Microsoft') + ')', 'ok', 'Account created'); nextOobe();
+    }
+    else if (a === 'bypass') { ob.bypass = true; osNote('🛠️ Shift+F10 → oobe\\bypassnro चलाया गया — अब "I have no internet" विकल्प मिलेगा।', 'ok', 'Ran oobe\\bypassnro — the "I have no internet" option is now available.'); renderOS(); return; }
+    else if (a.indexOf('priv:') === 0) { ob.priv = a.slice(5); nextOobe(); }
+    else if (a === 'login') { finishInstall(); }
+  }
+  function osAct(a) {
+    if (a === 'startusb') { startUsb(); return; }
+    if (a === 'saveexit') { biosSave(); return; }
+    if (a === 'bootkey') { OSS.step = 0; OSS.stage = 'setup'; OSS.err = ''; osNote('⌨️ कुंजी दबाई — USB से बूट हुआ, OS सेटअप खुल गया', 'in', 'Key pressed — booted from USB, setup opened'); renderOS(); return; }
+    if (a === 'print') { window.print(); return; }
+    if (a === 'download') { osDownload(); return; }
+    if (a === 'reset') { osResetAll(); return; }
+  }
+  function osResetAll() {
+    osInit(); osClearTimer();
+    var l = $('#osLog'); if (l) l.innerHTML = '';
+    var r = $('#osReport'); if (r) r.innerHTML = '';
+    var b = $('#osSteps'); if (b) b.innerHTML = '';
+    osLog('OS इंस्टॉल लैब तैयार — ऊपर से OS चुनिए।', 'in', 'OS install lab ready — choose an OS above.');
+    renderOS();
+  }
+
+  /* ---------- डिस्क पार्टीशन क्रियाएँ ---------- */
+  function osDiskAct(a) {
+    var linux = (osFam() === 'Linux'), d = linux ? OSS.lin.disk : OSS.win.disk;
+    var E = linux ? linDiskErr : winDiskErr;
+    d.dlgMsg = '';
+    if (a === 'refresh') { d.msg = ''; OSS.err = ''; OSS.errEn = ''; osNote('🔄 डिस्क सूची रीफ़्रेश की गई', 'in', 'Disk list refreshed'); renderOS(); return; }
+    if (a === 'new') { d.dlg = 'size'; d.size = Math.floor(d.unalloc); d.msg = ''; OSS.err = ''; renderOS(); return; }
+    if (a === 'delete') {
+      if (!d.sel || d.sel === '__un') { E('पहले किसी पार्टीशन को चुनिए, फिर डिलीट दबाइए।', 'Select a partition first, then press Delete.', 'पार्टीशन की पंक्ति पर क्लिक कीजिए (नीला हो जाएगा)।', 'Click the partition row (it turns blue).'); renderOS(); return; }
+      var pt = d.parts.filter(function (x) { return x.id === d.sel; })[0];
+      if (!pt) { d.sel = null; renderOS(); return; }
+      if (pt.typeEn === 'System' || pt.typeEn === 'Recovery' || pt.typeEn === 'Reserved') {
+        E('यह ' + pt.name + ' पार्टीशन सिस्टम का है — डिलीट करने से PC बूट ही नहीं होगा। इसे न छुएँ।', 'This ' + pt.en + ' partition belongs to the system — deleting it would stop the PC from booting. Leave it alone.',
+          'सिर्फ़ Primary पार्टीशन डिलीट कीजिए, सिस्टम वाले नहीं।', 'Only delete the Primary partition, never the system ones.'); renderOS(); return; }
+      if (pt.mnt === '/') {
+        E('root ( / ) पार्टीशन डिलीट करने से Linux बूट नहीं होगा।', 'Deleting the root ( / ) partition would stop Linux from booting.',
+          'पहले कोई दूसरा / बनाइए, फिर इस पुराने को हटाइए।', 'Create another / first, then remove the old one.'); renderOS(); return;
+      }
+      d.unalloc += pt.size;
+      d.parts = d.parts.filter(function (x) { return x.id !== d.sel; });
+      d.sel = null;
+      osNote('🗑️ पार्टीशन डिलीट किया: ' + pt.name + ' (' + pt.size.toFixed(1) + ' GB) — जगह अविभाजित में वापस आ गई', 'in', 'Deleted partition ' + pt.en + ' — space returned to unallocated');
+      renderOS(); return;
+    }
+    if (a === 'format') {
+      if (!d.sel || d.sel === '__un') { E('फ़ॉर्मेट के लिए पहले पार्टीशन चुनिए।', 'Select a partition before Format.', 'पंक्ति पर क्लिक कीजिए, फिर Format दबाइए।', 'Click a row, then press Format.'); renderOS(); return; }
+      var fp = d.parts.filter(function (x) { return x.id === d.sel; })[0];
+      if (fp.typeEn !== 'Primary') { E('सिस्टम पार्टीशन फ़ॉर्मेट नहीं करते।', 'Do not format a system partition.', 'Primary पार्टीशन चुनकर फ़ॉर्मेट कीजिए।', 'Select the Primary partition to format.'); renderOS(); return; }
+      fp.fs = 'NTFS'; fp.formatted = true;
+      osNote('🖌️ Primary पार्टीशन NTFS में फ़ॉर्मेट किया', 'ok', 'Formatted the Primary partition as NTFS');
+      renderOS(); return;
+    }
+    if (a === 'extend') {
+      if (!d.sel || d.sel === '__un') { E('बढ़ाने के लिए पहले Primary पार्टीशन चुनिए।', 'Select the Primary partition before Extend.', 'Primary की पंक्ति पर क्लिक कीजिए।', 'Click the Primary row.'); renderOS(); return; }
+      if (d.unalloc < 0.5) { E('अविभाजित जगह ही नहीं बची — इसलिए बढ़ाया नहीं जा सकता।', 'No unallocated space left to extend into.', 'For New से जगह कम बनाइए, तभी Extend काम करेगा।', 'Create a smaller partition with New to leave space for Extend.'); renderOS(); return; }
+      var ep = d.parts.filter(function (x) { return x.id === d.sel; })[0];
+      if (ep.typeEn !== 'Primary') { E('सिर्फ़ Primary पार्टीशन बढ़ाया जा सकता है।', 'Only the Primary partition can be extended.', 'Primary चुनिए।', 'Select Primary.'); renderOS(); return; }
+      ep.size += d.unalloc; d.unalloc = 0;
+      osNote('⤢ Primary पार्टीशन बढ़ाकर ' + ep.size.toFixed(1) + ' GB कर दिया', 'ok', 'Extend complete');
+      renderOS(); return;
+    }
+    if (a === 'next') {
+      if (linux) {
+        var root = d.parts.filter(function (x) { return x.mnt === '/'; })[0];
+        if (!root) { E('Linux के लिए root ( / ) पार्टीशन ज़रूरी है — ➕ नया दबाकर / बनाइए।', 'Linux needs a root ( / ) partition — press ➕ New and create /.', 'New → mount point \"/\" → 20GB या ज़्यादा → OK।', 'New → mount point \"/\" → 20GB or more → OK.'); renderOS(); return; }
+        if (root.size < 20) { E('/ पार्टीशन बहुत छोटा है (' + root.size.toFixed(1) + ' GB) — कम-से-कम 20GB चाहिए।', '/' + ' partition is too small (' + root.size.toFixed(1) + ' GB) — at least 20GB needed.', 'इसे डिलीट करके बड़ा / बनाइए।', 'Delete it and create a bigger /.'); renderOS(); return; }
+        OSS.err = ''; OSS.errEn = '';
+        osNote('✔ पार्टीशन तैयार: ' + d.parts.map(function (x) { return x.mnt + ' (' + x.size.toFixed(1) + 'GB)'; }).join(', '), 'ok', 'Partitions ready');
+        nextStep(); return;
+      }
+      if (!d.sel || d.sel === '__un') {
+        E('Windows यहाँ इंस्टॉल नहीं हो सकता — पहले ➕ नया दबाकर पार्टीशन बनाइए, फिर Primary चुनकर Next दबाइए।', 'Windows cannot be installed here — press ➕ New to create a partition, then select Primary and press Next.',
+          '➕ नया → ठीक है (Windows Recovery + EFI + MSR खुद बनाएगा) → Primary चुनिए → आगे बढ़ें।', '➕ New → OK (Windows makes Recovery + EFI + MSR itself) → select Primary → Next.'); renderOS(); return;
+      }
+      var sp = d.parts.filter(function (x) { return x.id === d.sel; })[0];
+      if (!sp || sp.typeEn !== 'Primary') {
+        E('इस पार्टीशन पर Windows इंस्टॉल नहीं हो सकता — यह सिस्टम पार्टीशन है। Primary (C:) चुनिए।', 'Windows cannot be installed on this partition — it is a system partition. Select Primary (C:).',
+          'नाम Primary वाली पंक्ति चुनिए, फिर आगे बढ़िए।', 'Select the row named Primary, then press Next.'); renderOS(); return;
+      }
+      if (sp.size < 20) { E('Primary पार्टीशन बहुत छोटा है — Windows के लिए कम-से-कम 20GB चाहिए।', 'Primary partition too small — Windows needs at least 20GB.', 'डिलीट करके बड़ा पार्टीशन बनाइए।', 'Delete and create a bigger partition.'); renderOS(); return; }
+      OSS.err = ''; OSS.errEn = ''; sp.os = true;
+      osNote('✔ इंस्टॉल के लिए Primary पार्टीशन चुना: ' + sp.size.toFixed(1) + ' GB (NTFS)', 'ok', 'Selected Primary partition (' + sp.size.toFixed(1) + ' GB, NTFS)');
+      nextStep(); return;
+    }
+  }
+  function osDlg(ok) {
+    var linux = (osFam() === 'Linux'), d = linux ? OSS.lin.disk : OSS.win.disk;
+    var E = linux ? linDiskErr : winDiskErr;
+    if (!ok) { d.dlg = null; d.dlgMsg = ''; renderOS(); return; }
+    if (d.dlg === 'size') {
+      var inp = $('#ptSize'), size = inp ? parseFloat(inp.value) : 0;
+      if (!size || isNaN(size) || size < 1) { d.dlgMsg = bl('साइज़ सही भरिए (GB में)।', 'Enter a valid size in GB.'); osErr('साइज़ सही नहीं भरा।', 'Invalid size entered.', 'बॉक्स में सिर्फ़ अंक लिखिए, जैसे 120।', 'Type only digits, like 120.'); renderOS(); return; }
+      var minGb = 20;
+      if (linux && OSS.lin.mnt === 'swap') minGb = 1;
+      if (size > d.unalloc + 0.01) { d.dlgMsg = bl('इतनी जगह नहीं है — बची हुई जगह ' + d.unalloc.toFixed(1) + ' GB है।', 'Not enough space — only ' + d.unalloc.toFixed(1) + ' GB is free.'); osErr('आपने ' + size + ' GB माँगा, पर अविभाजित जगह सिर्फ़ ' + d.unalloc.toFixed(1) + ' GB है।', 'You asked for ' + size + ' GB but only ' + d.unalloc.toFixed(1) + ' GB is free.', 'छोटा साइज़ डालिए या पहले जगह ख़ाली कीजिए।', 'Enter a smaller size or free up space first.'); renderOS(); return; }
+      if (size < minGb) { d.dlgMsg = bl('कम-से-कम ' + minGb + ' GB चाहिए।', 'At least ' + minGb + ' GB needed.'); osErr('साइज़ बहुत छोटा है — ' + (linux && OSS.lin.mnt === 'swap' ? 'swap' : (linux ? 'Linux' : 'Windows')) + ' के लिए कम-से-कम ' + minGb + ' GB चाहिए।', 'Size too small — needs at least ' + minGb + ' GB.', 'बड़ा साइज़ डालिए (जैसे 120 या 250)।', 'Enter a bigger size (e.g. 120 or 250).'); renderOS(); return; }
+      d.dlgMsg = ''; d.pendSize = size;
+      if (linux) { d.dlg = null; applyLinPart(size); renderOS(); return; }
+      d.dlg = 'confirm'; renderOS(); return;
+    }
+    if (d.dlg === 'confirm') { d.dlg = null; applyWinParts(d.pendSize); renderOS(); return; }
+  }
+  function applyLinPart(sizeGb) {
+    var d = OSS.lin.disk, mnt = OSS.lin.mnt, fs = (mnt === 'swap') ? 'swap' : (d.fs || 'ext4');
+    if (mnt === 'swap' && fs !== 'swap') fs = 'swap';
+    d.parts.push({ id: 'lp' + d.parts.length, mnt: mnt, name: (mnt === 'swap' ? 'swap (वर्चुअल मेमोरी)' : mnt), en: (mnt === 'swap' ? 'swap area' : mnt),
+      type: (mnt === '/' ? 'रूट' : mnt === '/home' ? 'यूज़र फ़ाइलें' : 'स्वैप'), typeEn: (mnt === '/' ? 'Root' : mnt === '/home' ? 'Home' : 'Swap'), size: sizeGb, fs: fs });
+    d.unalloc = Math.max(0, d.unalloc - sizeGb);
+    osNote('➕ ' + mnt + ' पार्टीशन बनाया (' + sizeGb + ' GB, ' + fs + ')', 'ok', 'Created ' + mnt + ' partition (' + sizeGb + ' GB, ' + fs + ')');
+  }
+
+  /* ---------- इंस्टॉल (कॉपी हो रही है) ---------- */
+  function startInstall() {
+    var o = osObj(); OSS.stage = 'install'; OSS.pct = 0;
+    var ph = ['Windows फ़ाइलें कॉपी हो रही हैं…', 'सुविधाएँ इंस्टॉल हो रही हैं…', 'अपडेट इंस्टॉल हो रहे हैं…', 'फ़ाइलें तैयार हो रही हैं…', 'PC पहली बार सेटअप के लिए तैयार हो रहा है…'];
+    if (osFam() === 'Linux') ph = ['फ़ाइलें कॉपी हो रही हैं…', 'पैकेज इंस्टॉल हो रहे हैं…', 'GRUB बूटलोडर लगा रहा है…', 'सिस्टम कॉन्फ़िगर हो रहा है…', 'लगभग तैयार…'];
+    osNote('⏳ इंस्टॉलेशन शुरू — ' + o.name + ' डिस्क पर कॉपी हो रहा है', 'in', 'Installation started');
+    osClearTimer(); renderOS();
+    osTimer = window.setInterval(function () {
+      OSS.pct += 2;
+      OSS.phase = ph[Math.min(ph.length - 1, Math.floor(OSS.pct / 20))];
+      if (OSS.pct >= 100) {
+        OSS.pct = 100; osClearTimer();
+        osNote('✅ फ़ाइलें कॉपी हो गईं — PC रीस्टार्ट हो रहा है', 'ok', 'Files copied — restarting');
+        OSS.stage = 'reboot'; renderOS();
+        window.setTimeout(function () { OSS.stage = 'oobe'; OSS.step = 0; renderOS(); }, 1400);
+        return;
+      }
+      renderOS();
+    }, 120);
+  }
+  function finishInstall() {
+    OSS.stage = 'done'; OSS.err = ''; OSS.errEn = '';
+    osNote('🎉 इंस्टॉलेशन पूरा — डेस्कटॉप तैयार!', 'ok', 'Installation complete — desktop ready!');
+    renderOS();
+    showOsReport();
+  }
+
+  /* ---------- रिपोर्ट ---------- */
+  function row(hi, en, val) { return '<tr><th>' + bl(hi, en) + '</th><td>' + esc(val == null || val === '' ? '—' : String(val)) + '</td></tr>'; }
+  function partsSummary() {
+    var linux = (osFam() === 'Linux'), d = linux ? OSS.lin.disk : OSS.win.disk;
+    if (!d.parts.length) return linux && OSS.lin.type === 'erase' ? 'पूरी डिस्क मिटाकर APFS/ext4 (स्वतः)' : '—';
+    return d.parts.map(function (p) { return (linux ? p.mnt : p.name) + ' ' + p.size.toFixed(1) + 'GB' + (p.fs ? ' ' + p.fs : ''); }).join(' · ');
+  }
+  function osReportBody(forFile) {
+    var o = osObj(), u = OSS.usb, s = student, mk = osMistakes();
+    var h = '';
+    if (!forFile) h += '<h3 class="rep-t">' + bl('इंस्टॉलेशन रिपोर्ट', 'Installation report') + '</h3>';
+    h += '<div class="rsec"><h4>' + bl('स्टूडेंट जानकारी', 'Student details') + '</h4><table class="rtbl"><tbody>' +
+      row('नाम', 'Name', s ? s.name : '—') + row('स्कूल/संस्थान', 'School / Institute', s ? s.school : '—') +
+      row('कक्षा/बैच', 'Class / Batch', s ? s.klass : '—') +
+      row('तारीख', 'Date', (s && s.date) ? s.date : new Date().toLocaleDateString('en-GB')) + '</tbody></table></div>';
+    h += '<div class="rsec"><h4>' + bl('इंस्टॉलेशन सारांश', 'Installation summary') + '</h4><table class="rtbl"><tbody>' +
+      row('ऑपरेटिंग सिस्टम', 'Operating system', o ? (o.name + (o.ver ? ' ' + o.ver : '')) : '—') +
+      row('बूट मोड', 'Boot mode', u.target === 'UEFI' ? 'UEFI + GPT' : 'Legacy BIOS + MBR') +
+      row('बूटेबल पेन ड्राइव', 'Bootable pen drive', (u.drv || '—') + ' GB · ' + (u.fs || '—') + ' · ' + (u.scheme || '—')) +
+      row('संस्करण', 'Edition', osFam() === 'Linux' ? (OSS.lin.type === 'erase' ? 'Erase disk (automatic)' : 'Manual partitions') : (OSS.win.edition || '—')) +
+      row('पार्टीशन', 'Partitions', partsSummary()) +
+      row('यूज़र खाता', 'User account', OSS.oobe.user || OSS.lin.user || '—') +
+      row('डेस्कटॉप', 'Desktop', '✔') + '</tbody></table></div>';
+    h += '<div class="rsec"><h4>' + bl('गलतियाँ और सुधार', 'Mistakes and corrections') + ' · ' + mk.length + '</h4>';
+    if (!mk.length) h += '<div class="rgood">' + bl('कोई ग़लती नहीं — शाबाश! पहली बार में सही इंस्टॉल।', 'No mistakes — well done! Correct install on the first try.') + '</div>';
+    else {
+      h += '<table class="rtbl"><thead><tr><th>#</th><th>' + bl('चरण', 'Step') + '</th><th>' + bl('ग़लती (आपने क्या किया)', 'Mistake (what you did)') + '</th><th>' + bl('सही तरीका', 'Correct way') + '</th></tr></thead><tbody>';
+      mk.forEach(function (m, i) {
+        h += '<tr><td>' + (i + 1) + '</td><td>' + bl(m.step, m.stepEn) + '<div class="mist">' + m.ts + '</div></td><td>' + bl(m.hi, m.en) + '</td><td>' + (m.fixHi ? bl(m.fixHi, m.fixEn) : '—') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    h += '</div>';
+    h += '<div class="rsec"><h4>' + bl('पूरा स्टेप-बाय-स्टेप लॉग', 'Full step-by-step log') + ' · ' + OSS.log.length + '</h4><table class="rtbl small"><thead><tr><th>' + bl('समय', 'Time') + '</th><th>' + bl('चरण', 'Step') + '</th><th>' + bl('विवरण', 'Detail') + '</th></tr></thead><tbody>';
+    OSS.log.forEach(function (x) { h += '<tr class="' + (x.kind === 'err' ? 'er' : '') + '"><td>' + x.ts + '</td><td>' + esc(x.step) + '</td><td>' + esc(x.hi) + '</td></tr>'; });
+    h += '</tbody></table></div>';
+    return h;
+  }
+  function showOsReport() {
+    var box = $('#osReport'); if (!box) return;
+    var s = student, name = s ? s.name : 'Student';
+    var date = (s && s.date) ? s.date : new Date().toLocaleDateString('en-GB');
+    var mk = osMistakes();
+    box.innerHTML = '<div class="rep">' + osReportBody(false) + '</div>' +
+      '<div class="repbtns"><button type="button" class="btn" data-osact="download">' + blx('📥 रिपोर्ट फ़ाइल डाउनलोड (HTML)', '📥 Download report file (HTML)') + '</button>' +
+      '<button type="button" class="mini" data-osact="print">' + blx('🖨️ प्रिंट / PDF', '🖨️ Print / PDF') + '</button>' +
+      '<button type="button" class="mini" data-osact="reset">' + blx('↺ नया इंस्टॉल', '↺ New install') + '</button></div>' +
+      '<div class="cert">' +
+      '<div class="cert-h"><span class="seal">✔</span><h3>' + bl('प्रमाण-पत्र — OS इंस्टॉलेशन', 'Certificate — OS installation') + '</h3></div>' +
+      '<div class="cert-txt">' + bl('यह प्रमाण-पत्र ' + name + ' को दिया जाता है, जिन्होंने कंप्यूटर लैब में ' + (osObj() ? osObj().name : '') + ' का पूरा इंस्टॉलेशन चरण-दर-चरण सफलतापूर्वक किया।', 'This certificate is awarded to ' + name + ' for successfully completing the step-by-step installation of ' + (osObj() ? osObj().name : '') + ' in Computer Lab.') +
+      '<br>' + bl('कुल चरण: ' + OSS.log.length + ' · ग़लतियाँ: ' + mk.length + ' · दक्षता: ' + Math.max(50, 100 - mk.length * 6) + '%', 'Steps: ' + OSS.log.length + ' · Mistakes: ' + mk.length + ' · Accuracy: ' + Math.max(50, 100 - mk.length * 6) + '%') + '</div>' +
+      '<div class="cert-foot"><span>' + bl('तारीख', 'Date') + ': ' + esc(date) + '</span><span>Future Instructor Group · कंप्यूटर लैब</span></div></div>';
+  }
+  function osDownload() {
+    var s = student, name = (s ? s.name : 'Student').replace(/[^\w\u0900-\u097F ]/g, '').trim() || 'Student';
+    var date = ((s && s.date) ? s.date : new Date().toLocaleDateString('en-GB')).replace(/\//g, '-');
+    var css = 'body{font-family:"Noto Sans Devanagari",Segoe UI,system-ui,sans-serif;max-width:1000px;margin:24px auto;padding:0 16px;color:#12203a;line-height:1.55}' +
+      'h1{font-size:22px;margin:0 0 4px}h4{margin:14px 0 6px;font-size:15px;color:#0b3a6b}' +
+      '.sub{color:#5a6b86;margin:0 0 16px;font-size:13px}' +
+      '.rsec{margin:0 0 16px}.rtbl{width:100%;border-collapse:collapse;font-size:13px}' +
+      '.rtbl th,.rtbl td{border:1px solid #c8d4e6;padding:6px 8px;text-align:left;vertical-align:top}' +
+      '.rtbl th{background:#f1f6fd;font-weight:700}.rtbl.small{font-size:12px}.rtbl tr.er td{background:#fff1f1}' +
+      '.bhi{display:block}.ben{display:block;font-size:11px;color:#6b7a91;font-weight:500}.bhi2{font-weight:700}.ben2{font-size:11.5px;color:#6b7a91}' +
+      '.mist{font-size:10.5px;color:#8a97ab}.rgood{background:#eafaf0;border:1px solid #9fe0b8;padding:8px 10px;border-radius:8px;font-size:13px}' +
+      '.rep-t{font-size:20px}.foot{margin-top:18px;border-top:1px solid #d6e0ee;padding-top:8px;font-size:12px;color:#6b7a91}';
+    var doc = '<!doctype html><html lang="hi"><head><meta charset="utf-8"><title>' + esc('OS Install Report — ' + name) + '</title>' +
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&display=swap">' +
+      '<style>' + css + '</style></head><body>' +
+      '<h1>' + esc('इंस्टॉलेशन रिपोर्ट / Installation Report') + '</h1>' +
+      '<p class="sub">' + esc(name + ' · ' + date + ' · Future Instructor Group · कंप्यूटर लैब') + '</p>' +
+      osReportBody(true) +
+      '<div class="foot">' + esc('ऑटोमैटिक रिपोर्ट — कंप्यूटर लैब · OS इंस्टॉल लैब / Auto report — Computer Lab') + '</div>' +
+      '</body></html>';
+    try {
+      var blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'OS-Report-' + name.replace(/ /g, '_') + '-' + date + '.html';
+      document.body.appendChild(a); a.click();
+      window.setTimeout(function () { URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 2000);
+      osNote('📥 रिपोर्ट फ़ाइल डाउनलोड की गई: OS-Report-' + name.replace(/ /g, '_') + '-' + date + '.html', 'ok', 'Report file downloaded');
+    } catch (err) { osNote('⚠️ डाउनलोड नहीं हो सका — कृपया प्रिंट/PDF बटन दबाइए।', 'warn', 'Download failed — please use Print/PDF.'); }
+    renderOS();
+  }
+  function renderOS() { renderOSPanel(); renderOSScreen(); }
+
+  /* ---------- इवेंट (पैनल) ---------- */
+  var osPanel = $('#osPanel');
+  if (osPanel) osPanel.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-os],[data-usb],[data-win],[data-lin],[data-oobe],[data-osact],[data-linmnt],[data-linfs]') : null;
+    if (!t) return;
+    var d = t.dataset;
+    if (d.os) { pickOs(d.os); return; }
+    if (d.usb) { OSS.usb[d.usb] = (d.usb === 'drv') ? parseInt(t.dataset.id, 10) : t.dataset.id; OSS.err = ''; OSS.errEn = ''; renderOSPanel(); return; }
+    if (d.win) { winAct(d.win); return; }
+    if (d.lin) { linAct(d.lin); return; }
+    if (d.oobe) { oobeAct(d.oobe); return; }
+    if (d.osact) { osAct(d.osact); return; }
+    if (d.linmnt) { OSS.lin.mnt = d.linmnt; if (d.linmnt === 'swap') OSS.lin.disk.fs = 'swap'; else if (OSS.lin.disk.fs === 'swap') OSS.lin.disk.fs = 'ext4'; OSS.lin.disk.dlgMsg = ''; renderOS(); return; }
+    if (d.linfs) { OSS.lin.disk.fs = d.linfs; OSS.lin.disk.dlgMsg = ''; renderOS(); return; }
+  });
+  osPanel.addEventListener('input', function (e) {
+    var f = e.target && e.target.dataset ? e.target.dataset.osfield : null;
+    if (!f) return;
+    if (f === 'winkey') OSS.win.keyTxt = e.target.value;
+    else if (f === 'linuser') OSS.lin.user = e.target.value;
+    else if (f === 'linpass') OSS.lin.pass = e.target.value;
+    else if (f === 'linpc') OSS.lin.pcname = e.target.value;
+    else if (f === 'oobeuser') OSS.oobe.user = e.target.value;
+  });
+
+  /* ---------- इवेंट (मॉनिटर स्क्रीन — पार्टीशन टेबल, BIOS बटन, डायलॉग) ---------- */
+  var osScr = $('#osScreen');
+  if (osScr) osScr.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-diskrow],[data-diskact],[data-dlg],[data-bmove],[data-bios],[data-linmnt],[data-linfs]') : null;
+    if (!t) return;
+    var d = t.dataset;
+    if (d.linmnt) { OSS.lin.mnt = d.linmnt; if (d.linmnt === 'swap') OSS.lin.disk.fs = 'swap'; else if (OSS.lin.disk.fs === 'swap') OSS.lin.disk.fs = 'ext4'; OSS.lin.disk.dlgMsg = ''; renderOS(); return; }
+    if (d.linfs) { OSS.lin.disk.fs = d.linfs; OSS.lin.disk.dlgMsg = ''; renderOS(); return; }
+    if (d.diskrow != null && d.diskrow !== undefined) {
+      var linux = (osFam() === 'Linux'), dd = linux ? OSS.lin.disk : OSS.win.disk;
+      dd.sel = (d.diskrow === '__un') ? '__un' : d.diskrow;
+      dd.msg = ''; OSS.err = ''; OSS.errEn = '';
+      renderOS(); return;
+    }
+    if (d.diskact) { osDiskAct(d.diskact); return; }
+    if (d.dlg) { osDlg(d.dlg === 'ok'); return; }
+    if (d.bios) {
+      var p = d.bios.split(':'), k = p[0], v = p[1];
+      if (k === 'mode') OSS.bios.mode = v;
+      else if (k === 'secure') OSS.bios.secure = v;
+      else if (k === 'tpm') OSS.bios.tpm = v;
+      else if (k === 'sata') OSS.bios.sata = v;
+      OSS.err = ''; OSS.errEn = '';
+      renderOS(); return;
+    }
+    if (d.bmove) {
+      var q = d.bmove.split(':'), i = parseInt(q[0], 10), dir = q[1], b = OSS.bios.order;
+      var j = dir === 'up' ? i - 1 : i + 1;
+      if (j >= 0 && j < b.length) { var tmp = b[i]; b[i] = b[j]; b[j] = tmp; }
+      renderOS(); return;
+    }
+  });
+
+  var osRepBox = $('#osReport');
+  if (osRepBox) osRepBox.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-osact]') : null;
+    if (t && t.dataset.osact) osAct(t.dataset.osact);
+  });
+
+  var osResetB = $('#osResetBtn');
+  if (osResetB) osResetB.addEventListener('click', function () { osAct('reset'); });
+  var osBackB = $('#osBackLab');
+  if (osBackB) osBackB.addEventListener('click', function () { var b = $('.tabs button[data-tab="lab"]'); if (b) b.click(); });
+  osLog('OS इंस्टॉल लैब तैयार — ऊपर से Windows या Linux चुनिए।', 'in', 'OS install lab ready — choose Windows or Linux above.');
+  /* ================= शुरुआत ================= */
+  renderStats();
+  log('लैब तैयार है — "लैब शुरू करें" दबाकर स्टूडेंट जानकारी भरिए।', 'in');
+})();
+</script>
+<script>
+/* 🔗 सीधा लिंक (deep link): assembly-lab.html#os / #cpu / #mb … खोलने पर सीधे वही टैब खुले */
+(function () {
+  function fromHash() {
+    var id = (location.hash || '').replace('#', '');
+    if (!id) return;
+    var b = document.querySelector('.tabs button[data-tab="' + id + '"]');
+    if (b && !b.classList.contains('on')) b.click();
+  }
+  fromHash();
+  window.addEventListener('hashchange', fromHash);
+})();
+</script>
+<script src="../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+
+/* ग्राहक इच्छा: आधा-अधूरा नहीं — embed में भी होम पूरा दिखे */
+#sec-home .sec-hero::after{content:'🎒 बाईं ओर के मेनू (☰) से हर विषय खोलें — थ्योरी + प्रैक्टिकल';display:block;margin-top:10px;font-weight:800;color:#0B6B4D;font-size:13.5px}
+.sb-nav{scrollbar-width:thin}
+.sb-nav::-webkit-scrollbar{width:8px}
+.sb-nav::-webkit-scrollbar-thumb{background:rgba(11,107,77,.4);border-radius:99px}

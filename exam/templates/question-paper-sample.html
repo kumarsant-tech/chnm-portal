@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>प्रश्न पत्र का HTML नमूना — CHNM</title>
+<style>
+  body { font-family: "Segoe UI", "Noto Sans Devanagari", Arial, sans-serif; margin: 24px; color: #17212b; background: #f6f8fa; }
+  .sheet { max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #d7dee6; border-radius: 10px; padding: 22px 26px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .hint { color: #52606d; font-size: 14px; margin: 0 0 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #c9d3dd; padding: 8px 9px; text-align: left; vertical-align: top; }
+  th { background: #eef3f8; white-space: nowrap; }
+  td:nth-child(2), td:nth-child(8), td:nth-child(9), td:nth-child(10) { white-space: nowrap; }
+  code { background: #f0f3f6; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>प्रश्न पत्र — HTML नमूना</h1>
+  <p class="hint">
+    यह फाइल डाउनलोड करें, नीचे की तालिका में अपने प्रश्न भरें और उसी फाइल को
+    <b>एडमिन → प्रश्न बैंक → आयात करें</b> में अपलोड करें। केवल पहली <code>&lt;table&gt;</code> पढ़ी जाती है —
+    हेडर पंक्ति के नाम वही रखें। सही उत्तर में <b>A / B / C / D</b> लिखें। फाइल में कोई स्क्रिप्ट न रखें।
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Question ID</th>
+        <th>Subject</th>
+        <th>Question</th>
+        <th>Option A</th>
+        <th>Option B</th>
+        <th>Option C</th>
+        <th>Option D</th>
+        <th>Correct Answer</th>
+        <th>Marks</th>
+        <th>Negative Marks</th>
+        <th>Explanation</th>
+        <th>Image</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>TT-PAPER-01</td>
+        <td>Trade Theory</td>
+        <td>SMPS किस प्रकार की पावर सप्लाई है?</td>
+        <td>स्विचिंग मोड</td>
+        <td>लीनियर</td>
+        <td>यूपीएस</td>
+        <td>इनवर्टर</td>
+        <td>A</td>
+        <td>1</td>
+        <td>0</td>
+        <td>SMPS = Switch Mode Power Supply — यह हाई फ्रीक्वेंसी पर स्विच करके वोल्टेज नियंत्रित करती है।</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>TT-PAPER-02</td>
+        <td>Trade Theory</td>
+        <td>UPS का मुख्य काम क्या है?</td>
+        <td>बैकअप के समय बिजली देना</td>
+        <td>बिजली बढ़ाना</td>
+        <td>AC को सीधे DC बनाना</td>
+        <td>नेटवर्क जोड़ना</td>
+        <td>A</td>
+        <td>1</td>
+        <td>0</td>
+        <td>UPS बिजली जाने पर बैटरी से निरंतर सप्लाई देता है।</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>TT-PAPER-03</td>
+        <td>Trade Theory</td>
+        <td>CPU का ALU किस काम के लिए होता है?</td>
+        <td>गणना और तर्क</td>
+        <td>डिस्क स्टोरेज</td>
+        <td>डिस्प्ले नियंत्रण</td>
+        <td>नेटवर्क नियंत्रण</td>
+        <td>A</td>
+        <td>1</td>
+        <td>0</td>
+        <td>ALU = Arithmetic Logic Unit, यह गणितीय और तार्किक कार्य करता है।</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

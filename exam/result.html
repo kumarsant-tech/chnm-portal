@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>परिणाम — Future Instructor CHNM Portal</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+<link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
+<link rel="stylesheet" href="./../assets/exam-ui.css?v=2">
+</head>
+<body data-page="result">
+  <header class="fi-header">
+    <a class="brand" href="index.html" aria-label="छात्र डैशबोर्ड">
+      <span class="brand-mark" aria-hidden="true">FI</span>
+      <span class="brand-text">
+        <strong>Future Instructor</strong>
+        <small>CHNM परीक्षा पोर्टल</small>
+      </span>
+    </a>
+    <div class="header-spacer"></div>
+    <nav class="header-links" aria-label="मुख्य मेन्यू">
+      <a class="header-link" href="index.html">डैशबोर्ड</a>
+      <a class="header-link desk-only" href="result.html">सभी परिणाम</a>
+      <button class="header-link" type="button" id="resultLogoutBtn">लॉगआउट</button>
+      <div class="header-user" id="userSlot" hidden></div>
+    </nav>
+  </header>
+
+  <main class="page" style="max-width:1040px">
+    <div id="loadingView" class="panel">
+      <div class="row"><span class="sync saving"><span class="dot"></span></span><b>परिणाम लोड हो रहा है…</b></div>
+    </div>
+
+    <div id="errorView" hidden></div>
+
+    <div id="listView" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h1 class="section-title">मेरे परिणाम</h1>
+            <p class="section-sub">केवल आपके ही परिणाम यहाँ दिखाई देते हैं। फाइनल परीक्षा के अंक एडमिन द्वारा जारी होने पर दिखते हैं।</p>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" type="button" id="listRefreshBtn">रिफ़्रेश करें</button>
+            <a class="btn btn-sm" href="index.html">डैशबोर्ड</a>
+          </div>
+        </div>
+        <div id="resultsList"></div>
+      </div>
+    </div>
+
+    <div id="resultView" hidden>
+      <div class="result-toolbar">
+        <a class="btn btn-ghost btn-sm" href="result.html">← सभी परिणाम</a>
+        <div class="row">
+          <button class="btn btn-ghost btn-sm" type="button" id="printBtn">प्रिंट / PDF</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="refreshBtn">रिफ़्रेश करें</button>
+          <a class="btn btn-ghost btn-sm" href="index.html">डैशबोर्ड</a>
+        </div>
+      </div>
+      <div id="resultBox"></div>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <p>Future Instructor · CHNM Portal — परीक्षा परिणाम केवल आपके सत्र में सुरक्षित रूप से दिखाए जाते हैं।</p>
+  </footer>
+
+  <script src="assets/ui.js"></script>
+  <script src="assets/result-view.js"></script>
+  <script src="assets/result.js"></script>
+<script src="./../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

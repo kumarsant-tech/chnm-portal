@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin Panel — Future Instructor CHNM Portal</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+<link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
+<link rel="stylesheet" href="./../assets/exam-ui.css?v=2">
+</head>
+<body data-page="admin" class="admin-body">
+  <div id="adminLogin" class="login-page" hidden>
+    <div class="login-shell">
+      <section class="login-hero">
+        <a class="brand" href="../index.html">
+          <span class="brand-mark" aria-hidden="true">FI</span>
+          <span class="brand-text"><strong>Future Instructor</strong><small>CHNM Portal · Admin</small></span>
+        </a>
+        <div class="login-hero-copy">
+          <span class="pill dark">EXAM CONTROL CENTER</span>
+          <h1>परीक्षा, प्रश्न और परिणाम — एक ही सुरक्षित डैशबोर्ड से।</h1>
+          <p>विद्यार्थी रिकॉर्ड, प्रश्न बैंक, लाइव प्रयास और परिणाम जारी करने का पूरा नियंत्रण।</p>
+        </div>
+        <ul class="login-features">
+          <li><span class="login-feature-icon" data-login-icon="users"></span><div><b>विद्यार्थी प्रबंधन</b><small>एडिट, निष्क्रिय या सेफ़-डिलीट</small></div></li>
+          <li><span class="login-feature-icon" data-login-icon="layers"></span><div><b>फ़ोल्डर-वार प्रश्न</b><small>हर आयात का अलग सेट</small></div></li>
+          <li><span class="login-feature-icon" data-login-icon="chart"></span><div><b>परिणाम और सूचना</b><small>रिलीज़ और सभी छात्रों तक सूचना</small></div></li>
+        </ul>
+        <p class="login-hero-foot" id="loginSecureNote"></p>
+      </section>
+
+      <section class="login-panel">
+        <div class="login-panel-head">
+          <span class="login-lock" id="loginLockIcon" aria-hidden="true"></span>
+          <div>
+            <h2>एडमिन लॉगिन</h2>
+            <p>जारी रखने के लिए एडमिन पासवर्ड दर्ज करें।</p>
+          </div>
+        </div>
+        <form id="adminLoginForm" class="stack" autocomplete="off">
+          <label class="field">
+            <span>एडमिन पासवर्ड</span>
+            <div class="password-field">
+              <input class="input" id="adminPassword" name="password" type="password" autocomplete="current-password" required autofocus />
+              <button type="button" class="password-toggle" id="adminPasswordToggle" aria-label="पासवर्ड दिखाएँ"></button>
+            </div>
+            <small>पासवर्ड सर्वर के Environment Variable से जाँचा जाता है — ब्राउज़र या कोड में सेव नहीं होता।</small>
+          </label>
+          <p id="adminLoginError" class="notice bad" hidden></p>
+          <button id="adminLoginBtn" class="btn btn-block btn-lg" type="submit">सुरक्षित लॉगिन</button>
+        </form>
+        <div class="login-meta">
+          <span>Future Instructor · CHNM</span>
+          <span><a href="index.html">छात्र पोर्टल</a> · <a href="../index.html">वेबसाइट</a></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="adminShell" class="admin-shell" hidden>
+    <aside id="adminSidebar" class="admin-sidebar">
+      <div class="admin-brand">
+        <span class="brand-mark" aria-hidden="true">FI</span>
+        <div><b>CHNM Admin</b><small>Exam Management</small></div>
+      </div>
+      <nav class="admin-nav" aria-label="एडमिन मेनू">
+        <span class="nav-group">आज</span>
+        <button type="button" data-nav="dashboard">डैशबोर्ड</button>
+        <button type="button" data-nav="live">लाइव परीक्षा</button>
+        <span class="nav-group">परीक्षा सेटअप</span>
+        <button type="button" data-nav="exams">परीक्षाएँ</button>
+        <button type="button" data-nav="questions">प्रश्न बैंक</button>
+        <button type="button" data-nav="catalog">विषय और ट्रेड</button>
+        <span class="nav-group">परिणाम</span>
+        <button type="button" data-nav="results">परिणाम</button>
+        <button type="button" data-nav="stats">आँकड़े</button>
+        <span class="nav-group">लोग और सिस्टम</span>
+        <button type="button" data-nav="students">विद्यार्थी</button>
+        <button type="button" data-nav="notify">सूचना और चैट</button>
+        <button type="button" data-nav="settings">सेटिंग्स</button>
+        <button type="button" data-nav="tools">टूल्स</button>
+        <div class="nav-sep" aria-hidden="true"></div>
+        <a href="index.html">छात्र पोर्टल</a>
+        <a href="../index.html">मुख्य वेबसाइट</a>
+      </nav>
+      <div class="admin-side-foot">
+        <span id="adminSiteName">Future Instructor</span><br />
+        <span>CHNM परीक्षा प्रणाली</span>
+        <div style="margin-top: 8px;">
+          <button id="adminLogoutBtn" class="btn btn-ghost btn-sm btn-block" type="button">लॉगआउट</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <button id="sidebarToggle" class="icon-btn mobile-nav-toggle" type="button" aria-label="मेनू खोलें"></button>
+        <div>
+          <h1 id="adminPageTitle">डैशबोर्ड</h1>
+          <div id="adminPageCrumb" class="crumb">Future Instructor · CHNM</div>
+        </div>
+        <div class="header-spacer"></div>
+        <button id="adminRefreshBtn" class="icon-btn" type="button" aria-label="रिफ़्रेश करें"></button>
+      </header>
+      <main id="adminContent" class="admin-content" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+  <script src="assets/ui.js"></script>
+  <script src="assets/result-view.js"></script>
+  <script src="assets/admin.js"></script>
+<script src="./../assets/modern-ui.js?v=1" defer></script>
+</body>
+</html>

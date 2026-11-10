@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /exam/admin.html
+Disallow: /exam/test.html
+Disallow: /exam/result.html
+Disallow: /exam/register.html
+Disallow: /exam/assets/
+Disallow: /api/

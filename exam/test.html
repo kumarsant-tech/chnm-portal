@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>परीक्षा — Future Instructor CHNM Portal</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+<link rel="stylesheet" href="./../assets/exam-ui.css?v=2">
+</head>
+<body data-page="test">
+  <div id="loadingView" class="cbt-loading">
+    <div class="brand-mark" aria-hidden="true">FI</div>
+    <p class="muted">परीक्षा लोड हो रही है…<br /><small>Loading exam…</small></p>
+  </div>
+
+  <div id="landingView" hidden>
+    <header class="fi-header">
+      <a class="brand" href="index.html">
+        <span class="brand-mark" aria-hidden="true">FI</span>
+        <span class="brand-text">
+          <strong>Future Instructor</strong>
+          <small>CHNM परीक्षा पोर्टल · Examination Portal</small>
+        </span>
+      </a>
+      <div class="header-spacer"></div>
+      <div class="header-links">
+        <a class="header-link" href="index.html">डैशबोर्ड / Dashboard</a>
+      </div>
+    </header>
+
+    <main class="exam-landing">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h1 id="landingTitle" class="section-title">परीक्षा</h1>
+            <p id="landingSub" class="section-sub"></p>
+          </div>
+          <span id="landingType" class="pill"></span>
+        </div>
+
+        <div id="landingMeta" class="landing-meta"></div>
+        <div id="landingNotice"></div>
+
+        <section class="instr-sheet" id="instrSheet" aria-live="polite">
+          <header class="instr-head">
+            <div>
+              <b id="instrTitle">सामान्य निर्देश</b>
+              <small id="instrSub">General Instructions</small>
+            </div>
+            <span id="instrStep" class="instr-step">1 / 4</span>
+          </header>
+          <div id="instrBody" class="instr-body"></div>
+          <footer class="instr-foot">
+            <button id="instrBack" class="btn btn-outline btn-sm" type="button">
+              <span class="bi-hi">← पिछला</span><span class="bi-en">Back</span>
+            </button>
+            <span class="grow"></span>
+            <span id="instrDots" class="instr-dots" aria-hidden="true"></span>
+            <span class="grow"></span>
+            <button id="instrNext" class="btn btn-sm btn-navy" type="button">
+              <span class="bi-hi">आगे →</span><span class="bi-en">Next</span>
+            </button>
+          </footer>
+        </section>
+
+        <div class="landing-lang-row">
+          <span class="label">पेपर की भाषा / Paper language</span>
+          <div class="cbt-lang" role="group" aria-label="पेपर की भाषा / Paper language">
+            <button type="button" id="landingLangHi" class="lang-btn active" aria-pressed="true">हिंदी</button>
+            <button type="button" id="landingLangEn" class="lang-btn" aria-pressed="false">English</button>
+          </div>
+          <small class="muted">प्रश्न और विकल्प इसी भाषा में दिखेंगे। / Questions and options will appear in this language.</small>
+        </div>
+
+        <div class="stack">
+          <label class="check declare-check" id="declareWrap" hidden>
+            <input type="checkbox" id="declareCheck" />
+            <span>
+              <span class="bi-hi">मैंने ऊपर दिए सभी निर्देश पढ़ और समझ लिए हैं। मैं परीक्षा के नियमों का पालन करूँगा/करूँगी।</span>
+              <span class="bi-en">I have read and understood all the instructions above. I will follow the examination rules.</span>
+            </span>
+          </label>
+
+          <div class="row-between">
+            <div id="landingResultWrap"></div>
+            <div class="landing-actions">
+              <a class="btn btn-outline" href="index.html"><span class="bi-hi">रद्द करें</span><span class="bi-en">Cancel</span></a>
+              <button id="startBtn" class="btn btn-lg" type="button" disabled>
+                <span class="bi-hi">परीक्षा शुरू करें</span><span class="bi-en">Start Examination</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="cbtView" class="cbt-body" hidden>
+    <div id="offlineBanner" class="offline-banner" hidden>
+      इंटरनेट कनेक्शन बंद है — उत्तर इस डिवाइस में सुरक्षित हैं, कनेक्शन आते ही सिंक होंगे।<br />
+      <small>You are offline — answers are saved on this device and will sync when the connection returns.</small>
+    </div>
+
+    <div id="fsBanner" class="fs-banner" hidden>
+      <span class="fs-text">
+        <span class="bi-hi">🖥️ पेज फ़ुल स्क्रीन में नहीं है — बटन दबाकर वापस जाएँ, टाइमर चलता रहेगा।<span id="fsExitCount" class="fs-count" hidden></span></span>
+        <span class="bi-en">Not in full screen — press the button to go back; the clock keeps running.</span>
+      </span>
+      <button id="fsBtnBanner" class="btn btn-sm btn-blue" type="button">
+        <span class="bi-hi">फ़ुल स्क्रीन करें</span><span class="bi-en">Enter Full Screen</span>
+      </button>
+    </div>
+
+    <header class="cbt-top">
+      <span class="brand-mark" aria-hidden="true">FI</span>
+      <div class="cbt-brand">
+        <b id="cbtBrandName">Future Instructor</b>
+        <small id="cbtBrandSub">CHNM परीक्षा पोर्टल</small>
+      </div>
+      <div class="cbt-title">
+        <b id="cbtTitle">परीक्षा</b>
+        <small id="cbtSub">Future Instructor · CHNM</small>
+      </div>
+      <div class="cbt-candidate">
+        <div id="candAvatar"></div>
+        <div>
+          <div id="candName" class="c-name"></div>
+          <div id="candReg" class="c-reg"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="cbt-statusbar">
+      <div class="cbt-status-left">
+        <span class="cbt-status-name"><i class="live-dot"></i> <span class="bi-inline"><b>सीबीटी परीक्षा</b><i>Computer Based Test</i></span></span>
+        <span id="paperType" class="cbt-paper-type"></span>
+        <button id="fsBtn" class="btn btn-sm btn-fs" type="button" hidden aria-pressed="false" title="फ़ुल स्क्रीन / Full Screen">
+          <span class="fs-ico" aria-hidden="true">⛶</span><span class="fs-label"><b>फ़ुल स्क्रीन</b><i>Full Screen</i></span>
+        </button>
+      </div>
+      <div id="timerBox" class="cbt-timer" role="timer" aria-live="off">
+        <small>शेष समय / Time Left (in sec)</small>
+        <b id="timerText">00:00:00</b>
+      </div>
+      <div class="cbt-status-right">
+        <button id="instrBtn" class="btn btn-outline btn-sm" type="button">
+          <span class="bi-hi">निर्देश</span><span class="bi-en">Instructions</span>
+        </button>
+        <div class="cbt-lang" role="group" aria-label="प्रश्न की भाषा / Question language">
+          <button type="button" id="topLangHi" class="lang-btn active" aria-pressed="true">हिंदी</button>
+          <button type="button" id="topLangEn" class="lang-btn" aria-pressed="false">English</button>
+        </div>
+        <button id="submitBtnTop" class="btn btn-sm btn-submit" type="button">
+          <span class="bi-hi">जमा करें</span><span class="bi-en">Submit</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="cbt-layout">
+      <main class="cbt-main">
+        <div class="cbt-question-wrap">
+          <section class="cbt-card" aria-labelledby="qText">
+            <div class="q-head">
+              <span id="qNo" class="q-no"></span>
+              <span id="qType" class="q-type"></span>
+              <span id="qMarkedTag" class="q-marked-note" hidden></span>
+              <span id="qMarks" class="q-marks"></span>
+              <div class="cbt-lang" role="group" aria-label="प्रश्न की भाषा / Question language">
+                <button type="button" id="langHi" class="lang-btn active" aria-pressed="true">हिंदी</button>
+                <button type="button" id="langEn" class="lang-btn" aria-pressed="false">English</button>
+              </div>
+            </div>
+            <div class="q-body">
+              <p id="qText" class="q-text"></p>
+              <img id="qImage" class="q-image" alt="प्रश्न चित्र / Question figure" hidden />
+              <div id="options" class="options" role="radiogroup" aria-labelledby="qText"></div>
+            </div>
+            <div class="q-actions">
+              <div class="qa-left">
+                <button id="markBtn" class="btn btn-md btn-soft" type="button">
+                  <span class="bi-hi">समीक्षा हेतु चिह्नित</span><span class="bi-en">Mark for Review</span>
+                </button>
+                <button id="clearBtn" class="btn btn-md btn-outline" type="button">
+                  <span class="bi-hi">उत्तर हटाएँ</span><span class="bi-en">Clear Response</span>
+                </button>
+              </div>
+              <div class="qa-right">
+                <button id="prevBtn" class="btn btn-md btn-ghost" type="button">
+                  <span class="bi-hi">← पिछला</span><span class="bi-en">Back</span>
+                </button>
+                <button id="markNextBtn" class="btn btn-md btn-mark" type="button">
+                  <span class="bi-hi">उत्तर + चिह्नित कर अगला</span><span class="bi-en">Answer &amp; Mark for Review &amp; Next</span>
+                </button>
+                <button id="saveNextBtn" class="btn btn-md btn-blue" type="button">
+                  <span class="bi-hi">सहेजें और अगला</span><span class="bi-en">Save &amp; Next</span>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="cbt-footer">
+          <span id="syncStatus" class="sync"><i class="dot"></i><span>तैयार / Ready</span></span>
+          <span id="answeredCount" class="answered-count"></span>
+          <span class="grow"></span>
+          <span id="submitGateFoot" class="submit-gate submit-gate-foot" hidden></span>
+          <button id="paletteToggle" class="btn btn-outline btn-sm palette-toggle" type="button">प्रश्न पैलेट / Palette</button>
+          <button id="submitBtnFoot" class="btn btn-danger btn-sm" type="button">समीक्षा व सबमिट / Review &amp; Submit</button>
+        </div>
+      </main>
+
+      <aside id="sidePanel" class="cbt-side" aria-label="प्रश्न पैलेट / Question Palette">
+        <div class="side-head">
+          <b>परीक्षा पैनल <small>Exam Panel</small></b>
+          <button id="paletteClose" class="cbt-icon-btn palette-toggle" type="button" aria-label="बंद करें / Close">✕</button>
+        </div>
+        <div class="side-scroll">
+          <div class="candidate-card">
+            <div id="miniAvatar" class="cand-photo"></div>
+            <b id="miniName" class="cand-name"></b>
+            <small id="miniReg" class="cand-reg"></small>
+            <dl class="cand-meta">
+              <div><dt>दिनांक / Date</dt><dd id="sideDate">—</dd></div>
+              <div><dt>मोबाइल / Mobile</dt><dd id="sideMobile">—</dd></div>
+              <div><dt>ट्रेड / Trade</dt><dd id="miniTrade">—</dd></div>
+            </dl>
+          </div>
+
+          <div class="cand-stats">
+            <div class="stat answered"><b id="countAnswered">0</b><span>उत्तर दिए<br />Answered</span></div>
+            <div class="stat not-answered"><b id="countRemaining">0</b><span>उत्तर नहीं दिए<br />Not Answered</span></div>
+            <div class="stat not-visited"><b id="countNotVisited">0</b><span>नहीं देखे<br />Not Visited</span></div>
+            <div class="stat marked"><b id="countMarked">0</b><span>चिह्नित<br />Marked</span></div>
+          </div>
+
+          <div class="palette-head">
+            <b>प्रश्न पैलेट <small>Question Palette</small></b>
+            <span id="paletteProgress">0 / 0</span>
+          </div>
+          <div id="paletteFilters" class="pal-filters" role="group" aria-label="पैलेट फ़िल्टर / Palette filter"></div>
+          <div id="palette" class="palette"></div>
+          <p id="paletteEmpty" class="palette-empty" hidden>इस श्रेणी में कोई प्रश्न नहीं। / No questions in this category.</p>
+
+          <div class="legend" aria-hidden="true">
+            <span><i class="a"></i> उत्तर दिया है<br /><small>Answered</small></span>
+            <span><i class="b"></i> उत्तर नहीं दिया है<br /><small>Not Answered</small></span>
+            <span><i class="c"></i> अभी नहीं देखा<br /><small>Not Visited</small></span>
+            <span><i class="d"></i> समीक्षा हेतु चिह्नित<br /><small>Marked for Review</small></span>
+            <span><i class="e"></i> उत्तर दिया और चिह्नित<br /><small>Answered &amp; Marked</small></span>
+          </div>
+          <p class="palette-note">
+            पैलेट में किसी प्रश्न संख्या पर क्लिक करके सीधे वहाँ जा सकते हैं। / Click any question number in the palette to jump to that question.
+          </p>
+        </div>
+        <div class="side-foot">
+          <p id="submitGate" class="submit-gate" hidden></p>
+          <button id="submitBtn" class="btn btn-danger btn-block" type="button">
+            <span class="bi-hi">समीक्षा व अंतिम सबमिट</span><span class="bi-en">Review &amp; Final Submit</span>
+          </button>
+        </div>
+      </aside>
+      <div id="drawerBackdrop" class="cbt-drawer-backdrop"></div>
+    </div>
+  </div>
+
+  <div id="finishedView" hidden>
+    <header class="fi-header">
+      <a class="brand" href="index.html">
+        <span class="brand-mark" aria-hidden="true">FI</span>
+        <span class="brand-text"><strong>Future Instructor</strong><small>CHNM परीक्षा पोर्टल</small></span>
+      </a>
+    </header>
+    <main class="exam-landing">
+      <div class="panel">
+        <div class="empty" style="border-style: solid;">
+          <strong id="finishTitle">परीक्षा सबमिट हो गई</strong>
+          <p id="finishMessage" class="muted"></p>
+          <p class="small muted">परिणाम आईडी / Result ID: <b id="finishResultId">—</b></p>
+        </div>
+        <div class="row" style="justify-content: flex-end; margin-top: 16px;">
+          <a id="finishDash" class="btn btn-ghost" href="index.html">डैशबोर्ड / Dashboard</a>
+          <a id="finishResult" class="btn" href="result.html">परिणाम देखें / View Result</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+  <script src="assets/ui.js"></script>
+  <script src="assets/test.js"></script>
+<script src="./../assets/exam-help.js?v=1" defer></script>
+</body>
+</html>

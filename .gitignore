@@ -1,0 +1,11 @@
+node_modules/
+.netlify/
+dist/
+.env
+.env.*
+*.backup.zip
+*.zip
+*blobs-backup*.json
+scripts/tmp-*
+.DS_Store
+Thumbs.db

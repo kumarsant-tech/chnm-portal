@@ -1,0 +1,142 @@
+/* tm-live.css — SMPS लैब जैसा "LIVE" सिमुलेटर रूप, Training Methodology पेजों के लिए।
+   क्लासेस वही रखी गई हैं जो trade के live sims में इस्तेमाल होती हैं। */
+
+.live-sim {
+  border: 1px solid #b9ded6;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f7fbfa;
+}
+.live-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(120deg, #07231f, #0c3a33);
+  color: #d8fff4;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.live-top b {
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  color: #7ef0c9;
+  padding: 2px 6px 2px 20px;
+  position: relative;
+}
+.live-top b::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #57e5b5;
+  animation: tm-pulse 1.5s ease-in-out infinite;
+}
+@keyframes tm-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(87, 226, 181, .25); }
+  50% { box-shadow: 0 0 0 6px rgba(87, 226, 181, .08); }
+}
+.live-top span:last-child { color: #a9d8cc; font-weight: 600; min-width: 0; }
+.live-stage { padding: 12px; background: #f9fcfc; overflow: hidden; }
+.live-stage > svg { display: block; width: 100%; height: auto; }
+.live-controls { padding: 10px 12px; border-top: 1px solid #dcebe7; background: #f1f9f6; }
+.live-readout { padding: 10px 12px; border-top: 1px solid #dcebe7; background: #fff; }
+.live-status {
+  padding: 8px 12px;
+  border-top: 1px solid #dcebe7;
+  background: #fbfdfd;
+  color: var(--muted);
+  font-size: 11.8px;
+  line-height: 1.55;
+}
+.live-status.good { color: #0b6b43; background: #f0fbf5; font-weight: 600; }
+.live-status.bad { color: #b42318; background: #fff6f4; font-weight: 600; }
+
+.live-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.live-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 132px;
+  color: #35505c;
+  font-size: 11.4px;
+  font-weight: 700;
+}
+.live-field output { color: var(--brand-dark); font-weight: 800; }
+.live-field input[type="range"] { width: 100%; accent-color: var(--brand); }
+.live-field select, .live-field .input {
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+.live-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 5px;
+  color: #35505c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.live-check input { width: 16px; height: 16px; accent-color: var(--brand); }
+.live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 8px; }
+.live-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+.live-stat span { font-size: 10.4px; font-weight: 700; color: var(--muted); letter-spacing: .2px; }
+.live-stat b { font-size: 13px; color: var(--ink); line-height: 1.35; }
+.live-stat.good { border-color: #bfe5ce; background: #f3fcf7; }
+.live-stat.good b { color: #0b6b43; }
+.live-stat.bad { border-color: #f2b8b1; background: #fff6f4; }
+.live-stat.bad b { color: #b42318; }
+.live-scope { display: block; width: 100%; height: auto; border-radius: 9px; }
+.live-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; }
+.live-seg .seg {
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: #fff;
+  padding: 7px 10px;
+  color: #4a5a66;
+  font: inherit;
+  font-size: 11.4px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.live-seg .seg:last-child { border-right: 0; }
+.live-seg .seg:hover { background: var(--surface-2); }
+.live-seg .seg.on { background: var(--brand); color: #fff; }
+.live-btn {
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.live-btn.ghost { background: #fff; color: var(--brand-dark); }
+.live-btn:hover { filter: brightness(1.06); }
+.live-hint { margin: 6px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+
+@media (max-width: 620px) {
+  .live-field { min-width: 100%; }
+  .live-stage { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-top b::before { animation: none; }
+}

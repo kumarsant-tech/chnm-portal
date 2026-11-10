@@ -1,0 +1,127 @@
+/* exam-ui.css — परीक्षा पोर्टल के लिए आधुनिक + आसान बनाती परत।
+   यह फ़ाइल styles.css और modern-ui.css के *बाद* लोड होती है और केवल
+   जोड़ती है; कोई पुराना नियम या ID नहीं बदलती। */
+
+:root {
+  --fi-exam-r: 14px;
+  --fi-exam-shadow: 0 1px 2px rgba(13, 27, 38, .06), 0 10px 28px rgba(13, 27, 38, .08);
+}
+
+/* ---------- 1. हर जगह साफ़ फोकस और बड़े टैप लक्ष्य ---------- */
+body[data-page] .btn:focus-visible,
+body[data-page] .input:focus-visible,
+body[data-page] .select:focus-visible,
+body[data-page] .option:has(input:focus-visible),
+body[data-page] .pal-btn:focus-visible,
+body[data-page] .admin-nav button:focus-visible {
+  outline: 3px solid rgba(13, 107, 95, .45);
+  outline-offset: 2px;
+}
+
+body[data-page] .btn {
+  transition: transform .14s var(--fi-ease, cubic-bezier(.22, .61, .36, 1)),
+    box-shadow .18s ease, background-color .18s ease;
+}
+body[data-page] .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--fi-exam-shadow); }
+body[data-page] .btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+body[data-page] .btn:disabled { cursor: not-allowed; }
+
+/* ---------- 2. लॉगिन / रजिस्ट्रेशन कार्ड ---------- */
+body[data-page="portal"] .auth-card,
+body[data-page="register"] .auth-card {
+  border-radius: var(--fi-exam-r);
+  box-shadow: var(--fi-exam-shadow);
+  border: 1px solid var(--line);
+}
+.auth-tabs button { min-height: 44px; font-weight: 700; }
+body[data-page] .input,
+body[data-page] .select { min-height: 46px; border-radius: 11px; }
+body[data-page] .field > span { font-weight: 700; letter-spacing: .1px; }
+
+/* ---------- 3. CBT: गिनती टाइल अब नैविगेशन बटन ---------- */
+.cbt-side .cand-stats .stat {
+  cursor: pointer;
+  transition: transform .12s var(--fi-ease, ease), box-shadow .16s ease;
+}
+.cbt-side .cand-stats .stat:hover { transform: translateY(-2px); box-shadow: var(--fi-exam-shadow); }
+.cbt-side .cand-stats .stat:focus-visible { outline: 3px solid rgba(13, 107, 95, .45); outline-offset: 2px; }
+.cbt-side .cand-stats .stat::after {
+  content: "→";
+  position: absolute;
+  right: 9px;
+  top: 7px;
+  font-size: 11px;
+  opacity: .55;
+}
+.cbt-side .cand-stats .stat { position: relative; }
+.cbt-side .legend { font-size: 11px; }
+
+/* पैलेट बटन — थोड़े बड़े और गोल */
+.pal-btn { border-radius: 9px; min-height: 34px; font-weight: 700; }
+
+/* ---------- 4. CBT: उत्तर के बटन ---------- */
+.q-actions .btn { min-height: 42px; font-weight: 700; }
+.q-actions #saveNextBtn { box-shadow: 0 6px 16px rgba(31, 111, 178, .22); }
+
+/* ---------- 5. CBT फ़ुटर: मोबाइल पर चिपका हुआ ---------- */
+@media (max-width: 1100px) {
+  .cbt-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background: rgba(255, 255, 255, .94);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -6px 18px rgba(13, 27, 38, .1);
+  }
+  .cbt-footer #submitBtnFoot { margin-left: auto; }
+}
+@media (max-width: 760px) {
+  .q-actions { gap: 6px; }
+  .q-actions .btn { font-size: 12.5px; padding: 10px 8px; }
+  .q-actions .qa-left, .q-actions .qa-right { gap: 6px; }
+  /* मोबाइल: सहेजें सबसे ऊपर पوری लंबाई, फिर बाक़ी बटन दो क़तारों में */
+  .q-actions #saveNextBtn { order: -1; grid-column: 1 / -1; background: var(--cbt-blue, #1f6fb2); color: #fff; }
+  .q-actions #markBtn { order: 1; }
+  .q-actions #clearBtn { order: 2; }
+  .q-actions #prevBtn { order: 2; }
+  .q-actions #markNextBtn { order: 3; }
+  .option { min-height: 52px; }
+  .cbt-main { padding-bottom: 4px; }
+}
+
+/* ---------- 6. टाइमर अधिक स्पष्ट ---------- */
+.cbt-timer b { font-size: 21px; }
+.cbt-timer.danger { animation: none; box-shadow: 0 0 0 3px rgba(214, 69, 65, .28); }
+@media (prefers-reduced-motion: reduce) { .cbt-timer.danger { animation: none; } }
+
+/* ---------- 7. एडमिन साइडबार समूह ---------- */
+.admin-nav .nav-group {
+  margin: 14px 8px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .42);
+}
+.admin-nav .nav-group:first-child { margin-top: 2px; }
+.admin-nav button, .admin-nav a { border-radius: 10px; min-height: 40px; }
+.admin-nav .nav-sep { margin: 12px 4px; }
+
+/* एडमिन टेबल/कार्ड थोड़े साफ़ */
+.admin-content .panel, .admin-card { box-shadow: var(--fi-exam-shadow); }
+
+/* ---------- 8. परिणाम पेज ---------- */
+body[data-page="result"] .answer-card,
+body[data-page="result"] .panel { box-shadow: var(--fi-exam-shadow); }
+
+/* ---------- 9. प्रिंट ---------- */
+@media print {
+  .cbt-side { display: none; }
+}
+
+/* ---------- 10. परीक्षा/एडमिन पेज: फ़्लोटिंग बटन फ़ॉर्म ढँकते हैं ---------- */
+body[data-page="admin"] #fi-top,
+body[data-page="portal"] #fi-top,
+body[data-page="register"] #fi-top,
+body[data-page="test"] #fi-top,
+body[data-page="result"] #fi-top { display: none !important; }
