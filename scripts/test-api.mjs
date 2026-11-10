@@ -467,6 +467,12 @@ console.log("\n4b. Five simultaneous demo learners");
   );
   const registered = learners.every((learner) => learner.status === 200 && learner.data.token);
   check("all 5 synthetic learners register", registered, learners.map((learner) => learner.status).join(", "));
+  const registrationIds = learners.map((learner) => learner.data.student?.id);
+  check(
+    "all 5 registrations receive distinct IDs",
+    registrationIds.every(Boolean) && new Set(registrationIds).size === 5,
+    registrationIds.join(", ")
+  );
 
   if (registered) {
     const starts = await Promise.all(
@@ -474,6 +480,12 @@ console.log("\n4b. Five simultaneous demo learners");
     );
     const started = starts.every((result) => result.status === 200 && result.data.attempt?.attemptId);
     check("all 5 learners start the published exam concurrently", started, starts.map((result) => result.status).join(", "));
+    const attemptIds = starts.map((result) => result.data.attempt?.attemptId);
+    check(
+      "all 5 learners receive independent attempts",
+      attemptIds.every(Boolean) && new Set(attemptIds).size === 5,
+      attemptIds.join(", ")
+    );
 
     if (started) {
       const saves = await Promise.all(
@@ -514,6 +526,12 @@ console.log("\n4b. Five simultaneous demo learners");
         "all 5 learners submit and receive separate results",
         submissions.every((submission) => submission.status === 200 && submission.data.resultId),
         submissions.map((submission) => submission.status).join(", ")
+      );
+      const resultIds = submissions.map((submission) => submission.data.resultId);
+      check(
+        "all 5 learners receive distinct results",
+        resultIds.every(Boolean) && new Set(resultIds).size === 5,
+        resultIds.join(", ")
       );
     }
   }

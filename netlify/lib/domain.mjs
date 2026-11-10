@@ -1,19 +1,22 @@
+import crypto from "node:crypto";
 import { K, getJson, putJson, listJson, listKeys, mapLimit } from "./db.mjs";
 import { HttpError } from "./http.mjs";
 
-// Sequential IDs like CHNM12 so every student number starts with the institute
-// prefix. The counter lives in one blob; the existence check keeps old IDs and
-// manually entered IDs from ever being handed out twice.
+// D1 and memory stores allocate sequential IDs atomically. Stores without an
+// atomic counter use a random suffix so simultaneous registrations cannot
+// overwrite one another.
 export async function nextRegistrationId(store) {
-  const saved = await getJson(store, K.registrationSeq(), { value: 0 });
-  let seq = Math.max(0, Number(saved?.value) || 0);
+  if (typeof store.nextSequence === "function") {
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const id = `CHNM${await store.nextSequence(K.registrationSeq())}`;
+      if (!(await getJson(store, K.students(id)))) return id;
+    }
+    throw new HttpError("नया रजिस्ट्रेशन ID नहीं बन पाया — दोबारा प्रयास करें", 500);
+  }
+
   for (let attempt = 0; attempt < 500; attempt += 1) {
-    seq += 1;
-    const id = `CHNM${seq}`;
-    if (await getJson(store, K.students(id))) continue;
-    await putJson(store, K.registrationSeq(), { value: seq, updatedAt: new Date().toISOString() });
-    if (await getJson(store, K.students(id))) continue;
-    return id;
+    const id = `CHNM${crypto.randomBytes(8).toString("hex").toUpperCase()}`;
+    if (!(await getJson(store, K.students(id)))) return id;
   }
   throw new HttpError("नया रजिस्ट्रेशन ID नहीं बन पाया — दोबारा प्रयास करें", 500);
 }

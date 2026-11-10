@@ -21,6 +21,13 @@ function memoryStore() {
     async setJSON(key, value) {
       MEMORY.set(key, clone(value));
     },
+    async nextSequence(key) {
+      const current = MEMORY.get(key);
+      const value = Number(current?.value) || 0;
+      const next = { value: value + 1, updatedAt: new Date().toISOString() };
+      MEMORY.set(key, next);
+      return next.value;
+    },
     async delete(key) {
       MEMORY.delete(key);
     },
@@ -66,6 +73,18 @@ function d1Store(database) {
     },
     async setJSON(key, value) {
       return this.set(key, JSON.stringify(value));
+    },
+    async nextSequence(key) {
+      const row = await database
+        .prepare(
+          "INSERT INTO app_kv (key, value) VALUES (?, json_object('value', 1, 'updatedAt', CURRENT_TIMESTAMP)) ON CONFLICT(key) DO UPDATE SET value = json_object('value', COALESCE(CAST(json_extract(app_kv.value, '$.value') AS INTEGER), 0) + 1, 'updatedAt', CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP RETURNING CAST(json_extract(value, '$.value') AS INTEGER) AS value"
+        )
+        .bind(String(key))
+        .first();
+      if (!row || !Number.isSafeInteger(Number(row.value))) {
+        throw new Error("D1 registration sequence could not be allocated");
+      }
+      return Number(row.value);
     },
     async delete(key) {
       await database.prepare("DELETE FROM app_kv WHERE key = ?").bind(String(key)).run();

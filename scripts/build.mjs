@@ -40,6 +40,7 @@ async function walk(dir) {
 }
 
 async function makeWritable(dir) {
+  if (process.platform !== "win32") await chmod(dir, 0o777);
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -48,7 +49,6 @@ async function makeWritable(dir) {
       await chmod(full, 0o666);
     }
   }
-  await chmod(dir, 0o777);
 }
 
 export async function build() {
