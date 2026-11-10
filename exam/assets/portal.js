@@ -1241,7 +1241,6 @@
       if (!dateOfBirth) return setError("#regError", "जन्मतिथि दर्ज करें।");
       if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError("#regError", "सही ईमेल दर्ज करें।");
       if (!tradeId) return setError("#regError", "अपना ट्रेड चुनें।");
-      if (!state.photo) return setError("#regError", "अपनी फोटो चुनें (JPG / PNG / WebP)।");
       if (!consent) return setError("#regError", "रजिस्ट्रेशन के लिए सहमति पर टिक करें।");
 
       const button = $("#registerBtn");
