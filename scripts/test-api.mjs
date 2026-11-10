@@ -1315,6 +1315,63 @@ console.log("\n11. Registration email and admin password recovery");
         gmailRequests.length === gmailRequestCount
     );
 
+    const fallbackRequests = [];
+    globalThis.fetch = async (url, options) => {
+      fallbackRequests.push({ url, options });
+      if (url === "https://oauth2.googleapis.com/token") {
+        return new Response(JSON.stringify({ access_token: "test-access-token" }), { status: 200 });
+      }
+      if (url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send") {
+        return new Response(JSON.stringify({ error: "insufficient scope" }), { status: 403 });
+      }
+      return new Response(JSON.stringify({ id: "resend-fallback-id" }), { status: 200 });
+    };
+    const fallbackDelivery = await sendEmail(
+      {
+        ...gmailEnv,
+        RESEND_API_KEY: "test-resend-key",
+        EMAIL_FROM: "CHNM Portal <noreply@example.com>",
+      },
+      {
+        to: "student@gmail.com",
+        subject: "पंजीकरण सफल",
+        text: "Fallback email body",
+        idempotencyKey: "registration/test-student",
+      }
+    );
+    check(
+      "Gmail rejection falls back to configured Resend sender",
+      fallbackDelivery.sent &&
+        fallbackRequests.length === 3 &&
+        fallbackRequests[1]?.url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send" &&
+        fallbackRequests[2]?.url === "https://api.resend.com/emails" &&
+        JSON.parse(fallbackRequests[2]?.options.body || "{}").to?.[0] === "student@gmail.com" &&
+        fallbackRequests[2]?.options.headers["Idempotency-Key"] === "registration/test-student"
+    );
+
+    let ambiguousGmailRequests = 0;
+    globalThis.fetch = async (url) => {
+      ambiguousGmailRequests += 1;
+      if (url === "https://oauth2.googleapis.com/token") {
+        return new Response(JSON.stringify({ access_token: "test-access-token" }), { status: 200 });
+      }
+      throw new Error("connection lost after Gmail send request");
+    };
+    const ambiguousDelivery = await sendEmail(
+      {
+        ...gmailEnv,
+        RESEND_API_KEY: "test-resend-key",
+        EMAIL_FROM: "CHNM Portal <noreply@example.com>",
+      },
+      { to: "student@gmail.com", subject: "test", text: "test" }
+    );
+    check(
+      "ambiguous Gmail transport failure avoids duplicate Resend fallback",
+      !ambiguousDelivery.sent &&
+        ambiguousDelivery.reason === "provider_error" &&
+        ambiguousGmailRequests === 2
+    );
+
     globalThis.fetch = async (url, options) => {
       sentEmails.push({
         url,
