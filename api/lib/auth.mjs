@@ -95,23 +95,38 @@ export async function checkAdminPassword(password, env, store) {
 }
 
 async function derivePasswordHash(password, salt, iterations) {
-  const key = await globalThis.crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(String(password)),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const bits = await globalThis.crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    key,
-    256
-  );
-  return Buffer.from(bits);
+  try {
+    const key = await globalThis.crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(String(password)),
+      "PBKDF2",
+      false,
+      ["deriveBits"]
+    );
+    const bits = await globalThis.crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      key,
+      256
+    );
+    return Buffer.from(bits);
+  } catch (error) {
+    console.error("password derivation failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    throw error;
+  }
 }
 
 export async function hashPassword(password) {
-  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  let salt;
+  try {
+    salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  } catch (error) {
+    console.error("password salt generation failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    throw error;
+  }
   const hash = await derivePasswordHash(password, salt, 120000);
   return `pbkdf2v2$${Buffer.from(salt).toString("base64url")}$${hash.toString("base64url")}`;
 }
