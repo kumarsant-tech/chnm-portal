@@ -81,7 +81,7 @@ export async function handleRegister({ req, ctx, store, env }) {
     source: "self",
     createdAt: now,
     updatedAt: now,
-    passwordHash: hashPassword(temporaryPasswordFromDob(input.dateOfBirth)),
+    passwordHash: await hashPassword(temporaryPasswordFromDob(input.dateOfBirth)),
     mustChangePassword: true,
   };
   const mobileReserved = input.mobile
@@ -159,7 +159,7 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
     throw new HttpError("यह छात्र खाता निष्क्रिय है — एडमिन से संपर्क करें", 403);
   }
   if (student.passwordHash) {
-    if (!checkPassword(password, student.passwordHash)) {
+    if (!(await checkPassword(password, student.passwordHash))) {
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
   } else {
@@ -168,7 +168,7 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
     if (!legacyIdMatches || !mobile || mobile !== student.mobile) {
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
-    if (student.pinHash && !checkPin(password, student.pinHash)) {
+    if (student.pinHash && !(await checkPin(password, student.pinHash))) {
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
     if (!student.mustChangePassword) {
@@ -219,13 +219,13 @@ export async function handleStudentPasswordChange({ req, ctx, store, student }) 
   if (newPassword === currentPassword) {
     throw new HttpError("नया पासवर्ड अस्थायी/वर्तमान पासवर्ड से अलग होना चाहिए", 400);
   }
-  if (student.passwordHash && !checkPassword(currentPassword, student.passwordHash)) {
+  if (student.passwordHash && !(await checkPassword(currentPassword, student.passwordHash))) {
     throw new HttpError("अस्थायी/वर्तमान पासवर्ड सही नहीं है", 401);
   }
-  if (!student.passwordHash && student.pinHash && !checkPin(currentPassword, student.pinHash)) {
+  if (!student.passwordHash && student.pinHash && !(await checkPin(currentPassword, student.pinHash))) {
     throw new HttpError("वर्तमान PIN सही नहीं है", 401);
   }
-  student.passwordHash = hashPassword(newPassword);
+  student.passwordHash = await hashPassword(newPassword);
   student.mustChangePassword = false;
   delete student.pinHash;
   student.updatedAt = new Date().toISOString();

@@ -89,29 +89,43 @@ export async function hasAdminCredential(env, store) {
 
 export async function checkAdminPassword(password, env, store) {
   const override = await getJson(store, K.adminPasswordOverride());
-  if (override) return checkPassword(password, override);
+  if (override) return await checkPassword(password, override);
   const configured = configValue(env, "ADMIN_PASSWORD");
   return Boolean(configured) && safeEqual(password || "", configured);
 }
 
-export function hashPassword(password) {
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256");
-  return `pbkdf2v2$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+async function derivePasswordHash(password, salt, iterations) {
+  const key = await globalThis.crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(String(password)),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await globalThis.crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    key,
+    256
+  );
+  return Buffer.from(bits);
 }
 
-export function checkPassword(password, stored) {
+export async function hashPassword(password) {
+  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derivePasswordHash(password, salt, 120000);
+  return `pbkdf2v2$${Buffer.from(salt).toString("base64url")}$${hash.toString("base64url")}`;
+}
+
+export async function checkPassword(password, stored) {
   try {
     const [kind, salt, hash] = String(stored || "").split("$");
     const iterations = kind === "pbkdf2v2" ? 120000 : kind === "pbkdf2" ? 60000 : 0;
     if (!iterations || !salt || !hash) return false;
     const expected = Buffer.from(hash, "base64url");
-    const actual = crypto.pbkdf2Sync(
+    const actual = await derivePasswordHash(
       String(password || ""),
       Buffer.from(salt, "base64url"),
-      iterations,
-      32,
-      "sha256"
+      iterations
     );
     return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
   } catch {
@@ -119,23 +133,21 @@ export function checkPassword(password, stored) {
   }
 }
 
-export function hashPin(pin) {
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.pbkdf2Sync(String(pin), salt, 60000, 32, "sha256");
-  return `pbkdf2$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+export async function hashPin(pin) {
+  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derivePasswordHash(pin, salt, 60000);
+  return `pbkdf2$${Buffer.from(salt).toString("base64url")}$${hash.toString("base64url")}`;
 }
 
-export function checkPin(pin, stored) {
+export async function checkPin(pin, stored) {
   try {
     const [kind, salt, hash] = String(stored || "").split("$");
     if (kind !== "pbkdf2" || !salt || !hash) return false;
     const expected = Buffer.from(hash, "base64url");
-    const actual = crypto.pbkdf2Sync(
+    const actual = await derivePasswordHash(
       String(pin || ""),
       Buffer.from(salt, "base64url"),
-      60000,
-      32,
-      "sha256"
+      60000
     );
     return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
   } catch {
