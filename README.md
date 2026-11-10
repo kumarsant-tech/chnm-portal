@@ -25,7 +25,7 @@
 - **विषय-वार परीक्षाएँ:** Trade Theory, TM, Trade Practical, Soft Skills, SMPS, Computer Hardware, Networking आदि; admin नए विषय जोड़ सकता है; हर आयात का अपना प्रश्न फ़ोल्डर (सेट)
 - **एडमिन पैनल:** आधुनिक split-screen login (पासवर्ड दिखाने/छिपाने का बटन), dashboard, exam builder में पूरा पेपर प्रीव्यू → ड्राफ्ट → Lock/snapshot → Publish/Unpublish, **टॉपिक-वार पेपर** (विषय के हर topic से चुनी हुई संख्या में प्रश्न) और **सीबीटी श्रृंखला** (एक विषय में CBT1, CBT2 … — topic बराबर-बरार बाँटे, प्रश्न दोहराए बिना), question bank (Excel/CSV/JSON/HTML import + validation + preview + फ़ोल्डर, प्रति फ़ाइल विषय चुनने का विकल्प), छात्र एडिट और सुरक्षित हटाना, catalog, results + CSV + release gating, stats, settings, tools/backup/audit
 - **सूचना और समूह चैट (पोर्टल के अंदर):** एडमिन भेजी सूचना भेजते ही सभी छात्रों के डैशबोर्ड पर सीधे दिखती है (नई सूचना का बैज काउंट, सभी/बैच-वार audience, एडिट/हटाना)। हर पंजीकृत छात्र अपने आप समूह चैट में शामिल रहता है — एडमिन का संदेश तुरंत सबको दिखता है, संदेश हटाना और flood protection सहित। कोई बाहरी ऐप (WhatsApp/Telegram) या join लिंक नहीं चाहिए।
-- **सुरक्षा:** env-आधारित admin password (env न मिलने पर server-side scrypt hash fallback), HMAC tokens, rate limiting, server-side timer/scoring, answer key gating, result isolation, duplicate submit prevention
+- **सुरक्षा:** Cloudflare Worker secrets से admin password और HMAC signing secret, atomic D1 rate limiting/mobile uniqueness, server-side timer/scoring, answer key gating, result isolation, duplicate submit prevention
 - **अलग Practice और Final:** practice के उत्तर/परिणाम final से अलग; final के अंक और उत्तर-कुंजी release के बाद ही दिखते हैं (release करते ही दोनों खुल जाते हैं)
 - **Live hosting/data:** Cloudflare Workers Static Assets + `/api` Worker + D1 database। पुरानी Netlify site/data अलग है और इस setup में बदली नहीं गई।
 
@@ -53,8 +53,9 @@ exam/templates/                                            प्रश्न �
 study/                                                     Training Methodology डिजिटल पुस्तक + सिमुलेटर
 study/trade/                                               Trade Theory 25-अध्याय पुस्तक + सिमुलेटर
 cloudflare/worker.mjs                                      Cloudflare Worker: API/static assets/cron
-netlify/functions/api.mjs                                  साझा CBT API
-netlify/lib/                                               auth, D1/Blobs database, scoring, handlers
+cloudflare/redirects.mjs                                   साझा Cloudflare/local redirect rules
+api/handler.mjs                                            CBT API handler
+api/lib/                                                   auth, D1 database, scoring, handlers
 scripts/build.mjs                                          dist बनाना
 scripts/dev-server.mjs                                     स्थानीय server (in-memory store)
 scripts/test-api.mjs                                       API regression tests
@@ -87,7 +88,6 @@ Cloudflare setup और auto-deploy का विवरण: [Cloudflare deployme
 
 ## गाइड
 
-- [पुरानी Netlify deployment guide](docs/deployment-guide-hi.md) (वर्तमान production के लिए नहीं)
 - [वेबसाइट रखरखाव manual](docs/site-maintenance-manual-hi.md)
 - [Cloudflare deployment guide](docs/cloudflare-deployment-hi.md)
 - [एडमिन गाइड](docs/admin-guide-hi.md)
@@ -99,11 +99,9 @@ Cloudflare setup और auto-deploy का विवरण: [Cloudflare deployme
 
 - होम पेज का कंटेंट, शिक्षक/समूह फोटो, डिज़ाइन और सभी लैब सुरक्षित हैं। उपयोगकर्ता के अनुरोध पर साइडबार से पुराना **कंप्यूटर लैब समूह (क्रम 34–50)**, अलग **Training Methodology** फोल्डर और **CHNM Academy** फोल्डर हटाए गए हैं। होम पेज में उपयोगकर्ता के स्पष्ट अनुरोध से हेडर में **📝 ऑनलाइन टेस्ट** लिंक जोड़ा गया, नीचे का तैरता परीक्षा बटन हटाया गया और Training Methodology navigation को नई डिजिटल बुक से जोड़ा गया (फोटो, मुख्य कंटेंट, लेआउट और रंग अपरिवर्तित; पुराना TM DOM content सुरक्षित)।
 - अध्ययन सामग्री NIMI की विषय-सूची पर आधारित **स्वतंत्र, सरल हिंदी सामग्री** है; मूल पुस्तक का पाठ/चित्र सम्मिलित नहीं है (श्रेय: © NIMI)।
-- `netlify.toml` पुराने Netlify deploy के लिए है; वर्तमान production Cloudflare Workers पर deploy होती है।
 - `exam/` के लिए CSP `no-store` के साथ लागू है; admin password कभी frontend में न रखें।
 - **Admin secrets:** Production में admin credentials Cloudflare Worker के encrypted secrets में हैं; इन्हें source code या GitHub में न रखें।
-- **सत्र स्थिरता:** admin token `localStorage` में रहता है (पुराना `sessionStorage` token स्वतः migrate होता है), और token का signature server-side fallback hash से बनता है — इसलिए env अस्थिर होने या tab reload होने पर admin अपने आप लॉगआउट नहीं होता।
-- **Persistent store पुनर्प्रयास:** store बनाने में अस्थायी विफलता आने पर cached promise reset हो जाता है, ताकि function instance हमेशा के लिए खराब न हो।
+- **सत्र स्थिरता:** admin token `localStorage` में रहता है (पुराना `sessionStorage` token स्वतः migrate होता है); `ADMIN_SECRET` को स्थिर रखें, क्योंकि इसे बदलने पर जारी tokens अमान्य हो जाते हैं।
 - **CITS-शैली CBT:** परीक्षा से पहले भाषा (हिंदी/English) और निर्देश-पुष्टि; प्रश्न स्क्रीन पर भाषा टॉगल, "चिह्नित करें और अगला" बटन, सर्वर टाइमर और प्रश्न पैलेट। प्रश्न में ` / ` से हिंदी और English अलग किए जाते हैं (आयात CSV इसी प्रारूप में हो सकती है)।
 - **एडमिन लाइव निगरानी:** साइडबार में **लाइव परीक्षा** — प्रगति, अंतिम गतिविधि, शेष समय और "फाइनल करें"; परिणाम पेज पर **मेरिट (शीर्ष 10)**।
 - मूल प्रोजेक्ट backup: `chnm-portal-with-exam.backup.zip`; नवीनतम बदलाव से पहले के backup: `chnm-portal-with-exam.backup-before-cits-upgrade.zip`, `chnm-portal-with-exam.backup-before-reliability-fix.zip` (इससे पहले: `…backup-before-admin-link.zip`, `…backup-before-admin-fallback.zip`)।

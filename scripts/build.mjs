@@ -1,5 +1,4 @@
-// Builds the static site into ./dist. Netlify runs this on every deploy; the
-// functions directory stays at the repository root and is bundled separately.
+// Builds the static site into ./dist for Cloudflare Workers Static Assets.
 import { chmod, cp, mkdir, rm, stat, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";

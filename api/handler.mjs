@@ -1,12 +1,12 @@
-import { getDb } from "../lib/db.mjs";
-import { HttpError, fail, json, readJson } from "../lib/http.mjs";
-import { ensureSeed } from "../lib/seed.mjs";
-import { requireAdmin, requireStudent } from "../lib/auth.mjs";
+import { getDb } from "./lib/db.mjs";
+import { HttpError, fail, json, readJson } from "./lib/http.mjs";
+import { ensureSeed } from "./lib/seed.mjs";
+import { requireAdmin, requireStudent } from "./lib/auth.mjs";
 import {
   handleBootstrap,
   handleRegister,
   handleStudentLogin,
-} from "../lib/api-public.mjs";
+} from "./lib/api-public.mjs";
 import {
   handleStudentAutosave,
   handleStudentDashboard,
@@ -16,7 +16,7 @@ import {
   handleStudentResults,
   handleStudentStart,
   handleStudentSubmit,
-} from "../lib/api-student.mjs";
+} from "./lib/api-student.mjs";
 import {
   handleAdminAttemptFinalize,
   handleAdminAudit,
@@ -57,7 +57,7 @@ import {
   handleAdminTradeDelete,
   handleAdminTrades,
   handleAdminTradeSave,
-} from "../lib/api-admin.mjs";
+} from "./lib/api-admin.mjs";
 import {
   handleAdminChat,
   handleAdminChatDelete,
@@ -72,7 +72,7 @@ import {
   handleNoticeRead,
   handleNotices,
   handleSiteNotices,
-} from "../lib/api-notify.mjs";
+} from "./lib/api-notify.mjs";
 
 const PUBLIC_ACTIONS = {
   bootstrap: handleBootstrap,

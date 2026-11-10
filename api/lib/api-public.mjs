@@ -50,8 +50,16 @@ export async function handleRegister({ req, ctx, store, env }) {
     createdAt: now,
     updatedAt: now,
   };
-  await putJson(store, K.students(id), student);
-  await putJson(store, K.mobileIndex(input.mobile), { studentId: id });
+  const mobileReserved = await store.setIfAbsent(K.mobileIndex(input.mobile), {
+    studentId: id,
+  });
+  if (!mobileReserved) throw new HttpError("यह मोबाइल नंबर पहले से रजिस्टर है", 409);
+  try {
+    await putJson(store, K.students(id), student);
+  } catch (error) {
+    await store.delete(K.mobileIndex(input.mobile));
+    throw error;
+  }
   await audit(store, "student.register", id, { ip });
   return json({ ok: true, token: issueStudentToken(id, env), student: studentSelf(student) });
 }

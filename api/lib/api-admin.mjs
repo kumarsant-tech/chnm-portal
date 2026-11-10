@@ -249,7 +249,7 @@ export async function handleAdminLogin({ req, ctx, store, env }) {
   await rateLimit(store, "admin-login", ip, 8, ADMIN_LOGIN_WINDOW);
   if (!hasAdminPassword(env)) {
     throw new HttpError(
-      "सर्वर पर ADMIN_PASSWORD सेट नहीं है। Hosting provider के secrets में ADMIN_PASSWORD जोड़ें।",
+      "Cloudflare Worker secrets में ADMIN_PASSWORD सेट नहीं है।",
       500
     );
   }
@@ -1225,11 +1225,24 @@ export async function handleAdminStudentSave({ store, req }) {
     if (!/^\d{4,8}$/.test(pin)) throw new HttpError("PIN 4 से 8 अंकों का होना चाहिए", 400);
     student.pinHash = hashPin(pin);
   }
+  const ownsMobile = Boolean(existing && holder?.studentId === existing.id);
+  const mobileReserved =
+    ownsMobile ||
+    (await store.setIfAbsent(K.mobileIndex(student.mobile), {
+      studentId: student.id,
+    }));
+  if (!mobileReserved) {
+    throw new HttpError("यह मोबाइल नंबर पहले से किसी छात्र के पास है", 409);
+  }
+  try {
+    await putJson(store, K.students(id), student);
+  } catch (error) {
+    if (!ownsMobile) await del(store, K.mobileIndex(student.mobile));
+    throw error;
+  }
   if (existing?.mobile && existing.mobile !== student.mobile) {
     await del(store, K.mobileIndex(existing.mobile));
   }
-  await putJson(store, K.mobileIndex(student.mobile), { studentId: student.id });
-  await putJson(store, K.students(id), student);
   await audit(store, existing ? "student.update" : "student.create", "admin", { studentId: id });
   const { pinHash, ...safeStudent } = student;
   return json({

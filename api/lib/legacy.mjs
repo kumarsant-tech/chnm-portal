@@ -105,9 +105,11 @@ async function ensureLegacyStudent(store, record, now) {
   const existing = await getJson(store, K.students(id));
   if (existing) return { student: existing, created: false };
   const mobile = phone(record.mobile);
+  let ownsMobile = false;
   if (mobile) {
     const holder = await getJson(store, K.mobileIndex(mobile));
     if (holder && holder.studentId !== id) return { student: null, created: false };
+    ownsMobile = holder?.studentId === id;
   }
   const student = {
     id,
@@ -127,8 +129,19 @@ async function ensureLegacyStudent(store, record, now) {
     createdAt: record.at || now,
     updatedAt: now,
   };
-  await putJson(store, K.students(id), student);
-  if (mobile) await putJson(store, K.mobileIndex(mobile), { studentId: id });
+  const mobileReserved =
+    !mobile ||
+    ownsMobile ||
+    (await store.setIfAbsent(K.mobileIndex(mobile), {
+      studentId: id,
+    }));
+  if (!mobileReserved) return { student: null, created: false };
+  try {
+    await putJson(store, K.students(id), student);
+  } catch (error) {
+    if (mobile && !ownsMobile) await store.delete(K.mobileIndex(mobile));
+    throw error;
+  }
   return { student, created: true };
 }
 

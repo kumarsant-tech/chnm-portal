@@ -3,11 +3,12 @@
 const testD1 = process.argv.includes("--d1");
 process.env.USE_MEMORY_STORE = testD1 ? "0" : "1";
 process.env.ADMIN_PASSWORD = "test-admin-pass";
-process.env.ADMIN_SECRET = "test-admin-secret";
+process.env.ADMIN_SECRET = "test-admin-secret-with-at-least-32-bytes";
 
-const { default: api } = await import("../netlify/functions/api.mjs");
-const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../netlify/lib/db.mjs");
-const { seedLegacyQuestions } = await import("../netlify/lib/seed.mjs");
+const { default: api } = await import("../api/handler.mjs");
+const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
+const { rateLimit } = await import("../api/lib/auth.mjs");
+const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
 let apiEnv;
 let sqlite;
 
@@ -79,6 +80,27 @@ async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
 const store = await getDb(apiEnv);
 await seedLegacyQuestions(store);
 
+console.log("\n0. Concurrent storage guarantees");
+{
+  const attempts = await Promise.allSettled(
+    Array.from({ length: 10 }, () =>
+      rateLimit(store, "concurrent-test", "same-client", 3, 60 * 1000)
+    )
+  );
+  const allowed = attempts.filter((attempt) => attempt.status === "fulfilled");
+  const limited = attempts.filter((attempt) => attempt.status === "rejected");
+  check("concurrent limiter allows exactly the configured maximum", allowed.length === 3);
+  check(
+    "concurrent limiter returns 429 with retry metadata",
+    limited.length === 7 &&
+      limited.every(
+        (attempt) =>
+          attempt.reason.status === 429 &&
+          Number(attempt.reason.details?.retryAfter) > 0
+      )
+  );
+}
+
 console.log("\n1. Public bootstrap + admin auth");
 {
   const boot = await call("bootstrap");
@@ -90,6 +112,41 @@ console.log("\n1. Public bootstrap + admin auth");
     JSON.stringify(boot.data.trades)
   );
   check("settings exposed", Boolean(boot.data.settings?.siteName));
+
+  const savedPassword = process.env.ADMIN_PASSWORD;
+  const savedBoundPassword = apiEnv?.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  if (apiEnv) apiEnv.ADMIN_PASSWORD = "";
+  const fallbackLogin = await call("admin_login", { password: "admin12345" }, "", "10.0.0.2");
+  process.env.ADMIN_PASSWORD = savedPassword;
+  if (apiEnv) apiEnv.ADMIN_PASSWORD = savedBoundPassword;
+  check("admin login requires configured password", fallbackLogin.status === 500);
+
+  const savedSecret = process.env.ADMIN_SECRET;
+  const savedBoundSecret = apiEnv?.ADMIN_SECRET;
+  delete process.env.ADMIN_SECRET;
+  if (apiEnv) apiEnv.ADMIN_SECRET = "";
+  const missingSecretLogin = await call(
+    "admin_login",
+    { password: "test-admin-pass" },
+    "",
+    "10.0.0.3"
+  );
+  process.env.ADMIN_SECRET = savedSecret;
+  if (apiEnv) apiEnv.ADMIN_SECRET = savedBoundSecret;
+  check("token signing requires configured ADMIN_SECRET", missingSecretLogin.status === 500);
+
+  process.env.ADMIN_SECRET = "too-short";
+  if (apiEnv) apiEnv.ADMIN_SECRET = "";
+  const shortSecretLogin = await call(
+    "admin_login",
+    { password: "test-admin-pass" },
+    "",
+    "10.0.0.4"
+  );
+  process.env.ADMIN_SECRET = savedSecret;
+  if (apiEnv) apiEnv.ADMIN_SECRET = savedBoundSecret;
+  check("token signing rejects short ADMIN_SECRET values", shortSecretLogin.status === 500);
 
   const bad = await call("admin_login", { password: "wrong" });
   check("wrong admin password rejected", bad.status === 401, bad.status);
@@ -282,6 +339,42 @@ console.log("\n3. Student registration, login, exam attempt");
 let studentToken;
 let resultId;
 {
+  const concurrentRegistrations = await Promise.all(
+    Array.from({ length: 8 }, (_, index) =>
+      call(
+        "register",
+        {
+          name: `Concurrent Student ${index}`,
+          fatherName: "Test Father",
+          mobile: "9876500099",
+          consent: true,
+        },
+        "",
+        `10.0.1.${index + 1}`
+      )
+    )
+  );
+  const successfulRegistrations = concurrentRegistrations.filter(
+    (registration) => registration.status === 200
+  );
+  const conflictingRegistrations = concurrentRegistrations.filter(
+    (registration) => registration.status === 409
+  );
+  check("concurrent duplicate mobile registrations allow exactly one", successfulRegistrations.length === 1);
+  check("concurrent duplicate mobile registrations return 409", conflictingRegistrations.length === 7);
+  const alreadyRegistered = await call(
+    "register",
+    {
+      name: "Duplicate Student",
+      fatherName: "Test Father",
+      mobile: "9876500099",
+      consent: true,
+    },
+    "",
+    "10.0.2.1"
+  );
+  check("existing mobile index still returns 409", alreadyRegistered.status === 409);
+
   const registration = await call("register", {
     name: "Test Student",
     fatherName: "Test Father",

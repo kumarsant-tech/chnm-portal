@@ -1,5 +1,5 @@
-// Data access layer. Uses Netlify Blobs or Cloudflare D1 in production and an
-// in-memory store for local development/tests (USE_MEMORY_STORE=1).
+// Data access layer. Uses Cloudflare D1 in production and an in-memory store
+// for local development/tests (USE_MEMORY_STORE=1).
 
 const MEMORY = new Map();
 
@@ -20,6 +20,19 @@ function memoryStore() {
     },
     async setJSON(key, value) {
       MEMORY.set(key, clone(value));
+    },
+    async setIfAbsent(key, value) {
+      if (MEMORY.has(key)) return false;
+      MEMORY.set(key, clone(value));
+      return true;
+    },
+    async consumeRateLimit(key, now, max, windowMs) {
+      const current = MEMORY.get(key) || { n: 0, reset: 0 };
+      const record = current.reset <= now
+        ? { n: 1, reset: now + windowMs }
+        : { n: current.n >= max + 1 ? current.n : current.n + 1, reset: current.reset };
+      MEMORY.set(key, record);
+      return record;
     },
     async nextSequence(key) {
       const current = MEMORY.get(key);
@@ -43,15 +56,6 @@ function memoryStore() {
   };
 }
 
-async function blobsStore(name) {
-  // The Blobs token in the function environment changes per invocation and
-  // expires. A store instance cached across warm invocations would keep using
-  // the old token and fail with "Failed to decode token: Token expired", so a
-  // fresh store must be created for every request.
-  const { getStore } = await import("@netlify/blobs");
-  return getStore({ name, consistency: "strong" });
-}
-
 function d1Store(database) {
   const upperBound = (prefix) => `${prefix}\uffff`;
   return {
@@ -73,6 +77,33 @@ function d1Store(database) {
     },
     async setJSON(key, value) {
       return this.set(key, JSON.stringify(value));
+    },
+    async setIfAbsent(key, value) {
+      const result = await database
+        .prepare("INSERT OR IGNORE INTO app_kv (key, value) VALUES (?, ?)")
+        .bind(String(key), JSON.stringify(value))
+        .run();
+      return Number(result.meta?.changes ?? result.changes ?? 0) > 0;
+    },
+    async consumeRateLimit(key, now, max, windowMs) {
+      const row = await database
+        .prepare(
+          "INSERT INTO app_kv (key, value) VALUES (?, json_object('n', 1, 'reset', ?)) " +
+            "ON CONFLICT(key) DO UPDATE SET value = json_object(" +
+            "'n', CASE WHEN CAST(json_extract(app_kv.value, '$.reset') AS INTEGER) <= ? THEN 1 " +
+            "WHEN CAST(json_extract(app_kv.value, '$.n') AS INTEGER) <= ? " +
+            "THEN CAST(json_extract(app_kv.value, '$.n') AS INTEGER) + 1 " +
+            "ELSE CAST(json_extract(app_kv.value, '$.n') AS INTEGER) END, " +
+            "'reset', CASE WHEN CAST(json_extract(app_kv.value, '$.reset') AS INTEGER) <= ? " +
+            "THEN ? ELSE CAST(json_extract(app_kv.value, '$.reset') AS INTEGER) END), " +
+            "updated_at = CURRENT_TIMESTAMP " +
+            "RETURNING CAST(json_extract(value, '$.n') AS INTEGER) AS n, " +
+            "CAST(json_extract(value, '$.reset') AS INTEGER) AS reset"
+        )
+        .bind(String(key), now + windowMs, now, max, now, now + windowMs)
+        .first();
+      if (!row) throw new Error("D1 rate limit could not be updated");
+      return { n: Number(row.n), reset: Number(row.reset) };
     },
     async nextSequence(key) {
       const row = await database
@@ -99,30 +130,18 @@ function d1Store(database) {
   };
 }
 
-function storeName() {
-  const name = String(process.env.BLOBS_STORE || "").trim();
-  // An invalid value (spaces, slashes, empty) makes every getStore call throw.
-  return /^[A-Za-z0-9_-]{1,64}$/.test(name) ? name : "chnm-exam-v2";
-}
-
-async function netlifyStore() {
-  return blobsStore(storeName());
-}
-
 export async function getLegacyDb(env = {}) {
   if (usingMemoryStore()) return memoryStore();
   if (env.LEGACY_DB) return d1Store(env.LEGACY_DB);
-  if (env.DB) {
-    throw new Error("पुराना Netlify data store Cloudflare पर उपलब्ध नहीं है");
-  }
-  return blobsStore("exam");
+  throw new Error("Legacy D1 database binding उपलब्ध नहीं है");
 }
 
 export const usingMemoryStore = () => process.env.USE_MEMORY_STORE === "1";
 
 export async function getDb(env = {}) {
   if (env.DB) return d1Store(env.DB);
-  return usingMemoryStore() ? memoryStore() : netlifyStore();
+  if (usingMemoryStore()) return memoryStore();
+  throw new Error("Cloudflare D1 database binding उपलब्ध नहीं है");
 }
 
 export function __resetMemoryStore() {

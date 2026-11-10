@@ -4,9 +4,6 @@
   "main": "cloudflare/worker.mjs",
   "compatibility_date": "2026-11-10",
   "compatibility_flags": ["nodejs_compat"],
-  "alias": {
-    "@netlify/blobs": "./cloudflare/netlify-blobs-unavailable.mjs"
-  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
