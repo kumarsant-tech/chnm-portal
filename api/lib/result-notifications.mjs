@@ -1,7 +1,7 @@
 import { K, getJson, putJson, mapLimit } from "./db.mjs";
 import { email } from "./validate.mjs";
 import { examResults } from "./domain.mjs";
-import { sendEmail, escapeEmailHtml } from "./email.mjs";
+import { emailConfigured, sendEmail, escapeEmailHtml } from "./email.mjs";
 
 const MAX_EMAILS_PER_RUN = 25;
 const MAX_CONCURRENT_EMAILS = 5;
@@ -55,7 +55,7 @@ export async function processResultReleaseEmails(store, env, exam) {
     return !["sent", "failed", "expired"].includes(entry.state?.status);
   });
   const batch = eligible.slice(0, MAX_EMAILS_PER_RUN);
-  const hasEmailConfig = Boolean(env?.RESEND_API_KEY && env?.EMAIL_FROM);
+  const hasEmailConfig = emailConfigured(env);
   const portalUrl = resultPortalUrl(env);
 
   const outcomes = await mapLimit(

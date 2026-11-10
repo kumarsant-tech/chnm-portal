@@ -11,6 +11,7 @@ const { default: api } = await import("../api/handler.mjs");
 const { handleRegister } = await import("../api/lib/api-public.mjs");
 const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
 const { rateLimit, hashPassword, checkPassword, hashPin, checkPin } = await import("../api/lib/auth.mjs");
+const { emailConfigured, sendEmail } = await import("../api/lib/email.mjs");
 const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
 let apiEnv;
 let sqlite;
@@ -1259,6 +1260,69 @@ console.log("\n11. Registration email and admin password recovery");
     return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
   };
   try {
+    const gmailEnv = {
+      GMAIL_CLIENT_ID: "test-client-id",
+      GMAIL_CLIENT_SECRET: "test-client-secret",
+      GMAIL_REFRESH_TOKEN: "test-refresh-token",
+    };
+    const gmailRequests = [];
+    globalThis.fetch = async (url, options) => {
+      gmailRequests.push({ url, options });
+      if (url === "https://oauth2.googleapis.com/token") {
+        return new Response(JSON.stringify({ access_token: "test-access-token" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "gmail-message-id" }), { status: 200 });
+    };
+    const gmailDelivery = await sendEmail(gmailEnv, {
+      to: "student@gmail.com",
+      subject: "पंजीकरण सफल",
+      text: "Gmail API test body",
+      html: "<p>Gmail API test body</p>",
+    });
+    const gmailTokenForm = new URLSearchParams(gmailRequests[0]?.options.body || "");
+    const gmailRaw = Buffer.from(
+      String(JSON.parse(gmailRequests[1]?.options.body || "{}").raw || "")
+        .replace(/-/g, "+")
+        .replace(/_/g, "/"),
+      "base64"
+    ).toString("utf8");
+    check(
+      "Gmail OAuth refresh-token exchange uses the configured client",
+      gmailRequests[0]?.url === "https://oauth2.googleapis.com/token" &&
+        gmailTokenForm.get("client_id") === gmailEnv.GMAIL_CLIENT_ID &&
+        gmailTokenForm.get("client_secret") === gmailEnv.GMAIL_CLIENT_SECRET &&
+        gmailTokenForm.get("refresh_token") === gmailEnv.GMAIL_REFRESH_TOKEN &&
+        gmailTokenForm.get("grant_type") === "refresh_token"
+    );
+    check(
+      "Gmail API sends UTF-8 multipart message through authenticated account",
+      gmailDelivery.sent &&
+        gmailRequests[1]?.url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send" &&
+      gmailRequests[1]?.options.headers.authorization?.startsWith("Bearer ") &&
+        gmailRaw.includes("To: student@gmail.com") &&
+        gmailRaw.includes("multipart/alternative") &&
+      gmailRaw.includes(Buffer.from("Gmail API test body").toString("base64"))
+    );
+    const gmailRequestCount = gmailRequests.length;
+    const incompleteGmail = await sendEmail(
+      { ...gmailEnv, GMAIL_CLIENT_ID: "" },
+      { to: "student@gmail.com", subject: "test", text: "test" }
+    );
+    check(
+      "incomplete Gmail credentials fail closed without provider requests",
+      !emailConfigured({ ...gmailEnv, GMAIL_CLIENT_ID: "" }) &&
+        incompleteGmail.reason === "not_configured" &&
+        gmailRequests.length === gmailRequestCount
+    );
+
+    globalThis.fetch = async (url, options) => {
+      sentEmails.push({
+        url,
+        body: JSON.parse(options.body),
+        idempotencyKey: options.headers["Idempotency-Key"],
+      });
+      return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
+    };
     const registration = await call(
       "register",
       {
