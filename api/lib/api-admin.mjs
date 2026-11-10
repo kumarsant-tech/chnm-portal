@@ -290,7 +290,7 @@ export async function handleAdminPasswordChange({ req, ctx, store, env }) {
   if (newPassword === currentPassword) {
     throw new HttpError("नया पासवर्ड वर्तमान पासवर्ड से अलग होना चाहिए", 400);
   }
-  await putJson(store, K.adminPasswordOverride(), hashPassword(newPassword));
+  await putJson(store, K.adminPasswordOverride(), await hashPassword(newPassword));
   const authVersion = await bumpAdminAuthVersion(store);
   await audit(store, "admin.password.change", "admin", { ip });
   return json({
@@ -368,7 +368,7 @@ export async function handleAdminResetPassword({ req, ctx, store, env }) {
   const tokenHash = hashResetToken(token);
   const reset = await store.consumeResetToken(K.adminPasswordReset(tokenHash), Date.now());
   if (!reset) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
-  await putJson(store, K.adminPasswordOverride(), hashPassword(newPassword));
+  await putJson(store, K.adminPasswordOverride(), await hashPassword(newPassword));
   await bumpAdminAuthVersion(store);
   await audit(store, "admin.password.reset", "admin", { ip });
   return json({ ok: true, message: "एडमिन पासवर्ड रीसेट हो गया है।" });
@@ -1373,7 +1373,7 @@ export async function handleAdminStudentSave({ store, req }) {
   } else if (String(input.pin || "").trim()) {
     const pin = String(input.pin).trim();
     if (!/^\d{4,8}$/.test(pin)) throw new HttpError("PIN 4 से 8 अंकों का होना चाहिए", 400);
-    student.pinHash = hashPin(pin);
+    student.pinHash = await hashPin(pin);
   }
   const ownsMobile = Boolean(existing && holder?.studentId === existing.id);
   const mobileReserved =

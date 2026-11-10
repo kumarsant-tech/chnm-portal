@@ -10,7 +10,7 @@ process.env.ADMIN_SECRET = "test-admin-secret-with-at-least-32-bytes";
 const { default: api } = await import("../api/handler.mjs");
 const { handleRegister } = await import("../api/lib/api-public.mjs");
 const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
-const { rateLimit } = await import("../api/lib/auth.mjs");
+const { rateLimit, hashPassword, checkPassword, hashPin, checkPin } = await import("../api/lib/auth.mjs");
 const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
 let apiEnv;
 let sqlite;
@@ -64,6 +64,30 @@ function check(name, condition, extra = "") {
     failures.push(name);
     console.log(`  FAIL ${name}${extra ? ` — ${extra}` : ""}`);
   }
+}
+
+console.log("\n0b. Web Crypto password hashing compatibility");
+{
+  const passwordHash = await hashPassword("test-password-for-web-crypto");
+  check(
+    "password hash uses the existing versioned PBKDF2 format",
+    passwordHash.startsWith("pbkdf2v2$")
+  );
+  check(
+    "Web Crypto verifies a newly hashed password",
+    await checkPassword("test-password-for-web-crypto", passwordHash)
+  );
+  const legacySalt = crypto.randomBytes(16);
+  const legacyHash = crypto.pbkdf2Sync("legacy-password", legacySalt, 60000, 32, "sha256");
+  check(
+    "Web Crypto still verifies legacy PBKDF2 password hashes",
+    await checkPassword(
+      "legacy-password",
+      `pbkdf2$${legacySalt.toString("base64url")}$${legacyHash.toString("base64url")}`
+    )
+  );
+  const pinHash = await hashPin("4826");
+  check("Web Crypto PIN hashing remains compatible", await checkPin("4826", pinHash));
 }
 
 async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
