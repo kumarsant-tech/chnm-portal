@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>परीक्षा कंट्रोलर · Future Instructor CHNM</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
+  <link rel="stylesheet" href="./../assets/exam-ui.css?v=2">
+</head>
+<body>
+  <header class="fi-header">
+    <a class="brand" href="../index.html" aria-label="Future Instructor पोर्टल होम">
+      <span class="brand-mark">FI</span>
+      <span class="brand-text"><strong>Future Instructor</strong><small>परीक्षा संचालन</small></span>
+    </a>
+    <div class="header-spacer"></div>
+    <nav class="header-links" aria-label="मुख्य मेन्यू">
+      <a class="header-link" href="index.html">छात्र पोर्टल</a>
+      <a class="header-link" href="admin.html">एडमिन लॉगिन</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="panel" id="controllerLogin">
+      <span class="pill dark">EXAM CONTROLLER</span>
+      <h1 style="margin-top:12px">परीक्षा कंट्रोलर लॉगिन</h1>
+      <p class="muted">यह खाता केवल परीक्षा संचालन के लिए है। प्रश्न, विद्यार्थी और सभी सेटिंग्स admin के नियंत्रण में रहेंगे।</p>
+      <form id="controllerLoginForm" class="stack" style="max-width:480px;margin-top:22px">
+        <label class="field"><span>यूज़रनेम</span><input class="input" id="controllerLoginUsername" autocomplete="username" maxlength="32" required></label>
+        <label class="field"><span>पासवर्ड</span><input class="input" id="controllerLoginPassword" type="password" autocomplete="current-password" maxlength="128" required></label>
+        <p class="notice bad" id="controllerLoginError" hidden></p>
+        <button class="btn btn-lg btn-block" id="controllerLoginButton" type="submit">लॉगिन करें</button>
+      </form>
+    </section>
+
+    <section id="controllerDashboard" hidden>
+      <div class="hero-student">
+        <div class="profile-row">
+          <div class="grow">
+            <p class="hero-eyebrow">EXAM CONTROLLER</p>
+            <h1 id="controllerWelcome">परीक्षा संचालन</h1>
+            <p class="muted">पेपर लॉक करें, परीक्षा प्रकाशित/रोकें और live attempts देखें।</p>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" type="button" id="controllerRefresh">रीफ़्रेश</button>
+            <button class="btn btn-outline btn-sm" type="button" id="controllerLogout">लॉगआउट</button>
+          </div>
+        </div>
+      </div>
+      <section class="panel" style="margin-top:20px">
+        <div class="row-between">
+          <div><h2>परीक्षाएँ</h2><p class="muted small">कंट्रोलर यहाँ प्रश्न या छात्र प्रोफ़ाइल नहीं देख सकता।</p></div>
+          <span class="pill info" id="controllerUpdated">लोड हो रहा है…</span>
+        </div>
+        <div id="controllerExamList" class="stack" style="margin-top:16px"></div>
+      </section>
+      <section class="panel" style="margin-top:20px">
+        <div class="row-between">
+          <div><h2>लाइव परीक्षा</h2><p class="muted small">सक्रिय प्रयास हर 15 सेकंड में ताज़ा होते हैं।</p></div>
+          <span class="pill" id="controllerLiveCount">0</span>
+        </div>
+        <div id="controllerLiveList" class="stack" style="margin-top:16px"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-foot"><span>Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span></footer>
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+  <script src="assets/ui.js"></script>
+  <script src="assets/controller.js"></script>
+</body>
+</html>

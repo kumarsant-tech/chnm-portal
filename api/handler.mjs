@@ -1,11 +1,13 @@
 import { getDb } from "./lib/db.mjs";
 import { HttpError, fail, json, readJson } from "./lib/http.mjs";
 import { ensureSeed } from "./lib/seed.mjs";
-import { requireAdmin, requireStudent } from "./lib/auth.mjs";
+import { requireAdmin, requireExamController, requireStudent } from "./lib/auth.mjs";
 import {
   handleBootstrap,
   handleRegister,
   handleStudentLogin,
+  handleStudentForgotPassword,
+  handleStudentResetPassword,
   handleStudentPasswordChange,
 } from "./lib/api-public.mjs";
 import {
@@ -32,6 +34,15 @@ import {
   handleAdminExamUnpublish,
   handleAdminExams,
   handleAdminExport,
+  handleAdminExamControllerGet,
+  handleAdminExamControllerSave,
+  handleExamControllerLogin,
+  handleExamControllerExams,
+  handleExamControllerLock,
+  handleExamControllerPublish,
+  handleExamControllerUnpublish,
+  handleExamControllerLive,
+  handleExamControllerAttemptFinalize,
   handleAdminLegacyImport,
   handleAdminLegacyPreview,
   handleAdminLive,
@@ -82,9 +93,12 @@ const PUBLIC_ACTIONS = {
   bootstrap: handleBootstrap,
   register: handleRegister,
   student_login: handleStudentLogin,
+  student_forgot_password: handleStudentForgotPassword,
+  student_reset_password: handleStudentResetPassword,
   admin_login: handleAdminLogin,
   admin_forgot_password: handleAdminForgotPassword,
   admin_reset_password: handleAdminResetPassword,
+  exam_controller_login: handleExamControllerLogin,
   site_notices: handleSiteNotices,
 };
 
@@ -138,6 +152,8 @@ const ADMIN_ACTIONS = {
   admin_results_csv: handleAdminResultsCsv,
   admin_stats: handleAdminStats,
   admin_settings_save: handleAdminSettingsSave,
+  admin_exam_controller_get: handleAdminExamControllerGet,
+  admin_exam_controller_save: handleAdminExamControllerSave,
   admin_password_change: handleAdminPasswordChange,
   admin_audit: handleAdminAudit,
   admin_legacy_preview: handleAdminLegacyPreview,
@@ -152,6 +168,15 @@ const ADMIN_ACTIONS = {
   admin_chat_delete: handleAdminChatDelete,
   admin_topics: handleAdminTopics,
   admin_paper_build: handleAdminPaperBuild,
+};
+
+const EXAM_CONTROLLER_ACTIONS = {
+  controller_exams: handleExamControllerExams,
+  controller_exam_lock: handleExamControllerLock,
+  controller_exam_publish: handleExamControllerPublish,
+  controller_exam_unpublish: handleExamControllerUnpublish,
+  controller_live: handleExamControllerLive,
+  controller_attempt_finalize: handleExamControllerAttemptFinalize,
 };
 
 export default async (req, ctx) => {
@@ -193,6 +218,19 @@ export default async (req, ctx) => {
     if (STUDENT_ACTIONS[action]) {
       const student = await requireStudent(req, store, env, action === "student_password_change");
       return await STUDENT_ACTIONS[action]({ req, ctx, env, store, body, student });
+    }
+
+    const controllerHandler = EXAM_CONTROLLER_ACTIONS[action];
+    if (controllerHandler) {
+      const controller = await requireExamController(req, store, env);
+      return await controllerHandler({
+        req,
+        ctx,
+        env,
+        store,
+        controller,
+        actor: `exam_controller:${controller.username}`,
+      });
     }
 
     const handler = ADMIN_ACTIONS[action];

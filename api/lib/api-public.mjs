@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { K, getJson, putJson, listJson } from "./db.mjs";
 import { HttpError, json, readJson, getIp } from "./http.mjs";
 import { clean, validateStudent, phone, temporaryPasswordFromDob } from "./validate.mjs";
@@ -13,7 +14,7 @@ import {
 import { publicSettings, studentSelf } from "./serializers.mjs";
 import { loadCatalog, nextRegistrationId, publicSubject, publicTrade } from "./domain.mjs";
 import { DEFAULT_SETTINGS } from "./seed.mjs";
-import { sendEmail, escapeEmailHtml } from "./email.mjs";
+import { emailConfigured, sendEmail, escapeEmailHtml } from "./email.mjs";
 
 function registrationLoginUrl(env) {
   const fallback = "https://futureinstructor.in/exam/index.html";
@@ -24,6 +25,22 @@ function registrationLoginUrl(env) {
   } catch {
     return fallback;
   }
+}
+
+function studentResetBaseUrl(env) {
+  try {
+    const url = new URL(String(env?.PUBLIC_BASE_URL || ""));
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+      return "";
+    }
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
 
 function registrationEmailHtml({ name, loginId, group, loginUrl }) {
@@ -254,10 +271,115 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
   await audit(store, "student.login", student.id, { ip });
   return json({
     ok: true,
-    token: issueStudentToken(student.id, env),
+    token: issueStudentToken(student.id, env, student.authVersion),
     student: studentSelf(student),
     requiresPasswordChange: Boolean(student.mustChangePassword || !student.passwordHash),
   });
+}
+
+export async function handleStudentForgotPassword({ req, ctx, store, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "student-forgot-password-ip", ip, 10, 60 * 60 * 1000);
+  const body = await readJson(req);
+  const identifier = clean(body.identifier ?? body.id, 40).toUpperCase();
+  const message =
+    "यदि इस लॉगिन ID से जुड़ा खाता और ईमेल उपलब्ध है, तो रीसेट लिंक भेज दिया जाएगा। अपना इनबॉक्स और स्पैम फ़ोल्डर देखें।";
+
+  if (!/^[A-Z0-9][A-Z0-9_/-]{1,39}$/.test(identifier)) {
+    return json({ ok: true, message });
+  }
+  await rateLimit(store, "student-forgot-password-id", identifier, 3, 60 * 60 * 1000);
+
+  const baseUrl = studentResetBaseUrl(env);
+  if (!baseUrl || !emailConfigured(env)) {
+    throw new HttpError(
+      "छात्र पासवर्ड रिकवरी उपलब्ध नहीं है। PUBLIC_BASE_URL और Gmail API या Resend ईमेल सेटिंग configure करें।",
+      503
+    );
+  }
+
+  const student = await findStudentByIdentifier(store, identifier);
+  const recipient = String(student?.email || "").trim().toLowerCase();
+  if (
+    !student ||
+    student.active === false ||
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)
+  ) {
+    return json({ ok: true, message });
+  }
+
+  const secret = crypto.randomBytes(32).toString("base64url");
+  const studentId = Buffer.from(String(student.id), "utf8").toString("base64url");
+  const token = `${studentId}.${secret}`;
+  const tokenHash = hashResetToken(token);
+  const expiresAt = Date.now() + 30 * 60 * 1000;
+  await putJson(store, K.studentPasswordReset(student.id), { tokenHash, expiresAt });
+  const resetUrl = `${baseUrl}/exam/index.html?reset=${encodeURIComponent(token)}`;
+  const delivery = await sendEmail(env, {
+    to: recipient,
+    subject: "छात्र पोर्टल पासवर्ड रीसेट",
+    text: [
+      `नमस्ते ${student.name || "छात्र"},`,
+      `पासवर्ड बदलने के लिए इस लिंक को 30 मिनट के भीतर खोलें: ${resetUrl}`,
+      "यदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।",
+    ].join("\n\n"),
+    html: [
+      `<p>नमस्ते ${escapeEmailHtml(student.name || "छात्र")},</p>`,
+      `<p>पासवर्ड बदलने के लिए <a href="${escapeEmailHtml(resetUrl)}">इस सुरक्षित लिंक</a> को 30 मिनट के भीतर खोलें।</p>`,
+      "<p>यदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।</p>",
+    ].join(""),
+    idempotencyKey: `student-password-reset/${tokenHash}`,
+  });
+  if (!delivery.sent) {
+    const currentReset = await getJson(store, K.studentPasswordReset(student.id));
+    if (currentReset?.tokenHash === tokenHash) {
+      await store.delete(K.studentPasswordReset(student.id));
+    }
+    console.error("student password reset email could not be sent", {
+      reason: delivery.reason || "unknown",
+    });
+  }
+  return json({ ok: true, message });
+}
+
+export async function handleStudentResetPassword({ req, ctx, store }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "student-reset-password", ip, 8, 15 * 60 * 1000);
+  const body = await readJson(req);
+  const token = String(body.token || "");
+  const newPassword = String(body.newPassword || "");
+  const invalidMessage = "रीसेट लिंक अमान्य या समाप्त हो गया है। नया लिंक माँगें।";
+  const match = token.match(/^([A-Za-z0-9_-]{1,200})\.([A-Za-z0-9_-]{43})$/);
+  if (!match) throw new HttpError(invalidMessage, 400);
+  if (newPassword.length < 10 || newPassword.length > 128) {
+    throw new HttpError("नया पासवर्ड 10 से 128 अक्षरों का होना चाहिए", 400);
+  }
+
+  const encodedStudentId = match[1];
+  const studentId = Buffer.from(encodedStudentId, "base64url").toString("utf8");
+  if (
+    !studentId ||
+    Buffer.from(studentId, "utf8").toString("base64url") !== encodedStudentId
+  ) {
+    throw new HttpError(invalidMessage, 400);
+  }
+  const reset = await store.consumeResetToken(
+    K.studentPasswordReset(studentId),
+    Date.now(),
+    hashResetToken(token)
+  );
+  if (!reset) throw new HttpError(invalidMessage, 400);
+  const student = await getJson(store, K.students(studentId));
+  if (!student || student.active === false) throw new HttpError(invalidMessage, 400);
+
+  student.passwordHash = await hashPassword(newPassword);
+  student.mustChangePassword = false;
+  student.authVersion = (Number(student.authVersion) || 0) + 1;
+  delete student.pinHash;
+  student.updatedAt = new Date().toISOString();
+  await putJson(store, K.students(student.id), student);
+  await audit(store, "student.password.reset", student.id, { ip });
+  return json({ ok: true, message: "पासवर्ड रीसेट हो गया है। अब नए पासवर्ड से लॉगिन करें।" });
 }
 
 async function findStudentByIdentifier(store, identifier) {

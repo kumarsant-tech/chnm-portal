@@ -26,8 +26,10 @@ import {
 } from "./validate.mjs";
 import {
   issueAdminToken,
+  issueExamControllerToken,
   hasAdminCredential,
   checkAdminPassword,
+  checkPassword,
   hashPassword,
   adminAuthVersion,
   bumpAdminAuthVersion,
@@ -271,6 +273,88 @@ export async function handleAdminLogin({ req, ctx, store, env }) {
   });
 }
 
+export async function handleExamControllerLogin({ req, ctx, store, env }) {
+  const ip = getIp(req, ctx);
+  const body = await readJson(req);
+  const username = String(body.username || "").trim().toLowerCase();
+  await rateLimit(store, "exam-controller-login-ip", ip, 8, ADMIN_LOGIN_WINDOW);
+  await rateLimit(store, "exam-controller-login-user", username || "invalid", 8, ADMIN_LOGIN_WINDOW);
+  const controller = await getJson(store, K.examController());
+  if (
+    !controller ||
+    controller.active === false ||
+    controller.username !== username ||
+    !(await checkPassword(String(body.password || ""), controller.passwordHash))
+  ) {
+    throw new HttpError("यूज़रनेम या पासवर्ड सही नहीं है", 401);
+  }
+  await clearRateLimit(store, "exam-controller-login-ip", ip);
+  await clearRateLimit(store, "exam-controller-login-user", username);
+  await audit(store, "exam_controller.login", username, { ip });
+  return json({
+    ok: true,
+    token: issueExamControllerToken(env, username, controller.authVersion),
+    controller: {
+      username: controller.username,
+      displayName: controller.displayName,
+    },
+    expiresIn: 12 * 3600,
+  });
+}
+
+export async function handleAdminExamControllerGet({ store }) {
+  const controller = await getJson(store, K.examController());
+  return json({
+    ok: true,
+    controller: controller
+      ? {
+          username: controller.username,
+          displayName: controller.displayName,
+          active: controller.active !== false,
+        }
+      : null,
+  });
+}
+
+export async function handleAdminExamControllerSave({ req, store, ctx }) {
+  const ip = getIp(req, ctx);
+  const body = await readJson(req);
+  const input = body.controller || {};
+  const username = String(input.username || "").trim().toLowerCase();
+  const displayName = clean(input.displayName ?? input.name, 60);
+  const password = String(input.password || "");
+  const current = await getJson(store, K.examController());
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
+    throw new HttpError("यूज़रनेम 3-32 अक्षर, अंक, dot, _ या - का होना चाहिए", 400);
+  }
+  if (displayName.length < 2) throw new HttpError("कंट्रोलर का नाम दर्ज करें", 400);
+  if (!current && !password) throw new HttpError("पहले कंट्रोलर पासवर्ड सेट करें", 400);
+  if (password && !validNewAdminPassword(password)) {
+    throw new HttpError("कंट्रोलर पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  const active = bool(input.active, current?.active !== false);
+  const changed =
+    !current ||
+    current.username !== username ||
+    current.displayName !== displayName ||
+    (current.active !== false) !== active ||
+    Boolean(password);
+  const controller = {
+    username,
+    displayName,
+    passwordHash: password ? await hashPassword(password) : current.passwordHash,
+    active,
+    authVersion: (Number(current?.authVersion) || 0) + (changed ? 1 : 0),
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.examController(), controller);
+  await audit(store, "exam_controller.save", "admin", { username, active, passwordChanged: Boolean(password) });
+  return json({
+    ok: true,
+    controller: { username, displayName, active },
+  });
+}
+
 function validNewAdminPassword(password) {
   return typeof password === "string" && password.length >= 12 && password.length <= 128;
 }
@@ -439,6 +523,77 @@ export async function handleAdminExams({ store }) {
   const items = [];
   for (const exam of exams) items.push(await examAdminSummary(store, exam, catalog));
   return json({ ok: true, exams: items, serverNow: Date.now() });
+}
+
+function controllerExamSummary(exam) {
+  return {
+    id: exam.id,
+    title: exam.title,
+    code: exam.code,
+    status: exam.status,
+    type: exam.type,
+    startAt: exam.startAt || null,
+    endAt: exam.endAt || null,
+    questionCount: Number(exam.questionCount ?? exam.totalQuestions) || 0,
+    totalQuestions: Number(exam.totalQuestions) || 0,
+    activeAttempts: Number(exam.activeAttempts) || 0,
+  };
+}
+
+export async function handleExamControllerExams(args) {
+  const response = await handleAdminExams(args);
+  const data = await response.json();
+  return json({
+    ok: true,
+    exams: (data.exams || []).map(controllerExamSummary),
+    serverNow: data.serverNow,
+  });
+}
+
+export async function handleExamControllerLock(args) {
+  const response = await handleAdminExamLock(args);
+  const data = await response.json();
+  return json({ ok: true, exam: controllerExamSummary(data.exam) });
+}
+
+export async function handleExamControllerPublish(args) {
+  const response = await handleAdminExamPublish(args);
+  const data = await response.json();
+  return json({ ok: true, exam: controllerExamSummary(data.exam) });
+}
+
+export async function handleExamControllerUnpublish(args) {
+  const response = await handleAdminExamUnpublish(args);
+  const data = await response.json();
+  return json({ ok: true, exam: controllerExamSummary(data.exam) });
+}
+
+export async function handleExamControllerAttemptFinalize(args) {
+  await handleAdminAttemptFinalize(args);
+  return json({ ok: true, message: "परीक्षा प्रयास जमा कर दिया गया है।" });
+}
+
+export async function handleExamControllerLive(args) {
+  const response = await handleAdminLive(args);
+  const data = await response.json();
+  return json({
+    ok: true,
+    items: (data.items || []).map((item) => ({
+      examId: item.examId,
+      examTitle: item.examTitle,
+      examCode: item.examCode,
+      studentId: item.studentId,
+      studentName: item.studentName,
+      answered: item.answered,
+      totalQuestions: item.totalQuestions,
+      startedAt: item.startedAt,
+      lastSeenAt: item.lastSeenAt,
+      endAt: item.endAt,
+      remainingSec: item.remainingSec,
+      expired: item.expired,
+    })),
+    serverNow: data.serverNow,
+  });
 }
 
 export async function handleAdminExamGet({ store, req }) {
@@ -626,7 +781,7 @@ export async function handleAdminExamPaper({ store, req }) {
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 
-export async function handleAdminExamLock({ store, req }) {
+export async function handleAdminExamLock({ store, req, actor = "admin" }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
   if (exam.status === "published") throw new HttpError("Published परीक्षा पहले Unpublish करें", 409);
@@ -649,11 +804,11 @@ export async function handleAdminExamLock({ store, req }) {
   exam.paperLockedAt = new Date().toISOString();
   exam.updatedAt = exam.paperLockedAt;
   await saveExam(store, exam);
-  await audit(store, "exam.lock", "admin", { examId: exam.id, version });
+  await audit(store, "exam.lock", actor, { examId: exam.id, version });
   return json({ ok: true, exam, paper, serverNow: Date.now() });
 }
 
-export async function handleAdminExamPublish({ store, req }) {
+export async function handleAdminExamPublish({ store, req, actor = "admin" }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
   if (exam.status === "published") return json({ ok: true, exam });
@@ -670,18 +825,18 @@ export async function handleAdminExamPublish({ store, req }) {
   exam.updatedAt = exam.publishedAt;
   exam.active = true;
   await saveExam(store, exam);
-  await audit(store, "exam.publish", "admin", { examId: exam.id, version: exam.paperVersion });
+  await audit(store, "exam.publish", actor, { examId: exam.id, version: exam.paperVersion });
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 
-export async function handleAdminExamUnpublish({ store, req }) {
+export async function handleAdminExamUnpublish({ store, req, actor = "admin" }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
   if (exam.status !== "published") return json({ ok: true, exam });
   exam.status = "locked";
   exam.updatedAt = new Date().toISOString();
   await saveExam(store, exam);
-  await audit(store, "exam.unpublish", "admin", { examId: exam.id });
+  await audit(store, "exam.unpublish", actor, { examId: exam.id });
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 
@@ -1481,7 +1636,7 @@ async function finalizeIfActive(store, examId, student) {
   }
 }
 
-export async function handleAdminAttemptFinalize({ store, req }) {
+export async function handleAdminAttemptFinalize({ store, req, actor = "admin" }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
   const student = await getJson(store, K.students(String(body.studentId || "")));
@@ -1489,7 +1644,7 @@ export async function handleAdminAttemptFinalize({ store, req }) {
   const attempt = await getJson(store, K.attempt(exam.id, student.id));
   if (!attempt) throw new HttpError("सक्रिय प्रयास नहीं मिला", 404);
   const result = await finalizeAttempt({ store, exam, attempt, student, autoSubmitted: true });
-  await audit(store, "attempt.finalize", "admin", {
+  await audit(store, "attempt.finalize", actor, {
     examId: exam.id,
     studentId: student.id,
     resultId: result.resultId,

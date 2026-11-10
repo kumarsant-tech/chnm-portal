@@ -60,6 +60,15 @@ export function issueAdminToken(env, authVersion = 0) {
   return signPayload({ r: "admin", av: authVersion, exp: Date.now() + 12 * HOUR }, env);
 }
 
+export function issueExamControllerToken(env, username, authVersion = 0) {
+  return signPayload({
+    r: "exam_controller",
+    sub: String(username).toLowerCase(),
+    cv: Number(authVersion) || 0,
+    exp: Date.now() + 12 * HOUR,
+  }, env);
+}
+
 export async function adminAuthVersion(store) {
   return Number(await getJson(store, K.adminAuthVersion())) || 0;
 }
@@ -71,10 +80,11 @@ export async function bumpAdminAuthVersion(store) {
   return store.increment(K.adminAuthVersion());
 }
 
-export function issueStudentToken(studentId, env) {
+export function issueStudentToken(studentId, env, authVersion = 0) {
   return signPayload({
     r: "student",
     sid: String(studentId),
+    sv: Number(authVersion) || 0,
     exp: Date.now() + 12 * HOUR,
   }, env);
 }
@@ -182,6 +192,23 @@ export async function requireAdmin(req, store, env) {
   return payload;
 }
 
+export async function requireExamController(req, store, env) {
+  const payload = verifyPayload(bearer(req), env);
+  if (!payload || payload.r !== "exam_controller" || !payload.sub) {
+    throw new HttpError("परीक्षा कंट्रोलर लॉगिन आवश्यक है", 401);
+  }
+  const controller = await getJson(store, K.examController());
+  if (
+    !controller ||
+    controller.active === false ||
+    controller.username !== payload.sub ||
+    Number(payload.cv ?? 0) !== (Number(controller.authVersion) || 0)
+  ) {
+    throw new HttpError("परीक्षा कंट्रोलर सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
+  }
+  return controller;
+}
+
 export async function requireStudent(req, store, env, allowPasswordChange = false) {
   const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "student" || !payload.sid) {
@@ -189,6 +216,9 @@ export async function requireStudent(req, store, env, allowPasswordChange = fals
   }
   const student = await getJson(store, K.students(payload.sid));
   if (!student) throw new HttpError("छात्र रिकॉर्ड नहीं मिला", 401);
+  if (Number(payload.sv ?? 0) !== (Number(student.authVersion) || 0)) {
+    throw new HttpError("पासवर्ड बदल गया है — दोबारा लॉगिन करें", 401);
+  }
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय कर दिया गया है", 403);
   }

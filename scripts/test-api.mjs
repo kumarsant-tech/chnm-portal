@@ -1562,6 +1562,201 @@ console.log("\n11. Registration email and admin password recovery");
     );
     check("changed admin password is active", finalAdminLogin.status === 200);
 
+    const controllerSave = await call(
+      "admin_exam_controller_save",
+      {
+        controller: {
+          username: "test-controller",
+          displayName: "परीक्षा कंट्रोलर",
+          password: "exam-controller-password-2026",
+          active: true,
+        },
+      },
+      finalAdminLogin.data.token
+    );
+    const controllerGet = await call(
+      "admin_exam_controller_get",
+      {},
+      finalAdminLogin.data.token
+    );
+    const controllerLogin = await call(
+      "exam_controller_login",
+      { username: "test-controller", password: "exam-controller-password-2026" }
+    );
+    const controllerToken = controllerLogin.data.token;
+    const controllerExams = await call("controller_exams", {}, controllerToken);
+    const controllerLive = await call("controller_live", {}, controllerToken);
+    const controllerDenied = await call("admin_overview", {}, controllerToken);
+    const controllerStudentRecordsDenied = await call("admin_students", {}, controllerToken);
+    check(
+      "admin can create a separate controller account without returning its hash",
+      controllerSave.status === 200 &&
+        controllerGet.data.controller?.username === "test-controller" &&
+        !JSON.stringify(controllerGet.data).includes("passwordHash")
+    );
+    check("exam controller has a separate successful login", controllerLogin.status === 200 && controllerToken);
+    check(
+      "controller exam list exposes no question content",
+      controllerExams.status === 200 &&
+        Array.isArray(controllerExams.data.exams) &&
+        !JSON.stringify(controllerExams.data).includes("questionIds")
+    );
+    check(
+      "controller live view excludes student network details",
+      controllerLive.status === 200 &&
+        !JSON.stringify(controllerLive.data).includes('"ip"')
+    );
+    check(
+      "controller cannot access admin dashboard or student records",
+      controllerDenied.status === 401 && controllerStudentRecordsDenied.status === 401
+    );
+    const controllerDisabled = await call(
+      "admin_exam_controller_save",
+      {
+        controller: {
+          username: "test-controller",
+          displayName: "परीक्षा कंट्रोलर",
+          active: false,
+        },
+      },
+      finalAdminLogin.data.token
+    );
+    check(
+      "admin can disable controller access and invalidate its session",
+      controllerDisabled.status === 200 &&
+        (await call("controller_exams", {}, controllerToken)).status === 401 &&
+        (await call("admin_overview", {}, finalAdminLogin.data.token)).status === 200
+    );
+
+    const studentLoginBeforeReset = await call(
+      "student_login",
+      { identifier: registration.data.loginId, password: "04051999" },
+      "",
+      "10.0.10.31"
+    );
+    const sentBeforeStudentReset = sentEmails.length;
+    const studentForgot = await call(
+      "student_forgot_password",
+      { identifier: registration.data.loginId, email: "attacker@example.com" },
+      "",
+      "10.0.10.32"
+    );
+    const studentResetEmail = sentEmails[sentEmails.length - 1];
+    const studentResetMatch = studentResetEmail?.body.text.match(/reset=([^&\s]+)/);
+    const studentResetToken = studentResetMatch
+      ? decodeURIComponent(studentResetMatch[1])
+      : "";
+    check(
+      "student forgot-password sends reset link only to saved student email",
+      studentLoginBeforeReset.status === 200 &&
+        studentForgot.status === 200 &&
+        sentEmails.length === sentBeforeStudentReset + 1 &&
+        studentResetEmail?.body.to?.[0] === "student@example.com" &&
+        !studentResetEmail?.body.text.includes("attacker@example.com")
+    );
+    check(
+      "student reset link uses the configured HTTPS portal origin",
+      studentResetEmail?.body.text.includes("https://portal.example/exam/index.html?reset=") &&
+        Boolean(studentResetToken)
+    );
+    const unknownStudentForgot = await call(
+      "student_forgot_password",
+      { identifier: "CITS-UNKNOWN-99" },
+      "",
+      "10.0.10.33"
+    );
+    check(
+      "student password recovery does not reveal whether an account exists",
+      unknownStudentForgot.status === studentForgot.status &&
+        unknownStudentForgot.data.message === studentForgot.data.message &&
+        sentEmails.length === sentBeforeStudentReset + 1
+    );
+    const emailLessForgot = await call(
+      "student_forgot_password",
+      { identifier: "9876500091" },
+      "",
+      "10.0.10.34"
+    );
+    check(
+      "accounts without a saved email receive the same non-enumerating response",
+      emailLessForgot.status === studentForgot.status &&
+        emailLessForgot.data.message === studentForgot.data.message &&
+        sentEmails.length === sentBeforeStudentReset + 1
+    );
+    const studentRecordBeforeReset = await getJson(store, `students/${registration.data.student.id}`);
+    const expiredStudentToken =
+      Buffer.from(studentRecordBeforeReset.id, "utf8").toString("base64url") +
+      "." +
+      crypto.randomBytes(32).toString("base64url");
+    const expiredStudentHash = crypto.createHash("sha256").update(expiredStudentToken).digest("hex");
+    await putJson(store, `auth/student-password-reset/${studentRecordBeforeReset.id}`, {
+      tokenHash: expiredStudentHash,
+      expiresAt: Date.now() - 1,
+    });
+    const expiredStudentReset = await call(
+      "student_reset_password",
+      { token: expiredStudentToken, newPassword: "student-expired-reset-password" },
+      "",
+      "10.0.10.35"
+    );
+    check("expired student reset links are rejected", expiredStudentReset.status === 400);
+    const validStudentForgot = await call(
+      "student_forgot_password",
+      { identifier: registration.data.loginId },
+      "",
+      "10.0.10.36"
+    );
+    const validStudentResetEmail = sentEmails[sentEmails.length - 1];
+    const validStudentResetMatch = validStudentResetEmail?.body.text.match(/reset=([^&\s]+)/);
+    const validStudentResetToken = validStudentResetMatch
+      ? decodeURIComponent(validStudentResetMatch[1])
+      : "";
+    const forgedStudentResetToken =
+      validStudentResetToken.split(".")[0] + "." + crypto.randomBytes(32).toString("base64url");
+    const forgedStudentReset = await call(
+      "student_reset_password",
+      { token: forgedStudentResetToken, newPassword: "student-forged-reset-password" },
+      "",
+      "10.0.10.41"
+    );
+    const studentReset = await call(
+      "student_reset_password",
+      { token: validStudentResetToken, newPassword: "student-reset-password-2026" },
+      "",
+      "10.0.10.37"
+    );
+    const oldStudentSession = await call(
+      "student_dashboard",
+      {},
+      studentLoginBeforeReset.data.token,
+      "10.0.10.38"
+    );
+    const newStudentLogin = await call(
+      "student_login",
+      { identifier: registration.data.loginId, password: "student-reset-password-2026" },
+      "",
+      "10.0.10.39"
+    );
+    const reusedStudentReset = await call(
+      "student_reset_password",
+      { token: validStudentResetToken, newPassword: "another-student-password-2026" },
+      "",
+      "10.0.10.40"
+    );
+    check(
+      "forged student reset token cannot consume the valid recovery link",
+      forgedStudentReset.status === 400 && studentReset.status === 200
+    );
+    check(
+      "student reset changes the password and invalidates prior sessions",
+      validStudentForgot.status === 200 &&
+        studentReset.status === 200 &&
+        oldStudentSession.status === 401 &&
+        newStudentLogin.status === 200 &&
+        !newStudentLogin.data.requiresPasswordChange &&
+        reusedStudentReset.status === 400
+    );
+
     const releaseEmailStart = sentEmails.length;
     await call("admin_exam_release", { examId, releaseResults: false }, finalAdminLogin.data.token);
     const releasedWithEmail = await call(

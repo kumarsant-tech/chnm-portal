@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <title>छात्र पोर्टल · Future Instructor CHNM</title>
   <meta name="description" content="Future Instructor CHNM / CITS ऑनलाइन परीक्षा — छात्र लॉगिन, रजिस्ट्रेशन, अभ्यास परीक्षा, फाइनल परीक्षा और परिणाम।">
   <link rel="stylesheet" href="assets/styles.css">
@@ -78,6 +79,27 @@
             <p class="notice bad" id="loginError" hidden></p>
             <button class="btn btn-lg btn-block" id="loginBtn" type="submit">लॉगिन करें</button>
             <p class="tiny muted" style="margin:0">पहली बार पासवर्ड आपकी जन्मतिथि DDMMYYYY है।</p>
+            <button class="btn-link" id="forgotPasswordBtn" type="button" aria-controls="studentForgotPanel" aria-expanded="false">पासवर्ड भूल गए?</button>
+          </form>
+
+          <form id="studentForgotPanel" class="stack" hidden novalidate>
+            <h3>पासवर्ड रिकवरी</h3>
+            <p class="muted small">अपना CITS नंबर या पंजीकृत मोबाइल दर्ज करें। लिंक खाते में दर्ज ईमेल पर भेजा जाएगा।</p>
+            <label class="field"><span>CITS नंबर या मोबाइल नंबर</span><input class="input" id="studentForgotId" autocomplete="username" autocapitalize="characters" maxlength="40" required></label>
+            <p class="notice bad" id="studentForgotError" hidden></p>
+            <p class="notice info" id="studentForgotMessage" hidden></p>
+            <button class="btn btn-lg btn-block" id="studentForgotSubmit" type="submit">रीसेट लिंक भेजें</button>
+            <button class="btn btn-ghost btn-block" id="forgotBackBtn" type="button">लॉगिन पर वापस जाएँ</button>
+          </form>
+
+          <form id="studentResetPanel" class="stack" hidden novalidate>
+            <h3>नया पासवर्ड सेट करें</h3>
+            <p class="muted small">नया पासवर्ड कम-से-कम 10 अक्षरों का रखें।</p>
+            <label class="field"><span>नया पासवर्ड</span><input class="input" id="resetNewPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="resetConfirmPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <p class="notice bad" id="studentResetError" hidden></p>
+            <button class="btn btn-lg btn-block" id="studentResetSubmit" type="submit">पासवर्ड रीसेट करें</button>
+            <button class="btn btn-ghost btn-block" id="resetBackBtn" type="button">लॉगिन पर वापस जाएँ</button>
           </form>
 
           <form id="passwordChangePanel" class="stack" hidden novalidate>

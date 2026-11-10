@@ -278,6 +278,7 @@
     chatDraft: "",
   };
   let chatTimer = null;
+  let studentResetToken = "";
 
   const page = document.body.dataset.page || "portal";
   const registerOnly = page === "register";
@@ -309,6 +310,24 @@
     setHeaderUser(UI.studentData());
   }
 
+  function showStudentReset(token) {
+    studentResetToken = token;
+    hide($("#loadingView"), true);
+    hide($("#dashboardView"), true);
+    hide($("#authView"), false);
+    hide($(".auth-tabs"), true);
+    hide($("#loginForm"), true);
+    hide($("#studentForgotPanel"), true);
+    hide($("#studentResetPanel"), false);
+    hide($("#registerForm"), true);
+    hide($("#registerSuccess"), true);
+    hide($("#passwordChangePanel"), true);
+    $("#userSlot").hidden = true;
+    $("#authTitle").textContent = "पासवर्ड रीसेट करें";
+    $("#authSub").textContent = "नया पासवर्ड बनाकर अपने छात्र खाते में वापस जाएँ।";
+    $("#resetNewPassword").focus();
+  }
+
   function setNotice(target, message, tone) {
     const node = typeof target === "string" ? $(target) : target;
     if (!node) return;
@@ -322,11 +341,14 @@
   function setAuthTab(tab) {
     if (registerOnly) tab = "register";
     if (!state.registrationOpen && tab === "register" && !registerOnly) tab = "login";
+    $("#forgotPasswordBtn")?.setAttribute("aria-expanded", "false");
     state.tab = tab;
     $$("[data-auth-tab]").forEach((button) => {
       button.setAttribute("aria-selected", button.dataset.authTab === tab ? "true" : "false");
     });
     hide($("#loginForm"), tab !== "login");
+    hide($("#studentForgotPanel"), true);
+    hide($("#studentResetPanel"), true);
     hide($("#registerForm"), tab !== "register");
     hide($("#passwordChangePanel"), true);
     hide($("#registerSuccess"), true);
@@ -334,7 +356,7 @@
     $("#authSub").textContent =
       tab === "register"
         ? "सभी जानकारी ध्यान से भरें। रजिस्ट्रेशन के बाद ID सुरक्षित रखें।"
-        : "रजिस्ट्रेशन ID और मोबाइल नंबर दर्ज करें।";
+        : "CITS नंबर या पंजीकृत मोबाइल नंबर दर्ज करें।";
     if (tab === "register" && !state.registrationOpen) {
       setNotice("#authNotice", "नया रजिस्ट्रेशन अभी बंद है — परीक्षा संयोजक से संपर्क करें।", "warn");
     }
@@ -1194,6 +1216,86 @@
     }
   }
 
+  function wirePasswordRecovery() {
+    const forgotButton = $("#forgotPasswordBtn");
+    const forgotPanel = $("#studentForgotPanel");
+    const forgotForm = $("#studentForgotPanel");
+    const resetForm = $("#studentResetPanel");
+    if (forgotButton && forgotPanel && forgotForm) {
+      forgotButton.addEventListener("click", () => {
+        $("#studentForgotId").value = $("#loginId").value.trim();
+        hide($("#loginForm"), true);
+        hide(forgotPanel, false);
+        forgotButton.setAttribute("aria-expanded", "true");
+        $("#authTitle").textContent = "पासवर्ड रिकवरी";
+        $("#authSub").textContent = "रीसेट लिंक आपके खाते में दर्ज ईमेल पर भेजा जाएगा।";
+        setError("#studentForgotError", "");
+        setError("#studentForgotMessage", "");
+        $("#studentForgotId").focus();
+      });
+      $("#forgotBackBtn").addEventListener("click", () => {
+        forgotButton.setAttribute("aria-expanded", "false");
+        showAuth("login");
+      });
+      forgotForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setError("#studentForgotError", "");
+        setError("#studentForgotMessage", "");
+        const identifier = $("#studentForgotId").value.trim().toUpperCase();
+        if (!/^[A-Za-z0-9][A-Za-z0-9_/-]{1,39}$/.test(identifier)) {
+          setError("#studentForgotError", "सही CITS नंबर या पंजीकृत मोबाइल दर्ज करें।");
+          return;
+        }
+        await UI.withBusy($("#studentForgotSubmit"), async () => {
+          try {
+            const data = await UI.call("student_forgot_password", { identifier });
+            setError("#studentForgotMessage", data.message || "यदि ईमेल खाते में दर्ज है, तो रीसेट लिंक भेज दिया जाएगा।");
+          } catch (error) {
+            setError("#studentForgotError", error.message || "रीसेट लिंक नहीं भेजा जा सका।");
+          }
+        }, "लिंक भेजा जा रहा है…");
+      });
+    }
+
+    if (resetForm) {
+      $("#resetBackBtn").addEventListener("click", () => {
+        studentResetToken = "";
+        history.replaceState(null, "", location.pathname);
+        showAuth("login");
+      });
+      resetForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setError("#studentResetError", "");
+        const newPassword = $("#resetNewPassword").value;
+        if (newPassword.length < 10) {
+          setError("#studentResetError", "नया पासवर्ड कम-से-कम 10 अक्षरों का रखें।");
+          return;
+        }
+        if (newPassword !== $("#resetConfirmPassword").value) {
+          setError("#studentResetError", "दोनों नए पासवर्ड एक जैसे नहीं हैं।");
+          return;
+        }
+        await UI.withBusy($("#studentResetSubmit"), async () => {
+          try {
+            const data = await UI.call("student_reset_password", {
+              token: studentResetToken,
+              newPassword,
+            });
+            $("#resetNewPassword").value = "";
+            $("#resetConfirmPassword").value = "";
+            studentResetToken = "";
+            UI.clearStudentSession();
+            history.replaceState(null, "", location.pathname);
+            showAuth("login");
+            setNotice("#authNotice", data.message || "पासवर्ड रीसेट हो गया है। अब लॉगिन करें।", "good");
+          } catch (error) {
+            setError("#studentResetError", error.message || "पासवर्ड रीसेट नहीं हो सका।");
+          }
+        }, "पासवर्ड रीसेट हो रहा है…");
+      });
+    }
+  }
+
   function wireRegistration() {
     const form = $("#registerForm");
     if (!form) return;
@@ -1348,8 +1450,16 @@
     if (DASH_TABS.includes(hash)) state.tab = hash;
     if (!registerOnly) wireAuthTabs();
     wireLogin();
+    wirePasswordRecovery();
     wireRegistration();
     wireDashboard();
+
+    const resetToken = new URLSearchParams(location.search).get("reset");
+    if (!registerOnly && resetToken !== null) {
+      UI.clearStudentSession();
+      showStudentReset(resetToken);
+      return;
+    }
 
     try {
       state.boot = await UI.bootstrap();

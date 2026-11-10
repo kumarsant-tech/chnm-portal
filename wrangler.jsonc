@@ -3,7 +3,8 @@
   "name": "chnm-portal",
   "main": "cloudflare/worker.mjs",
   "vars": {
-    "EMAIL_FROM": "Future Instructor <notice@futureinstructor.in>"
+    "EMAIL_FROM": "Future Instructor <notice@futureinstructor.in>",
+    "PUBLIC_BASE_URL": "https://futureinstructor.in"
   },
   "workers_dev": true,
   "preview_urls": true,

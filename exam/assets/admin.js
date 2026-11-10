@@ -4267,8 +4267,12 @@
 
   /* ---------- settings ---------- */
   async function renderSettings(content) {
-    const ov = await ensureOverview(true);
+    const [ov, controllerData] = await Promise.all([
+      ensureOverview(true),
+      api("admin_exam_controller_get"),
+    ]);
     const s = ov.settings;
+    const controller = controllerData.controller;
 
     content.innerHTML =
       '<div class="admin-section-head"><div><h1>सेटिंग्स</h1><p>नई परीक्षाओं के डिफ़ॉल्ट, पंजीकरण और परिणाम जारी करने की नीति।</p></div></div>' +
@@ -4306,6 +4310,26 @@
       '<label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="adminConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>' +
       '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="adminPasswordChangeBtn">पासवर्ड बदलें</button></div></form>' +
       '<p class="tiny muted">भूला हुआ पासवर्ड रीसेट लिंक केवल Cloudflare secret ADMIN_EMAIL पर भेजा जाता है।</p></section>' +
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>परीक्षा कंट्रोलर खाता</h3><p class="admin-card-sub">कंट्रोलर केवल पेपर लॉक/प्रकाशित/रोक, लाइव निगरानी और प्रयास जमा कर सकता है। छात्र, प्रश्न, परिणाम और सेटिंग्स का access admin के पास ही रहेगा।</p></div><a class="btn btn-ghost btn-sm" href="controller.html">कंट्रोलर लॉगिन पेज</a></div>' +
+      '<form id="examControllerForm" class="settings-grid">' +
+      '<label class="field"><span>कंट्रोलर नाम</span><input class="input" id="controllerDisplayName" maxlength="60" value="' +
+      attr(controller?.displayName || "") +
+      '" required></label>' +
+      '<label class="field"><span>यूज़रनेम</span><input class="input" id="controllerUsername" minlength="3" maxlength="32" value="' +
+      attr(controller?.username || "") +
+      '" autocomplete="username" required></label>' +
+      '<label class="field"><span>' +
+      (controller ? "नया पासवर्ड (वैकल्पिक)" : "पहला पासवर्ड") +
+      '</span><input class="input" id="controllerPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password"' +
+      (controller ? "" : " required") +
+      '><small>कम-से-कम 12 अक्षर। खाली छोड़ने पर मौजूदा पासवर्ड नहीं बदलेगा।</small></label>' +
+      '<label class="check"><input type="checkbox" id="controllerActive"' +
+      (controller?.active !== false ? " checked" : "") +
+      '> कंट्रोलर लॉगिन चालू रखें</label>' +
+      '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="controllerSaveBtn">कंट्रोलर खाता सेव करें</button></div>' +
+      '</form><p class="tiny muted">' +
+      (controller ? "वर्तमान यूज़रनेम: " + esc(controller.username) : "अभी कंट्रोलर खाता नहीं बनाया गया है।") +
+      "</p></section>" +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>Cloudflare सुरक्षा कॉन्फ़िगरेशन</h3><p class="admin-card-sub">Secret values केवल Cloudflare Worker settings में रखें — फ्रंटएंड या GitHub में नहीं।</p></div></div>' +
       '<dl class="detail-list">' +
       detailRow("ADMIN_PASSWORD", "शुरुआती पासवर्ड (पासवर्ड बदलने के बाद वैकल्पिक)") +
@@ -4343,6 +4367,30 @@
         UI.setButtonBusy(button, false);
       } catch (error) {
         UI.toast(error.message || "सेटिंग्स सेव नहीं हो सकीं", "bad");
+        UI.setButtonBusy(button, false);
+      }
+    });
+
+    $("#examControllerForm", content).addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = $("#controllerSaveBtn", content);
+      UI.setButtonBusy(button, true, "सेव हो रहा है…");
+      try {
+        const result = await api("admin_exam_controller_save", {
+          controller: {
+            displayName: $("#controllerDisplayName", content).value.trim(),
+            username: $("#controllerUsername", content).value.trim(),
+            password: $("#controllerPassword", content).value,
+            active: $("#controllerActive", content).checked,
+          },
+        });
+        $("#controllerPassword", content).value = "";
+        UI.toast("परीक्षा कंट्रोलर खाता सेव हो गया", "good");
+        const note = $("#examControllerForm + p", content);
+        if (note) note.textContent = "वर्तमान यूज़रनेम: " + result.controller.username;
+      } catch (error) {
+        UI.toast(error.message || "कंट्रोलर खाता सेव नहीं हो सका", "bad");
+      } finally {
         UI.setButtonBusy(button, false);
       }
     });
