@@ -72,7 +72,14 @@ npx wrangler secret put ADMIN_SECRET
 
 ## 5. GitHub से auto-deploy
 
-Cloudflare Dashboard → **Workers & Pages** → `chnm-portal` Worker → **Settings / Builds** → GitHub repository connect करें। Production branch `main`, build command `npm ci && npm run build`, deploy command `npx wrangler deploy` रखें। GitHub Actions/Cloudflare secrets में API token की जरूरत हो तो उसे केवल Cloudflare/GitHub secret store में रखें।
+Cloudflare Workers Builds इस Worker को private repository `kumarsant-tech/chnm-portal` की `main` branch से जोड़ता है:
+
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Root directory: repository root
+- Preview builds: बंद; केवल `main` production में deploy होती है
+
+अब `main` पर commit push होते ही Cloudflare build और deploy करेगा; अलग से `wrangler deploy` चलाने की जरूरत नहीं है। Deploy की स्थिति Cloudflare Dashboard → **Workers & Pages** → `chnm-portal` → **Deployments** में देखें। Runtime secrets केवल Cloudflare में रखें, GitHub repository में नहीं। `npm test` और `npm run test:d1` पहले चला लेना चाहिए; GitHub auto-deploy tests चलाए बिना हर pushed commit deploy करता है।
 
 ## मौजूदा API और scheduled expiry
 
