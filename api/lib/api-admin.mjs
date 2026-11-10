@@ -38,6 +38,7 @@ import {
   hashPin,
 } from "./auth.mjs";
 import { sendEmail } from "./email.mjs";
+import { processResultReleaseEmails } from "./result-notifications.mjs";
 import {
   examSummary,
   resultDetail,
@@ -685,12 +686,16 @@ export async function handleAdminExamUnpublish({ store, req }) {
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 
-export async function handleAdminExamRelease({ store, req }) {
+export async function handleAdminExamRelease({ store, req, ctx, env }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
+  const wasReleased = Boolean(exam.releaseResults);
   const releaseResults = bool(body.releaseResults, exam.releaseResults);
   exam.releaseResults = releaseResults;
   exam.showAnswers = releaseResults;
+  exam.notifyResultsOnRelease = releaseResults
+    ? Boolean(exam.notifyResultsOnRelease || !wasReleased)
+    : false;
   let releaseAt = null;
   if (body.releaseAt) {
     const time = new Date(body.releaseAt).getTime();
@@ -700,11 +705,30 @@ export async function handleAdminExamRelease({ store, req }) {
   exam.releaseAt = releaseAt;
   exam.updatedAt = new Date().toISOString();
   await saveExam(store, exam);
-  await audit(store, "exam.release", "admin", {
-    examId: exam.id,
-    releaseResults: exam.releaseResults,
-    showAnswers: exam.showAnswers,
-  });
+  try {
+    await audit(store, "exam.release", "admin", {
+      examId: exam.id,
+      releaseResults: exam.releaseResults,
+      showAnswers: exam.showAnswers,
+    });
+  } catch (error) {
+    console.error("exam release audit logging failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
+  if (
+    exam.notifyResultsOnRelease &&
+    (!exam.releaseAt || Date.parse(exam.releaseAt) <= Date.now())
+  ) {
+    const notifications = processResultReleaseEmails(store, env, exam).catch((error) => {
+      console.error("result release email processing failed", {
+        examId: exam.id,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    });
+    if (typeof ctx?.waitUntil === "function") ctx.waitUntil(notifications);
+    else await notifications;
+  }
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 

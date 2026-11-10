@@ -4,7 +4,7 @@
 
 import { K, getJson, putJson, getLegacyDb, listKeys, usingMemoryStore } from "./db.mjs";
 import { LEGACY_QUESTIONS } from "./seed.mjs";
-import { clean, validKey, phone } from "./validate.mjs";
+import { clean, validKey, phone, email } from "./validate.mjs";
 
 const SUBJECT_MAP = {
   Mixed: "mixed",
@@ -103,7 +103,15 @@ async function ensureLegacyStudent(store, record, now) {
   const id = clean(record.id, 40);
   if (!validKey(id)) return { student: null, created: false };
   const existing = await getJson(store, K.students(id));
-  if (existing) return { student: existing, created: false };
+  if (existing) {
+    const legacyEmail = email(record.email);
+    if (!existing.email && legacyEmail) {
+      const updated = { ...existing, email: legacyEmail, updatedAt: now };
+      await putJson(store, K.students(id), updated);
+      return { student: updated, created: false };
+    }
+    return { student: existing, created: false };
+  }
   const mobile = phone(record.mobile);
   let ownsMobile = false;
   if (mobile) {
@@ -116,7 +124,7 @@ async function ensureLegacyStudent(store, record, now) {
     name: clean(record.name, 60) || "पुराना छात्र",
     fatherName: "",
     mobile,
-    email: "",
+    email: email(record.email),
     tradeId: "",
     legacyTrade: clean(record.trade, 40),
     batch: "",

@@ -7,7 +7,7 @@ const escapeHtml = (value) =>
     "'": "&#39;",
   })[character]);
 
-export async function sendEmail(env, { to, subject, text, html }) {
+export async function sendEmail(env, { to, subject, text, html, idempotencyKey }) {
   const apiKey = String(env?.RESEND_API_KEY || "");
   const from = String(env?.EMAIL_FROM || "");
   if (!apiKey || !from) return { sent: false, reason: "not_configured" };
@@ -18,13 +18,20 @@ export async function sendEmail(env, { to, subject, text, html }) {
       headers: {
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
       body: JSON.stringify({ from, to: [to], subject, text, html }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!response.ok) return { sent: false, reason: "provider_error" };
+    if (!response.ok) {
+      console.error("email provider rejected message", { status: response.status });
+      return { sent: false, reason: "provider_error" };
+    }
     return { sent: true };
-  } catch {
+  } catch (error) {
+    console.error("email provider request failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
     return { sent: false, reason: "provider_error" };
   }
 }

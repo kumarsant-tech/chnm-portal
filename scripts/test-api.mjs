@@ -8,6 +8,7 @@ process.env.ADMIN_PASSWORD = "test-admin-pass";
 process.env.ADMIN_SECRET = "test-admin-secret-with-at-least-32-bytes";
 
 const { default: api } = await import("../api/handler.mjs");
+const { handleRegister } = await import("../api/lib/api-public.mjs");
 const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
 const { rateLimit } = await import("../api/lib/auth.mjs");
 const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
@@ -205,6 +206,7 @@ const examPayload = {
 };
 let examId;
 let questionIds = [];
+let studentId;
 {
   const imported = await call(
     "admin_questions_import",
@@ -436,7 +438,7 @@ let resultId;
   });
   check("self registration ok", registration.status === 200, JSON.stringify(registration.data));
   check("unconfigured registration email is explicitly reported", registration.data.notification?.reason === "not_configured");
-  const studentId = registration.data.student?.id;
+  studentId = registration.data.student?.id;
   check("registration id starts with CHNM", /^CHNM\d+$/.test(studentId || ""), studentId);
   check("CITS number becomes the login ID", registration.data.loginId === "CITS-TEST-1");
   check("registration does not expose a session token", !registration.data.token);
@@ -834,6 +836,32 @@ console.log("\n7. Legacy data import");
   check("legacy import ok", imported.status === 200 && imported.data.report.results.imported === 1, JSON.stringify(imported.data.report));
   const again = await call("admin_legacy_import", {}, globalThis.adminToken);
   check("legacy import idempotent", again.data.report.results.existing === 1, JSON.stringify(again.data.report));
+  const legacyStudent = await getJson(store, "students/FIG-99999");
+  check("legacy student email is preserved for result notifications", legacyStudent?.email === "legacy@example.com");
+  await putJson(store, "students/FIG-99999", { ...legacyStudent, email: "" });
+  await call("admin_legacy_import", {}, globalThis.adminToken);
+  check(
+    "legacy import restores a missing email without overwriting existing profile fields",
+    (await getJson(store, "students/FIG-99999"))?.email === "legacy@example.com"
+  );
+
+  await store.delete("idx/mobile/9876599999");
+  const duplicateLegacyMobile = await call(
+    "register",
+    {
+      name: "Duplicate Legacy Mobile",
+      mobile: "9876599999",
+      dateOfBirth: "2000-01-01",
+      consent: true,
+      skipSetup: true,
+    },
+    "",
+    "10.0.7.2"
+  );
+  check(
+    "legacy mobile without an index cannot register a second account",
+    duplicateLegacyMobile.status === 409
+  );
 
   const login = await call("student_login", { id: "FIG-99999", mobile: "9876599999" });
   check("legacy student login requires password setup", login.status === 200 && login.data.requiresPasswordChange);
@@ -1199,7 +1227,11 @@ console.log("\n11. Registration email and admin password recovery");
     PUBLIC_BASE_URL: "https://portal.example",
   };
   globalThis.fetch = async (url, options) => {
-    sentEmails.push({ url, body: JSON.parse(options.body) });
+    sentEmails.push({
+      url,
+      body: JSON.parse(options.body),
+      idempotencyKey: options.headers["Idempotency-Key"],
+    });
     return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
   };
   try {
@@ -1221,6 +1253,108 @@ console.log("\n11. Registration email and admin password recovery");
     check("student confirmation does not disclose DOB", !sentEmails[0]?.body.text.includes("04051999"));
     check("registration API explicitly reports email availability", registration.data.notification?.message.includes("ईमेल भेज"));
 
+    globalThis.fetch = async () => new Response(JSON.stringify({ message: "provider rejected sender" }), { status: 422 });
+    const rejectedEmailRegistration = await call(
+      "register",
+      {
+        name: "Email Provider Reject",
+        mobile: "9876500089",
+        email: "student@example.com",
+        dateOfBirth: "1999-05-04",
+        consent: true,
+        skipSetup: true,
+      },
+      "",
+      "10.0.10.9"
+    );
+    check(
+      "provider rejection does not fail registration",
+      rejectedEmailRegistration.status === 200 &&
+        rejectedEmailRegistration.data.notification?.reason === "provider_error"
+    );
+    check(
+      "provider rejection keeps the student account",
+      Boolean(await getJson(store, `students/${rejectedEmailRegistration.data.student?.id}`))
+    );
+
+    globalThis.fetch = async () => {
+      throw new Error("provider transport unavailable");
+    };
+    const unavailableEmailRegistration = await call(
+      "register",
+      {
+        name: "Email Provider Offline",
+        mobile: "9876500090",
+        email: "student@example.com",
+        dateOfBirth: "1999-05-04",
+        consent: true,
+        skipSetup: true,
+      },
+      "",
+      "10.0.10.10"
+    );
+    check(
+      "email transport failure does not fail registration",
+      unavailableEmailRegistration.status === 200 &&
+        unavailableEmailRegistration.data.notification?.reason === "provider_error"
+    );
+    check(
+      "transport failure keeps the student account",
+      Boolean(await getJson(store, `students/${unavailableEmailRegistration.data.student?.id}`))
+    );
+
+    const auditFailureStore = {
+      ...store,
+      async setJSON(key, value) {
+        if (String(key).startsWith("audit/")) throw new Error("audit storage unavailable");
+        return store.setJSON(key, value);
+      },
+    };
+    const originalConsoleError = console.error;
+    let auditDiagnostic = [];
+    let auditFailureResponse;
+    console.error = (...args) => {
+      auditDiagnostic = args;
+    };
+    try {
+      auditFailureResponse = await handleRegister({
+        req: new Request("https://portal.example/api", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: "Audit Store Offline",
+            mobile: "9876500091",
+            dateOfBirth: "1999-05-04",
+            consent: true,
+          }),
+        }),
+        ctx: { ip: "10.0.10.11" },
+        store: auditFailureStore,
+        env: apiEnv,
+      });
+    } finally {
+      console.error = originalConsoleError;
+    }
+    const auditFailureData = await auditFailureResponse.json();
+    check(
+      "post-save audit failure does not fail registration",
+      auditFailureResponse.status === 200 &&
+        Boolean(await getJson(store, `students/${auditFailureData.student?.id}`))
+    );
+    check(
+      "audit failure diagnostic excludes student identifiers",
+      auditDiagnostic[0] === "registration audit logging failed" &&
+        !JSON.stringify(auditDiagnostic).includes("9876500091")
+    );
+
+    globalThis.fetch = async (url, options) => {
+      sentEmails.push({
+        url,
+        body: JSON.parse(options.body),
+        idempotencyKey: options.headers["Idempotency-Key"],
+      });
+      return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
+    };
     const forgot = await call("admin_forgot_password", { email: "attacker@example.com" }, "", "10.0.10.2");
     check("forgot password returns a non-enumerating success", forgot.status === 200 && !forgot.data.message.includes("attacker@example.com"));
     check("reset email recipient is fixed to ADMIN_EMAIL", sentEmails[1]?.body.to?.[0] === "admin@example.com");
@@ -1271,6 +1405,41 @@ console.log("\n11. Registration email and admin password recovery");
       "10.0.10.7"
     );
     check("changed admin password is active", finalAdminLogin.status === 200);
+
+    const releaseEmailStart = sentEmails.length;
+    await call("admin_exam_release", { examId, releaseResults: false }, finalAdminLogin.data.token);
+    const releasedWithEmail = await call(
+      "admin_exam_release",
+      { examId, releaseResults: true },
+      finalAdminLogin.data.token
+    );
+    const resultEmail = sentEmails
+      .slice(releaseEmailStart)
+      .find((sent) => sent.body.subject.startsWith("परीक्षा परिणाम जारी"));
+    check(
+      "publishing results sends one Resend notification to the student",
+      releasedWithEmail.status === 200 &&
+        resultEmail?.body.to?.[0] === "student@example.com"
+    );
+    check(
+      "result notification contains a portal link without score details",
+      resultEmail?.body.text.includes("https://portal.example/exam/index.html") &&
+        !resultEmail.body.text.includes("70%")
+    );
+    check(
+      "result notification uses a stable Resend idempotency key",
+      resultEmail?.idempotencyKey === `result-release/${examId}/${studentId}`
+    );
+    const emailCountAfterPublish = sentEmails.length;
+    await call(
+      "admin_exam_release",
+      { examId, releaseResults: true },
+      finalAdminLogin.data.token
+    );
+    check(
+      "repeating result publish does not send a duplicate email",
+      sentEmails.length === emailCountAfterPublish
+    );
   } finally {
     globalThis.fetch = savedFetch;
     apiEnv = savedEnv;
