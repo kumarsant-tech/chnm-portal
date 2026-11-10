@@ -1395,6 +1395,17 @@ console.log("\n11. Registration email and admin password recovery");
     );
     check("registration confirmation email uses Resend", registration.status === 200 && registration.data.notification?.sent);
     check("student email contains configured group name", sentEmails[0]?.body.text.includes("Future Instructor Group · CITS"));
+    check(
+      "registration email uses the branded responsive HTML template",
+      sentEmails[0]?.body.html.includes("width:100%;background:#ffffff") &&
+        sentEmails[0]?.body.html.includes("आपका प्यार ही हमारी प्रगति है") &&
+        sentEmails[0]?.body.html.includes("पोर्टल में लॉगिन करें")
+    );
+    check(
+      "registration email includes the configured portal login URL",
+      sentEmails[0]?.body.html.includes('href="https://portal.example/exam/index.html"') &&
+        sentEmails[0]?.body.text.includes("https://portal.example/exam/index.html")
+    );
     check("student confirmation does not disclose DOB", !sentEmails[0]?.body.text.includes("04051999"));
     check("registration API explicitly reports email availability", registration.data.notification?.message.includes("ईमेल भेज"));
 
