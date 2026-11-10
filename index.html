@@ -4838,6 +4838,7 @@ if(supply)renderOhmCircuit();
 'use strict';
 var wrap=document.querySelector('.wrap');
 if(!wrap)return;
+var pageSections=Array.prototype.slice.call(document.querySelectorAll('body > section, .wrap > section'));
 var gallery=document.getElementById('real'),guide=document.getElementById('component-testing');
 if(gallery&&guide){
  var guidePanel=document.createElement('div');guidePanel.className='real-test-guide';
@@ -5167,8 +5168,8 @@ Object.keys(realLinks).forEach(function(sectionId){
  });
  /* असली पार्ट के बटन की अलग सूची हटा दी: नीचे हर पार्ट पहले से खुलकर दिखता है */
 });
-/* सूचीकृत पैनल के अलावा बाकी पुराने सेक्शन भी छुपे रहें। */
-wrap.querySelectorAll(':scope > section').forEach(function(section){section.classList.add('pv-hide')});
+/* पैनल .wrap के बाहर भी हैं; सभी मुख्य सेक्शन को नेविगेशन से नियंत्रित करें। */
+pageSections.forEach(function(section){section.classList.add('pv-hide')});
 ['part1','part2'].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.add('pv-hide')});
 var oldNav=wrap.querySelector('nav.tabs');if(oldNav)oldNav.classList.add('pv-hide');
 
@@ -5181,7 +5182,7 @@ wrap.appendChild(bar);
 var cur=null;
 function show(id,noHash){
  var p=byId[id];if(!p){id='home';p=byId.home;if(!p)return}
- wrap.querySelectorAll(':scope > section').forEach(function(section){section.classList.add('pv-hide')});
+ pageSections.forEach(function(section){section.classList.add('pv-hide')});
  p.el.classList.remove('pv-hide');
  if(hero)hero.classList.toggle('pv-hide',id!=='home');
  p.el.insertAdjacentElement('beforebegin',bar);bar.classList.remove('pv-hide');
