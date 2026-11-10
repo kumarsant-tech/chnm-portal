@@ -9,18 +9,22 @@ function hasFallbackAdmin() {
   return Boolean(FALLBACK_ADMIN && FALLBACK_ADMIN.salt && FALLBACK_ADMIN.hash);
 }
 
-function sessionSecret() {
+function configValue(env, key) {
+  return String(env?.[key] || process.env[key] || "");
+}
+
+function sessionSecret(env) {
+  if (env?.DB) {
+    const secret = configValue(env, "ADMIN_SECRET");
+    if (!secret) throw new HttpError("Cloudflare secret ADMIN_SECRET सेट नहीं है", 500);
+    return secret;
+  }
   // The bundled hash always exists, so tokens keep the same signature even if
   // env injection is inconsistent between function instances (which otherwise
   // invalidates tokens mid-session and logs the admin out).
   if (hasFallbackAdmin()) return FALLBACK_ADMIN.hash;
-  const secret = process.env.ADMIN_SECRET || process.env.ADMIN_PASSWORD || "";
-  if (!secret) {
-    throw new HttpError(
-      "सर्वर पर ADMIN_PASSWORD / ADMIN_SECRET सेट नहीं है",
-      500
-    );
-  }
+  const secret = configValue(env, "ADMIN_SECRET") || configValue(env, "ADMIN_PASSWORD");
+  if (!secret) throw new HttpError("सर्वर पर ADMIN_PASSWORD / ADMIN_SECRET सेट नहीं है", 500);
   return secret;
 }
 
@@ -32,21 +36,21 @@ export function safeEqual(a, b) {
   return crypto.timingSafeEqual(digest(a), digest(b));
 }
 
-function signPayload(payload) {
+function signPayload(payload, env) {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto
-    .createHmac("sha256", sessionSecret())
+    .createHmac("sha256", sessionSecret(env))
     .update(body)
     .digest("base64url");
   return `${body}.${signature}`;
 }
 
-function verifyPayload(token) {
+function verifyPayload(token, env) {
   try {
     const [body, signature] = String(token || "").split(".");
     if (!body || !signature) return null;
     const expected = crypto
-      .createHmac("sha256", sessionSecret())
+      .createHmac("sha256", sessionSecret(env))
       .update(body)
       .digest("base64url");
     if (!safeEqual(signature, expected)) return null;
@@ -64,24 +68,25 @@ export function bearer(req) {
   return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
 }
 
-export function issueAdminToken() {
-  return signPayload({ r: "admin", exp: Date.now() + 12 * HOUR });
+export function issueAdminToken(env) {
+  return signPayload({ r: "admin", exp: Date.now() + 12 * HOUR }, env);
 }
 
-export function issueStudentToken(studentId) {
+export function issueStudentToken(studentId, env) {
   return signPayload({
     r: "student",
     sid: String(studentId),
     exp: Date.now() + 12 * HOUR,
-  });
+  }, env);
 }
 
-export function hasAdminPassword() {
-  return Boolean(process.env.ADMIN_PASSWORD) || hasFallbackAdmin();
+export function hasAdminPassword(env) {
+  if (env?.DB) return Boolean(configValue(env, "ADMIN_PASSWORD"));
+  return Boolean(configValue(env, "ADMIN_PASSWORD")) || hasFallbackAdmin();
 }
 
-export function checkAdminPassword(password) {
-  const configured = process.env.ADMIN_PASSWORD;
+export function checkAdminPassword(password, env) {
+  const configured = configValue(env, "ADMIN_PASSWORD");
   if (configured) return safeEqual(password || "", configured);
   if (!hasFallbackAdmin()) return false;
   try {
@@ -122,16 +127,16 @@ export function checkPin(pin, stored) {
   }
 }
 
-export async function requireAdmin(req) {
-  const payload = verifyPayload(bearer(req));
+export async function requireAdmin(req, env) {
+  const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "admin") {
     throw new HttpError("एडमिन लॉगिन आवश्यक है", 401);
   }
   return payload;
 }
 
-export async function requireStudent(req, store) {
-  const payload = verifyPayload(bearer(req));
+export async function requireStudent(req, store, env) {
+  const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "student" || !payload.sid) {
     throw new HttpError("छात्र लॉगिन आवश्यक है", 401);
   }

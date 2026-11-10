@@ -18,7 +18,7 @@ export async function handleBootstrap({ store }) {
   });
 }
 
-export async function handleRegister({ req, ctx, store }) {
+export async function handleRegister({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "register", ip, 12, 60 * 60 * 1000);
   const body = await readJson(req);
@@ -53,10 +53,10 @@ export async function handleRegister({ req, ctx, store }) {
   await putJson(store, K.students(id), student);
   await putJson(store, K.mobileIndex(input.mobile), { studentId: id });
   await audit(store, "student.register", id, { ip });
-  return json({ ok: true, token: issueStudentToken(id), student: studentSelf(student) });
+  return json({ ok: true, token: issueStudentToken(id, env), student: studentSelf(student) });
 }
 
-export async function handleStudentLogin({ req, ctx, store }) {
+export async function handleStudentLogin({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   const body = await readJson(req);
   const id = clean(body.id, 40).toUpperCase();
@@ -77,5 +77,5 @@ export async function handleStudentLogin({ req, ctx, store }) {
     throw new HttpError("PIN सही नहीं है", 401);
   }
   await audit(store, "student.login", student.id, { ip });
-  return json({ ok: true, token: issueStudentToken(student.id), student: studentSelf(student) });
+  return json({ ok: true, token: issueStudentToken(student.id, env), student: studentSelf(student) });
 }

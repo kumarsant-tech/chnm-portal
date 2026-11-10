@@ -1,12 +1,51 @@
-// End-to-end API test against the in-memory Blobs replacement.
-// Run: ELECTRON_RUN_AS_NODE=1 <node> scripts/test-api.mjs
-process.env.USE_MEMORY_STORE = "1";
+// End-to-end API test against memory or a local SQLite-backed D1 binding.
+// Run: node scripts/test-api.mjs [--d1]
+const testD1 = process.argv.includes("--d1");
+process.env.USE_MEMORY_STORE = testD1 ? "0" : "1";
 process.env.ADMIN_PASSWORD = "test-admin-pass";
 process.env.ADMIN_SECRET = "test-admin-secret";
 
 const { default: api } = await import("../netlify/functions/api.mjs");
 const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../netlify/lib/db.mjs");
 const { seedLegacyQuestions } = await import("../netlify/lib/seed.mjs");
+let apiEnv;
+let sqlite;
+
+if (testD1) {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { readFile } = await import("node:fs/promises");
+  const migration = await readFile(
+    new URL("../cloudflare/migrations/0001_create_app_kv.sql", import.meta.url),
+    "utf8"
+  );
+  sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(migration);
+  const d1Binding = {
+    prepare(query) {
+      return {
+        bind(...values) {
+          return {
+            async first() {
+              return sqlite.prepare(query).get(...values) || null;
+            },
+            async all() {
+              return { results: sqlite.prepare(query).all(...values) };
+            },
+            async run() {
+              return sqlite.prepare(query).run(...values);
+            },
+          };
+        },
+      };
+    },
+  };
+  apiEnv = {
+    DB: d1Binding,
+    LEGACY_DB: d1Binding,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    ADMIN_SECRET: process.env.ADMIN_SECRET,
+  };
+}
 
 let passed = 0;
 let failed = 0;
@@ -31,13 +70,13 @@ async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
     headers,
     body: JSON.stringify({ action, ...payload }),
   });
-  const res = await api(req, { ip });
+  const res = await api(req, { ip, env: apiEnv });
   const type = res.headers.get("content-type") || "";
   const data = type.includes("json") ? await res.json() : await res.text();
   return { status: res.status, data, headers: res.headers };
 }
 
-const store = await getDb();
+const store = await getDb(apiEnv);
 await seedLegacyQuestions(store);
 
 console.log("\n1. Public bootstrap + admin auth");
@@ -849,9 +888,50 @@ console.log("\n10. परीक्षा के English निर्देश (i
   );
 }
 
+if (testD1) {
+  const { default: worker } = await import("../cloudflare/worker.mjs");
+  const runtimeEnv = {
+    ...apiEnv,
+    ASSETS: { fetch: async () => new Response("exam asset") },
+  };
+  const asset = await worker.fetch(
+    new Request("https://example.test/exam/index.html"),
+    runtimeEnv
+  );
+  check(
+    "Cloudflare exam assets carry CSP and no-store headers",
+    asset.headers.get("content-security-policy")?.includes("default-src 'self'") &&
+      asset.headers.get("cache-control") === "no-store, max-age=0"
+  );
+  const redirect = await worker.fetch(
+    new Request("https://example.test/Computer-Lab"),
+    runtimeEnv
+  );
+  check(
+    "Cloudflare preserves legacy Netlify redirects",
+    redirect.status === 301 && redirect.headers.get("location") === "/Computer-Lab/02-basics.html"
+  );
+  const routed = await worker.fetch(
+    new Request("https://example.test/api", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "bootstrap" }),
+    }),
+    runtimeEnv
+  );
+  check("Cloudflare Worker routes /api to the D1-backed CBT API", routed.status === 200);
+  const unavailable = await worker.fetch(
+    new Request("https://example.test/api", { method: "POST" }),
+    { ASSETS: runtimeEnv.ASSETS }
+  );
+  check("Cloudflare API fails explicitly when D1 is unbound", unavailable.status === 503);
+  await worker.scheduled({}, runtimeEnv);
+  check("Cloudflare scheduled expiry handler runs", true);
+}
 console.log(`\n===== ${passed} passed, ${failed} failed =====`);
 if (failed) {
   console.log("Failures:", failures.join(", "));
   process.exit(1);
 }
 __resetMemoryStore();
+sqlite?.close();

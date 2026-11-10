@@ -1,5 +1,7 @@
 node_modules/
 .netlify/
+.wrangler/
+.wrangler-dry-run/
 dist/
 .env
 .env.*
@@ -7,5 +9,6 @@ dist/
 *.zip
 *blobs-backup*.json
 scripts/tmp-*
+cloudflare/import-data*.sql
 .DS_Store
 Thumbs.db

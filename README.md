@@ -1,8 +1,8 @@
 # Future Instructor – CHNM पोर्टल + सुरक्षित CBT परीक्षा प्रणाली
 
-यह रिपॉज़िटरी मूल CHNM वेबसाइट का होम पेज कंटेंट/फोटो/डिज़ाइन और सभी लैब सुरक्षित रखती है (उपयोगकर्ता अनुरोध पर साइडबार से पुराना कंप्यूटर लैब समूह, अलग Training Methodology फोल्डर और CHNM Academy फोल्डर हटाए गए हैं), और उसके साथ Netlify Functions + Netlify Blobs पर चलने वाली **पूरी CBT परीक्षा प्रणाली**, **Training Methodology डिजिटल पुस्तक** तथा **25-अध्याय Trade Theory डिजिटल पुस्तक** देती है।
+यह रिपॉज़िटरी मूल CHNM वेबसाइट का होम पेज कंटेंट/फोटो/डिज़ाइन और सभी लैब सुरक्षित रखती है, और उसके साथ **पूरी CBT परीक्षा प्रणाली**, **Training Methodology डिजिटल पुस्तक** तथा **25-अध्याय Trade Theory डिजिटल पुस्तक** देती है।
 
-> स्थिति: **Netlify पर लाइव** — https://chnm26.netlify.app/ (project `chnm26`, team `sant-kumar-kushwaha`)। Functions + Blobs चालू हैं; `ADMIN_PASSWORD` और `ADMIN_SECRET` production environment variables में सेट हैं। ताज़ा परिणाम: `docs/testing-report-hi.md`।
+> वर्तमान production: **Netlify** — https://chnm26.netlify.app/। **Cloudflare Workers + D1** अलग hosting/database के रूप में तैयार किए जा रहे हैं; data export/import और account authentication के बाद ही उसका नया URL live माना जाएगा। विवरण: [Cloudflare deployment guide](docs/cloudflare-deployment-hi.md)।
 
 ## लाइव लिंक
 
@@ -27,7 +27,8 @@
 - **सूचना और समूह चैट (पोर्टल के अंदर):** एडमिन भेजी सूचना भेजते ही सभी छात्रों के डैशबोर्ड पर सीधे दिखती है (नई सूचना का बैज काउंट, सभी/बैच-वार audience, एडिट/हटाना)। हर पंजीकृत छात्र अपने आप समूह चैट में शामिल रहता है — एडमिन का संदेश तुरंत सबको दिखता है, संदेश हटाना और flood protection सहित। कोई बाहरी ऐप (WhatsApp/Telegram) या join लिंक नहीं चाहिए।
 - **सुरक्षा:** env-आधारित admin password (env न मिलने पर server-side scrypt hash fallback), HMAC tokens, rate limiting, server-side timer/scoring, answer key gating, result isolation, duplicate submit prevention
 - **अलग Practice और Final:** practice के उत्तर/परिणाम final से अलग; final के अंक और उत्तर-कुंजी release के बाद ही दिखते हैं (release करते ही दोनों खुल जाते हैं)
-- **Data:** Netlify Blobs — कोई paid database/API नहीं
+- **Current live data:** Netlify Blobs; **Cloudflare target:** D1 migration के बाद
+- **Cloudflare target:** Static assets + `/api` Worker + D1 key-value storage; live Netlify backup के लिए सुरक्षित exporter/importer scripts शामिल हैं
 
 ## प्रश्न पेपर अपलोड फोल्डर
 

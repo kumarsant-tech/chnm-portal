@@ -1,5 +1,5 @@
-// Data access layer. Uses Netlify Blobs in production and an in-memory store
-// for local development/tests (USE_MEMORY_STORE=1).
+// Data access layer. Uses Netlify Blobs or Cloudflare D1 in production and an
+// in-memory store for local development/tests (USE_MEMORY_STORE=1).
 
 const MEMORY = new Map();
 
@@ -45,6 +45,41 @@ async function blobsStore(name) {
   return getStore({ name, consistency: "strong" });
 }
 
+function d1Store(database) {
+  const upperBound = (prefix) => `${prefix}\uffff`;
+  return {
+    async get(key, options = {}) {
+      const row = await database
+        .prepare("SELECT value FROM app_kv WHERE key = ?")
+        .bind(String(key))
+        .first();
+      if (!row) return null;
+      return options.type === "json" ? JSON.parse(row.value) : row.value;
+    },
+    async set(key, value) {
+      await database
+        .prepare(
+          "INSERT INTO app_kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP"
+        )
+        .bind(String(key), String(value))
+        .run();
+    },
+    async setJSON(key, value) {
+      return this.set(key, JSON.stringify(value));
+    },
+    async delete(key) {
+      await database.prepare("DELETE FROM app_kv WHERE key = ?").bind(String(key)).run();
+    },
+    async list({ prefix = "" } = {}) {
+      const { results } = await database
+        .prepare("SELECT key FROM app_kv WHERE key >= ? AND key < ? ORDER BY key")
+        .bind(String(prefix), upperBound(String(prefix)))
+        .all();
+      return { blobs: results.map(({ key }) => ({ key })), directories: [] };
+    },
+  };
+}
+
 function storeName() {
   const name = String(process.env.BLOBS_STORE || "").trim();
   // An invalid value (spaces, slashes, empty) makes every getStore call throw.
@@ -55,14 +90,19 @@ async function netlifyStore() {
   return blobsStore(storeName());
 }
 
-export async function getLegacyDb() {
+export async function getLegacyDb(env = {}) {
   if (usingMemoryStore()) return memoryStore();
+  if (env.LEGACY_DB) return d1Store(env.LEGACY_DB);
+  if (env.DB) {
+    throw new Error("पुराना Netlify data store Cloudflare पर उपलब्ध नहीं है");
+  }
   return blobsStore("exam");
 }
 
 export const usingMemoryStore = () => process.env.USE_MEMORY_STORE === "1";
 
-export async function getDb() {
+export async function getDb(env = {}) {
+  if (env.DB) return d1Store(env.DB);
   return usingMemoryStore() ? memoryStore() : netlifyStore();
 }
 

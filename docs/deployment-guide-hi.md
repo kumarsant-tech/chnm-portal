@@ -3,6 +3,8 @@
 यह गाइड Future Instructor – CHNM Portal + CBT परीक्षा प्रणाली को Netlify पर लाइव करने की पूरी प्रक्रिया बताती है। परियोजना **Netlify Functions + Netlify Blobs** पर चलती है — कोई paid database, external API या paid hosting जरूरी नहीं है।
 
 > **वर्तमान स्थिति (2 नवंबर 2026):** साइट **लाइव है** — https://chnm26.netlify.app/ (project `chnm26`, team `sant-kumar-kushwaha`)। Deploy Netlify Dashboard → **Upload your project files** (Netlify Drop) से `chnm-netlify-upload.zip` अपलोड करके हुआ। Functions `/api` और Blobs काम कर रहे हैं; `ADMIN_PASSWORD` तथा `ADMIN_SECRET` project environment variables में सेट हैं। नीचे के चरण भविष्य के re-deploy/नई साइट के लिए हैं।
+>
+> Netlify के बजाय नई Cloudflare hosting/database पर जाने के लिए [Cloudflare deployment guide](./cloudflare-deployment-hi.md) देखें।
 
 ---
 

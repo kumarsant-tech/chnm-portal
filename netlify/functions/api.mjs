@@ -157,31 +157,32 @@ export default async (req, ctx) => {
     const body = await readJson(req);
     const action = typeof body.action === "string" ? body.action.trim() : "";
     if (!action) throw new HttpError("action आवश्यक है", 400);
+    const env = ctx?.env || {};
     let store;
     try {
-      store = await getDb();
+      store = await getDb(env);
     } catch (error) {
       console.error("db unavailable", error);
       return fail(
-        "डेटाबेस (Netlify Blobs) उपलब्ध नहीं है — साइट deploy, environment और Netlify credits जाँचें",
+        "डेटाबेस उपलब्ध नहीं है — deployment और database binding जाँचें",
         503
       );
     }
     await ensureSeed(store);
 
     if (PUBLIC_ACTIONS[action]) {
-      return await PUBLIC_ACTIONS[action]({ req, ctx, store, body });
+      return await PUBLIC_ACTIONS[action]({ req, ctx, env, store, body });
     }
 
     if (STUDENT_ACTIONS[action]) {
-      const student = await requireStudent(req, store);
-      return await STUDENT_ACTIONS[action]({ req, ctx, store, body, student });
+      const student = await requireStudent(req, store, env);
+      return await STUDENT_ACTIONS[action]({ req, ctx, env, store, body, student });
     }
 
     const handler = ADMIN_ACTIONS[action];
     if (handler) {
-      const admin = await requireAdmin(req);
-      return await handler({ req, ctx, store, body, admin });
+      const admin = await requireAdmin(req, env);
+      return await handler({ req, ctx, env, store, body, admin });
     }
 
     return json({ error: "अज्ञात action", action }, 400);

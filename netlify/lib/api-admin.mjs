@@ -244,22 +244,22 @@ function paged(items, body, defaultSize = 25) {
   };
 }
 
-export async function handleAdminLogin({ req, ctx, store }) {
+export async function handleAdminLogin({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "admin-login", ip, 8, ADMIN_LOGIN_WINDOW);
-  if (!hasAdminPassword()) {
+  if (!hasAdminPassword(env)) {
     throw new HttpError(
-      "सर्वर पर ADMIN_PASSWORD सेट नहीं है। Netlify Environment Variables में ADMIN_PASSWORD जोड़ें।",
+      "सर्वर पर ADMIN_PASSWORD सेट नहीं है। Hosting provider के secrets में ADMIN_PASSWORD जोड़ें।",
       500
     );
   }
   const body = await readJson(req);
-  if (!checkAdminPassword(body.password)) {
+  if (!checkAdminPassword(body.password, env)) {
     throw new HttpError("गलत पासवर्ड", 401);
   }
   await clearRateLimit(store, "admin-login", ip);
   await audit(store, "admin.login", "admin", { ip });
-  return json({ ok: true, token: issueAdminToken(), expiresIn: 12 * 3600 });
+  return json({ ok: true, token: issueAdminToken(env), expiresIn: 12 * 3600 });
 }
 
 export async function handleAdminOverview({ store }) {
@@ -279,7 +279,7 @@ export async function handleAdminOverview({ store }) {
   const practiceResults = results.filter((result) => result.examType === "practice");
   let legacy = null;
   try {
-    legacy = await legacyPreview();
+    legacy = await legacyPreview(env);
   } catch {
     legacy = null;
   }
@@ -1362,7 +1362,7 @@ export async function handleAdminResults({ store, req }) {
   });
 }
 
-export async function handleAdminLive({ store }) {
+export async function handleAdminLive({ store, env }) {
   const [attempts, exams, students, catalog] = await Promise.all([
     listJson(store, "attempts/"),
     listJson(store, "exams/"),
@@ -1591,12 +1591,18 @@ export async function handleAdminAudit({ store, req }) {
   return json({ ok: true, entries: await recentAudit(store, limit), serverNow: Date.now() });
 }
 
-export async function handleAdminLegacyPreview() {
-  return json({ ok: true, legacy: await legacyPreview() });
+export async function handleAdminLegacyPreview({ env }) {
+  if (env?.DB && !env?.LEGACY_DB) {
+    throw new HttpError("Cloudflare पर पुराने Netlify डेटा के लिए सुरक्षित backup import करें", 501);
+  }
+  return json({ ok: true, legacy: await legacyPreview(env) });
 }
 
-export async function handleAdminLegacyImport({ store }) {
-  const report = await importLegacyData(store);
+export async function handleAdminLegacyImport({ store, env }) {
+  if (env?.DB && !env?.LEGACY_DB) {
+    throw new HttpError("Cloudflare पर पुराने Netlify डेटा के लिए सुरक्षित backup import करें", 501);
+  }
+  const report = await importLegacyData(store, env);
   await audit(store, "legacy.import", "admin", {
     students: report.students.imported,
     results: report.results.imported,

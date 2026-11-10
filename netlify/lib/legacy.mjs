@@ -132,8 +132,8 @@ async function ensureLegacyStudent(store, record, now) {
   return { student, created: true };
 }
 
-export async function legacyPreview() {
-  const legacy = await getLegacyDb();
+export async function legacyPreview(env) {
+  const legacy = await getLegacyDb(env);
   const [studentKeys, resultKeys, attemptKeys] = await Promise.all([
     listKeys(legacy, "s/"),
     listKeys(legacy, "r/"),
@@ -158,8 +158,8 @@ export async function legacyPreview() {
   };
 }
 
-export async function importLegacyData(store) {
-  const legacy = await getLegacyDb();
+export async function importLegacyData(store, env) {
+  const legacy = await getLegacyDb(env);
   const now = new Date().toISOString();
   const cfg = (await getJson(legacy, "config")) || {};
   const report = {
