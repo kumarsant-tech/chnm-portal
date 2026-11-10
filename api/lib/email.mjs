@@ -7,25 +7,30 @@ const escapeHtml = (value) =>
     "'": "&#39;",
   })[character]);
 
-function emailProvider(env) {
+function emailProviders(env) {
   const gmail = {
     clientId: String(env?.GMAIL_CLIENT_ID || "").trim(),
     clientSecret: String(env?.GMAIL_CLIENT_SECRET || "").trim(),
     refreshToken: String(env?.GMAIL_REFRESH_TOKEN || "").trim(),
   };
-  if (gmail.clientId || gmail.clientSecret || gmail.refreshToken) {
-    return Object.values(gmail).every(Boolean) ? { type: "gmail", ...gmail } : null;
-  }
-
   const resend = {
     apiKey: String(env?.RESEND_API_KEY || "").trim(),
     from: String(env?.EMAIL_FROM || "").trim(),
   };
-  return resend.apiKey && resend.from ? { type: "resend", ...resend } : null;
+  const gmailConfigured = Object.values(gmail).every(Boolean);
+  const resendConfigured = Boolean(resend.apiKey && resend.from);
+  if (gmailConfigured) {
+    return {
+      primary: { type: "gmail", ...gmail },
+      fallback: resendConfigured ? { type: "resend", ...resend } : null,
+    };
+  }
+  if (resendConfigured) return { primary: { type: "resend", ...resend }, fallback: null };
+  return null;
 }
 
 export function emailConfigured(env) {
-  return Boolean(emailProvider(env));
+  return Boolean(emailProviders(env));
 }
 
 function base64(bytes) {
@@ -79,6 +84,7 @@ function gmailRawMessage({ to, subject, text, html }) {
 }
 
 async function sendGmail(provider, message) {
+  let sendAttempted = false;
   try {
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -93,15 +99,16 @@ async function sendGmail(provider, message) {
     });
     if (!tokenResponse.ok) {
       console.error("Gmail OAuth token request rejected", { status: tokenResponse.status });
-      return { sent: false, reason: "provider_error" };
+      return { sent: false, reason: "provider_error", safeToFallback: true };
     }
     const tokenData = await tokenResponse.json();
     const accessToken = typeof tokenData?.access_token === "string" ? tokenData.access_token : "";
     if (!accessToken) {
       console.error("Gmail OAuth response omitted access token");
-      return { sent: false, reason: "provider_error" };
+      return { sent: false, reason: "provider_error", safeToFallback: true };
     }
 
+    sendAttempted = true;
     const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
       headers: {
@@ -113,23 +120,26 @@ async function sendGmail(provider, message) {
     });
     if (!response.ok) {
       console.error("Gmail API rejected message", { status: response.status });
-      return { sent: false, reason: "provider_error" };
+      return {
+        sent: false,
+        reason: "provider_error",
+        safeToFallback: response.status >= 400 && response.status < 500,
+      };
     }
     return { sent: true };
   } catch (error) {
     console.error("Gmail email request failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    return { sent: false, reason: "provider_error" };
+    return {
+      sent: false,
+      reason: "provider_error",
+      safeToFallback: !sendAttempted,
+    };
   }
 }
 
-export async function sendEmail(env, { to, subject, text, html, idempotencyKey }) {
-  const provider = emailProvider(env);
-  if (!provider) return { sent: false, reason: "not_configured" };
-  const message = { to, subject, text, html };
-  if (provider.type === "gmail") return sendGmail(provider, message);
-
+async function sendResend(provider, { to, subject, text, html, idempotencyKey }) {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -152,6 +162,21 @@ export async function sendEmail(env, { to, subject, text, html, idempotencyKey }
     });
     return { sent: false, reason: "provider_error" };
   }
+}
+
+export async function sendEmail(env, { to, subject, text, html, idempotencyKey }) {
+  const providers = emailProviders(env);
+  if (!providers) return { sent: false, reason: "not_configured" };
+  const message = { to, subject, text, html };
+  if (providers.primary.type === "resend") {
+    return sendResend(providers.primary, { ...message, idempotencyKey });
+  }
+
+  const delivery = await sendGmail(providers.primary, message);
+  if (delivery.sent || !delivery.safeToFallback || !providers.fallback) {
+    return { sent: delivery.sent, ...(delivery.sent ? {} : { reason: delivery.reason }) };
+  }
+  return sendResend(providers.fallback, { ...message, idempotencyKey });
 }
 
 export function escapeEmailHtml(value) {

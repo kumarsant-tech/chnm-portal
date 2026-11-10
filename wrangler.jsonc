@@ -2,6 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chnm-portal",
   "main": "cloudflare/worker.mjs",
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [
+    { "pattern": "futureinstructor.in", "custom_domain": true },
+    { "pattern": "www.futureinstructor.in", "custom_domain": true }
+  ],
   "compatibility_date": "2026-11-10",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
