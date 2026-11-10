@@ -1,30 +1,18 @@
 import crypto from "node:crypto";
 import { HttpError } from "./http.mjs";
 import { K, getJson, putJson } from "./db.mjs";
-import { FALLBACK_ADMIN } from "./admin-credentials.mjs";
 
 const HOUR = 3600000;
-
-function hasFallbackAdmin() {
-  return Boolean(FALLBACK_ADMIN && FALLBACK_ADMIN.salt && FALLBACK_ADMIN.hash);
-}
 
 function configValue(env, key) {
   return String(env?.[key] || process.env[key] || "");
 }
 
 function sessionSecret(env) {
-  if (env?.DB) {
-    const secret = configValue(env, "ADMIN_SECRET");
-    if (!secret) throw new HttpError("Cloudflare secret ADMIN_SECRET सेट नहीं है", 500);
-    return secret;
+  const secret = configValue(env, "ADMIN_SECRET");
+  if (Buffer.byteLength(secret, "utf8") < 32) {
+    throw new HttpError("Cloudflare secret ADMIN_SECRET कम-से-कम 32 bytes का होना चाहिए", 500);
   }
-  // The bundled hash always exists, so tokens keep the same signature even if
-  // env injection is inconsistent between function instances (which otherwise
-  // invalidates tokens mid-session and logs the admin out).
-  if (hasFallbackAdmin()) return FALLBACK_ADMIN.hash;
-  const secret = configValue(env, "ADMIN_SECRET") || configValue(env, "ADMIN_PASSWORD");
-  if (!secret) throw new HttpError("सर्वर पर ADMIN_PASSWORD / ADMIN_SECRET सेट नहीं है", 500);
   return secret;
 }
 
@@ -68,8 +56,19 @@ export function bearer(req) {
   return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
 }
 
-export function issueAdminToken(env) {
-  return signPayload({ r: "admin", exp: Date.now() + 12 * HOUR }, env);
+export function issueAdminToken(env, authVersion = 0) {
+  return signPayload({ r: "admin", av: authVersion, exp: Date.now() + 12 * HOUR }, env);
+}
+
+export async function adminAuthVersion(store) {
+  return Number(await getJson(store, K.adminAuthVersion())) || 0;
+}
+
+export async function bumpAdminAuthVersion(store) {
+  if (typeof store.increment !== "function") {
+    throw new Error("Storage provider does not support atomic counters");
+  }
+  return store.increment(K.adminAuthVersion());
 }
 
 export function issueStudentToken(studentId, env) {
@@ -81,22 +80,39 @@ export function issueStudentToken(studentId, env) {
 }
 
 export function hasAdminPassword(env) {
-  if (env?.DB) return Boolean(configValue(env, "ADMIN_PASSWORD"));
-  return Boolean(configValue(env, "ADMIN_PASSWORD")) || hasFallbackAdmin();
+  return Boolean(configValue(env, "ADMIN_PASSWORD"));
 }
 
-export function checkAdminPassword(password, env) {
+export async function hasAdminCredential(env, store) {
+  return Boolean(await getJson(store, K.adminPasswordOverride())) || hasAdminPassword(env);
+}
+
+export async function checkAdminPassword(password, env, store) {
+  const override = await getJson(store, K.adminPasswordOverride());
+  if (override) return checkPassword(password, override);
   const configured = configValue(env, "ADMIN_PASSWORD");
-  if (configured) return safeEqual(password || "", configured);
-  if (!hasFallbackAdmin()) return false;
+  return Boolean(configured) && safeEqual(password || "", configured);
+}
+
+export function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256");
+  return `pbkdf2v2$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+}
+
+export function checkPassword(password, stored) {
   try {
-    const actual = crypto.scryptSync(
+    const [kind, salt, hash] = String(stored || "").split("$");
+    const iterations = kind === "pbkdf2v2" ? 120000 : kind === "pbkdf2" ? 60000 : 0;
+    if (!iterations || !salt || !hash) return false;
+    const expected = Buffer.from(hash, "base64url");
+    const actual = crypto.pbkdf2Sync(
       String(password || ""),
-      Buffer.from(FALLBACK_ADMIN.salt, "hex"),
-      FALLBACK_ADMIN.keylen,
-      { N: FALLBACK_ADMIN.n, r: FALLBACK_ADMIN.r, p: FALLBACK_ADMIN.p }
+      Buffer.from(salt, "base64url"),
+      iterations,
+      32,
+      "sha256"
     );
-    const expected = Buffer.from(FALLBACK_ADMIN.hash, "hex");
     return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
   } catch {
     return false;
@@ -127,15 +143,18 @@ export function checkPin(pin, stored) {
   }
 }
 
-export async function requireAdmin(req, env) {
+export async function requireAdmin(req, store, env) {
   const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "admin") {
     throw new HttpError("एडमिन लॉगिन आवश्यक है", 401);
   }
+  if (Number(payload.av ?? 0) !== (await adminAuthVersion(store))) {
+    throw new HttpError("एडमिन सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
+  }
   return payload;
 }
 
-export async function requireStudent(req, store, env) {
+export async function requireStudent(req, store, env, allowPasswordChange = false) {
   const payload = verifyPayload(bearer(req), env);
   if (!payload || payload.r !== "student" || !payload.sid) {
     throw new HttpError("छात्र लॉगिन आवश्यक है", 401);
@@ -145,6 +164,9 @@ export async function requireStudent(req, store, env) {
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय कर दिया गया है", 403);
   }
+  if (!allowPasswordChange && (student.mustChangePassword || !student.passwordHash)) {
+    throw new HttpError("पहले अपना नया पासवर्ड सेट करें", 428, { passwordChangeRequired: true });
+  }
   return student;
 }
 
@@ -152,8 +174,11 @@ export async function rateLimit(store, scope, identity, max, windowMs) {
   const id = digest(identity).toString("hex").slice(0, 32);
   const key = K.rateLimit(scope, id);
   const now = Date.now();
-  const record = (await getJson(store, key)) || { n: 0, reset: 0 };
-  if (record.reset > now && record.n >= max) {
+  if (typeof store.consumeRateLimit !== "function") {
+    throw new Error("Storage provider does not support atomic rate limiting");
+  }
+  const record = await store.consumeRateLimit(key, now, max, windowMs);
+  if (record.reset > now && record.n > max) {
     const retryAfter = Math.ceil((record.reset - now) / 1000);
     throw new HttpError(
       `बहुत अधिक कोशिशें — ${Math.ceil(retryAfter / 60)} मिनट बाद प्रयास करें`,
@@ -161,12 +186,6 @@ export async function rateLimit(store, scope, identity, max, windowMs) {
       { retryAfter }
     );
   }
-  if (record.reset <= now) {
-    record.n = 0;
-    record.reset = now + windowMs;
-  }
-  record.n += 1;
-  await putJson(store, key, record);
 }
 
 export async function clearRateLimit(store, scope, identity) {

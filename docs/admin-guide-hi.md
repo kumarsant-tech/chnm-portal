@@ -292,7 +292,7 @@ CITS पैटर्न के लिए नई परीक्षा में 
 
 > बैकअप फाइल में छात्रों की निजी जानकारी, प्रश्न-पत्र और चैट संदेश होते हैं। इसे सार्वजनिक न करें; निजी ड्राइव में रखें।
 
-पुरानी Netlify Blobs site अलग system है। वर्तमान Cloudflare D1 data का backup एडमिन पैनल से लें; पुरानी Netlify backup को current data न मानें।
+पुराने Netlify Blobs deployment का data मौजूदा D1 से अलग है। यदि उसे migrate करना हो, पहले [Environment Variables guide](./environment-variables.md) के one-off export/import चरण देखें; import केवल खाली D1 database में करें। वर्तमान Cloudflare D1 data का backup एडमिन पैनल से लें।
 
 ---
 

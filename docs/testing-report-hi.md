@@ -4,7 +4,7 @@
 **तारीख:** 1 नवंबर 2026
 **परीक्षण वातावरण:** Windows 10 (x64), Node.js v24.18.0 (Qoder के Electron runtime से), स्थानीय dev server `http://127.0.0.1:8888`, in-memory data store, headless/in-app browser.
 
-> **स्पष्ट स्थिति:** यह रिपोर्ट **स्थानीय (local) परीक्षण** की है। इस मशीन पर Netlify credentials उपलब्ध नहीं थे, इसलिए **Netlify पर वास्तविक लाइव deployment नहीं किया गया** और लाइव साइट पर कोई परीक्षण नहीं हुआ। Deployment-ready configuration तैयार है; लाइव करते समय `docs/deployment-guide-hi.md` की post-deploy चेकलिस्ट दोबारा चलानी होगी।
+> **ऐतिहासिक रिपोर्ट:** नीचे के परीक्षण और Netlify-संबंधी टिप्पणियाँ 1 नवंबर 2026 की हैं और वर्तमान deployment का वर्णन नहीं करतीं। Production अब Cloudflare Workers + D1 पर है; मौजूदा बदलावों के लिए `npm test` और `npm run test:d1` चलाएँ। Netlify deployment support हटा दिया गया है; legacy Blobs backup export/import utilities केवल data migration के लिए बनी हैं।
 
 ---
 
@@ -161,7 +161,9 @@ node scripts/test-api.mjs
 
 ### 3.7 Admin password fallback (1 नवंबर 2026)
 
-Netlify free plan पर environment variable कभी-कभी function runtime तक नहीं पहुँचता। इसलिए env के बिना भी login चलाने के लिए server-side scrypt fallback जोड़ा गया।
+> ऐतिहासिक सुविधा: fallback और Netlify runtime अब हटाए जा चुके हैं। मौजूदा Cloudflare Worker में login के लिए `ADMIN_PASSWORD` और token signing के लिए पर्याप्त लंबाई वाला `ADMIN_SECRET` अनिवार्य है।
+
+Netlify free plan पर environment variable कभी-कभी function runtime तक नहीं पहुँचता। इसलिए env के बिना भी login चलाने के लिए server-side scrypt fallback जोड़ा गया था।
 
 | # | जाँच | परिणाम |
 |---|---|---|
@@ -175,7 +177,7 @@ Netlify free plan पर environment variable कभी-कभी function runti
 | 8 | `admin-credentials.mjs` में plaintext या client exposure | नहीं — केवल salt + one-way hash; `dist/` में फ़ाइल नहीं |
 | 9 | Env set होने पर fallback का उपयोग | नहीं — env ही प्राथमिक |
 
-Fallback पासवर्ड rotate करने के लिए `scripts/set-admin-password.mjs` जोड़ा गया है; बदलने पर पुराने tokens अमान्य हो जाते हैं।
+उस समय fallback पासवर्ड rotate करने के लिए `scripts/set-admin-password.mjs` जोड़ा गया था; fallback हटने के बाद यह script भी हटाई गई।
 
 ### 3.8 Portal में एडमिन लॉगिन लिंक
 
@@ -187,6 +189,8 @@ Fallback पासवर्ड rotate करने के लिए `scripts/set
 | 4 | Footer का पुराना एडमिन लिंक | पास — बना हुआ |
 
 ### 3.9 एडमिन सत्र स्थिरता और Blobs पुनर्प्रयास (1 नवंबर 2026)
+
+> ऐतिहासिक परीक्षण: नीचे के परिणाम पुराने Blobs-backed runtime और fallback signing key के हैं; वे मौजूदा D1/Cloudflare व्यवहार का दावा नहीं करते।
 
 | # | जाँच | परिणाम |
 |---|---|---|
@@ -308,7 +312,7 @@ Fallback पासवर्ड rotate करने के लिए `scripts/set
 | 6 | Legacy छात्र login/result | पास — पुराना `FIG-…` डेटा अभी भी लॉगिन और परिणाम दिखाता है |
 | 7 | API suite | पास — 78/78 (student delete guard सहित) |
 
-> निष्कर्ष: नया deploy मौजूदा रजिस्टर्ड छात्रों, प्रश्नों, परीक्षाओं, attempts या परिणामों को नहीं मिटाता। शर्त: उसी Netlify साइट पर deploy करें और `BLOBS_STORE` न बदलें। विस्तृत चेकलिस्ट [deployment-guide-hi.md](deployment-guide-hi.md) के सेक्शन 10.1 में है।
+> ऐतिहासिक निष्कर्ष (Netlify deployment): पुराने deploys ने Blobs data नहीं मिटाया। मौजूदा Cloudflare deployment अलग D1 database उपयोग करती है; deployment मार्गदर्शिका [यहाँ](cloudflare-deployment-hi.md) है।
 
 ---
 
@@ -532,7 +536,7 @@ node scripts/test-api.mjs
 - पुरानी `docs/testing-report-hi.md` की §3.14 (2 नवंबर) WhatsApp जाँच का **ऐतिहासिक रिकॉर्ड** है, इसलिए वैसी रहने दी गई; उसके बाद के दस्तावेज़ (README §विशेषताएँ, `admin-guide-hi.md` §7.2/§11, `student-guide-hi.md` §1/§3.1–3.2/§7) अब इन-ऐप सूचना/चैट बताते हैं।
 
 ### 11.5 डेटा सुरक्षा (deploy)
-- सूचनाएँ (`notices/`) और समूह चैट (`chat/`) भी Netlify Blobs में ही रहते हैं — deploy या rollback से नहीं मिटते (`deployment-guide-hi.md` §10.1)।
+- ऐतिहासिक Netlify deployment में सूचनाएँ (`notices/`) और समूह चैट (`chat/`) Blobs में थीं; मौजूदा production data Cloudflare D1 में है।
 - एडमिन → टूल्स → **JSON बैकअप** में अब `notices` और `chat` भी शामिल हैं; नया API test इसे जाँचता है।
 - deploy **नहीं** किया गया — अनुमति के बिना लाइव साइट पर कुछ नहीं भेजा जाएगा।
 
@@ -633,7 +637,7 @@ SMPS पेज बदले हैं पर **deploy नहीं** किय�
   - कोई सूचना न हो तो आसान भाषा में: *"अभी कोई सूचना नहीं — एडमिन जैसे ही नई सूचना डालेंगे, वह यहाँ अपने आप दिख जाएगी।"*
   - हर **60 सेकंड** में सर्वर से ताज़ा — पेज खुला हो तो नई सूचना अपने आप आ जाती है; टैब छिपा हो तो फिर से खोलते ही ताज़ा।
   - हिंदी/English टॉगल पर लेबल और **तारीख़ की भाषा** भी बदलती है (सूचना का पाठ वही रहता है जो एडमिन ने लिखा)।
-- **नया API:** पब्लिक `site_notices` (`netlify/lib/api-notify.mjs` + `netlify/functions/api.mjs`) — टोकन के बिना, केवल `active !== false` और `audience = all` सूचनाएँ, `read` स्थिति कभी नहीं भेजी जाती। छात्रों वाला `notices_list` पहले जैसा टोकन माँगता है — कोई बदलाव नहीं।
+- **नया API:** पब्लिक `site_notices` (`api/lib/api-notify.mjs` + `api/handler.mjs`) — टोकन के बिना, केवल `active !== false` और `audience = all` सूचनाएँ, `read` स्थिति कभी नहीं भेजी जाती। छात्रों वाला `notices_list` पहले जैसा टोकन माँगता है — कोई बदलाव नहीं।
 - सुरक्षा: एडमिन का शीर्षक/संदेश DOM में **escape** करके जाता है (HTML इंजेक्शन नहीं चल सकता)।
 
 ### 14.2 Automated API tests

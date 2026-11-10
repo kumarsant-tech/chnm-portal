@@ -40,23 +40,22 @@
     <section class="auth-wrap" id="authView" hidden>
       <div class="auth-aside">
         <div>
-          <span class="pill dark">CITS / CHNM · CBT SYSTEM</span>
-          <h1 style="margin-top:14px">सुरक्षित ऑनलाइन परीक्षा,<br>आपके ही ट्रेड के लिए।</h1>
-          <p>रजिस्ट्रेशन ID और मोबाइल नंबर से लॉगिन करें। परीक्षा का समय, उत्तर और परिणाम सर्वर पर सुरक्षित रहते हैं।</p>
+          <span class="pill dark">CHNM / CITS परीक्षा</span>
+          <h1 style="margin-top:14px">परीक्षा की तैयारी<br>सरल और सुरक्षित।</h1>
+          <p>अपने CITS नंबर या पंजीकृत मोबाइल से लॉगिन करें।</p>
           <div class="auth-features">
-            <div class="auth-feature"><span>1</span><div><b>पहले रजिस्ट्रेशन</b><small>फोटो, नाम, मोबाइल, ट्रेड और बैच दर्ज करें।</small></div></div>
-            <div class="auth-feature"><span>2</span><div><b>अपनी परीक्षा चुनें</b><small>अभ्यास और फाइनल परीक्षा अलग-अलग रहती हैं।</small></div></div>
-            <div class="auth-feature"><span>3</span><div><b>परिणाम और उत्तर</b><small>एडमिन द्वारा जारी होने के बाद ही दिखते हैं।</small></div></div>
+            <div class="auth-feature"><span>1</span><div><b>लॉगिन करें</b><small>CITS नंबर या मोबाइल और पासवर्ड दर्ज करें।</small></div></div>
+            <div class="auth-feature"><span>2</span><div><b>परीक्षा चुनें</b><small>उपलब्ध परीक्षा शुरू करें।</small></div></div>
           </div>
         </div>
-        <p class="tiny" style="color:#a9c0d0;margin-top:32px">केवल अपने ही परिणाम देखे जा सकते हैं। अपना ID और मोबाइल नंबर सुरक्षित रखें।</p>
+        <p class="tiny" style="color:#a9c0d0;margin-top:32px">पहली बार लॉगिन करने के बाद नया पासवर्ड सेट करें।</p>
       </div>
 
       <div class="auth-main">
         <div class="auth-card panel">
           <div id="authNotice"></div>
           <h2 id="authTitle">छात्र लॉगिन</h2>
-          <p class="muted small" id="authSub">रजिस्ट्रेशन ID और मोबाइल नंबर दर्ज करें।</p>
+          <p class="muted small" id="authSub">CITS नंबर या पंजीकृत मोबाइल और पासवर्ड दर्ज करें।</p>
 
           <div class="auth-tabs" role="tablist" aria-label="लॉगिन या रजिस्ट्रेशन">
             <button type="button" role="tab" aria-selected="true" data-auth-tab="login" id="tabLogin">लॉगिन</button>
@@ -65,20 +64,30 @@
 
           <form id="loginForm" class="stack" novalidate>
             <label class="field">
-              <span>रजिस्ट्रेशन ID</span>
-              <input class="input" id="loginId" name="id" placeholder="CHNM12" autocomplete="username" autocapitalize="characters" spellcheck="false" required>
+              <span>CITS नंबर या मोबाइल नंबर</span>
+              <input class="input" id="loginId" name="identifier" placeholder="CITS नंबर / 10 अंकों का मोबाइल" autocomplete="username" autocapitalize="characters" spellcheck="false" maxlength="40" required>
             </label>
             <label class="field">
-              <span>पंजीकृत मोबाइल नंबर</span>
-              <input class="input" id="loginMobile" name="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंकों का मोबाइल" autocomplete="tel" required>
+              <span>पासवर्ड</span>
+              <input class="input" id="loginPassword" name="password" type="password" autocomplete="current-password" maxlength="128">
             </label>
             <label class="field">
-              <span>PIN <span class="muted small">(यदि एडमिन ने सेट किया हो)</span></span>
-              <input class="input" id="loginPin" name="pin" type="password" inputmode="numeric" maxlength="8" placeholder="वैकल्पिक" autocomplete="current-password">
+              <span>पुराने खाते के लिए पंजीकृत मोबाइल</span>
+              <input class="input" id="loginMobile" name="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="केवल पुराने खाते के लिए" autocomplete="tel">
             </label>
             <p class="notice bad" id="loginError" hidden></p>
             <button class="btn btn-lg btn-block" id="loginBtn" type="submit">लॉगिन करें</button>
-            <p class="tiny muted" style="margin:0">ID भूल गए? परीक्षा संयोजक से संपर्क करें। एक मोबाइल नंबर से केवल एक ही रजिस्ट्रेशन होता है।</p>
+            <p class="tiny muted" style="margin:0">पहली बार पासवर्ड आपकी जन्मतिथि DDMMYYYY है।</p>
+          </form>
+
+          <form id="passwordChangePanel" class="stack" hidden novalidate>
+            <h3>नया पासवर्ड सेट करें</h3>
+            <p class="muted small">पहली बार लॉगिन के बाद यह जरूरी है।</p>
+            <label class="field"><span>अस्थायी / वर्तमान पासवर्ड</span><input class="input" id="changeCurrentPassword" type="password" autocomplete="current-password" maxlength="128"></label>
+            <label class="field"><span>नया पासवर्ड</span><input class="input" id="changeNewPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="changeConfirmPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <p class="notice bad" id="passwordChangeError" hidden></p>
+            <button class="btn btn-lg btn-block" id="passwordChangeBtn" type="submit">पासवर्ड सुरक्षित करें</button>
           </form>
 
           <form id="registerForm" class="stack" hidden novalidate>
@@ -93,26 +102,30 @@
             <div class="form-grid">
               <label class="field full"><span>पूरा नाम *</span><input class="input" id="regName" maxlength="60" autocomplete="name" required></label>
               <label class="field"><span>पिता का नाम</span><input class="input" id="regFather" maxlength="60" autocomplete="off"></label>
-              <label class="field"><span>मोबाइल नंबर *</span><input class="input" id="regMobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंक" autocomplete="tel" required></label>
-              <label class="field"><span>ईमेल *</span><input class="input" id="regEmail" type="email" maxlength="80" autocomplete="email" required></label>
+              <label class="field"><span>CITS नंबर</span><input class="input" id="regCits" maxlength="30" placeholder="यदि उपलब्ध हो"></label>
+              <label class="field"><span>मोबाइल नंबर</span><input class="input" id="regMobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंक" autocomplete="tel"></label>
+              <label class="field"><span>जन्मतिथि *</span><input class="input" id="regDob" type="date" autocomplete="bday" required><small>इसी से पहला अस्थायी पासवर्ड बनेगा।</small></label>
+              <label class="field"><span>ईमेल</span><input class="input" id="regEmail" type="email" maxlength="100" autocomplete="email" placeholder="पुष्टिकरण ईमेल के लिए"></label>
               <label class="field"><span>ट्रेड *</span><select class="select" id="regTrade" required><option value="">ट्रेड चुनें</option></select></label>
               <label class="field"><span>बैच / सत्र</span><input class="input" id="regBatch" maxlength="40" value="2026-27" placeholder="जैसे 2026-27"></label>
             </div>
+            <p class="tiny muted">CITS नंबर या मोबाइल नंबर में से एक देना आवश्यक है।</p>
             <label class="check"><input type="checkbox" id="regConsent"> मैं पुष्टि करता/करती हूँ कि दी गई जानकारी सही है और परीक्षा नियमों का पालन करूँगा/करूँगी।</label>
             <p class="notice bad" id="regError" hidden></p>
             <button class="btn btn-lg btn-block" id="registerBtn" type="submit">रजिस्ट्रेशन करें</button>
-            <p class="tiny muted" style="margin:0">रजिस्ट्रेशन के बाद आपको एक CHNM ID मिलेगा (जैसे CHNM12)। उसे सुरक्षित रखें — लॉगिन और परिणाम के लिए जरूरी है।</p>
+            <p class="tiny muted" style="margin:0">CITS नंबर न होने पर आपका मोबाइल लॉगिन ID होगा।</p>
           </form>
 
           <div id="registerSuccess" class="stack" hidden>
             <div class="notice good"><strong>रजिस्ट्रेशन पूरा हो गया</strong><br>आपका रजिस्ट्रेशन ID नीचे है। इसे स्क्रीनशॉट या नोट में सुरक्षित रखें।</div>
             <div class="reg-id-box">
-              <span class="small muted">रजिस्ट्रेशन ID</span>
-              <b id="regIdValue">CHNM12</b>
+              <span class="small muted">लॉगिन ID</span>
+              <b id="regLoginValue">9876543210</b>
               <div class="row"><button type="button" class="btn btn-soft btn-sm" id="copyRegId">ID कॉपी करें</button></div>
             </div>
-            <div class="notice info"><strong>सूचनाएँ पोर्टल पर मिलेंगी</strong><br>परीक्षा, परिणाम और जरूरी सूचना आपके डैशबोर्ड पर सीधे दिखती है। सभी पंजीकृत छात्रों के लिए समूह चैट भी यहीं है।</div>
-            <button type="button" class="btn btn-lg btn-block" id="openDashboardBtn">डैशबोर्ड खोलें</button>
+            <div class="notice info" id="registerEmailNotice"></div>
+            <p class="small muted">लॉगिन में इस ID और अपनी जन्मतिथि DDMMYYYY दर्ज करें। फिर नया पासवर्ड सेट करें।</p>
+            <a class="btn btn-lg btn-block" href="index.html">लॉगिन करें</a>
           </div>
         </div>
       </div>
@@ -177,7 +190,7 @@
 
   <footer class="site-foot">
     <div class="row-between">
-      <span>Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span>
+      <span id="portalGroupFooter">Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span>
       <span class="row">
         <a href="../index.html">मुख्य पोर्टल</a>
         <a href="admin.html">एडमिन</a>

@@ -45,10 +45,24 @@
               <input class="input" id="adminPassword" name="password" type="password" autocomplete="current-password" required autofocus />
               <button type="button" class="password-toggle" id="adminPasswordToggle" aria-label="पासवर्ड दिखाएँ"></button>
             </div>
-            <small>पासवर्ड सर्वर के Environment Variable से जाँचा जाता है — ब्राउज़र या कोड में सेव नहीं होता।</small>
+            <small>भूलने पर configured admin email पर reset link मँगाएँ।</small>
           </label>
           <p id="adminLoginError" class="notice bad" hidden></p>
           <button id="adminLoginBtn" class="btn btn-block btn-lg" type="submit">सुरक्षित लॉगिन</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="adminForgotOpen">पासवर्ड भूल गए?</button>
+        </form>
+        <form id="adminForgotForm" class="stack" hidden>
+          <p class="muted small">रीसेट लिंक केवल Cloudflare में सेट किए गए एडमिन ईमेल पर भेजा जाएगा।</p>
+          <p id="adminForgotMessage" class="notice" hidden></p>
+          <button id="adminForgotBtn" class="btn btn-block" type="submit">रीसेट लिंक भेजें</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="adminForgotBack">लॉगिन पर वापस जाएँ</button>
+        </form>
+        <form id="adminResetForm" class="stack" hidden>
+          <p class="muted small">नया पासवर्ड कम-से-कम 12 अक्षरों का रखें।</p>
+          <label class="field"><span>नया पासवर्ड</span><input class="input" id="adminResetPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+          <label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="adminResetConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+          <p id="adminResetError" class="notice bad" hidden></p>
+          <button id="adminResetBtn" class="btn btn-block btn-lg" type="submit">पासवर्ड रीसेट करें</button>
         </form>
         <div class="login-meta">
           <span>Future Instructor · CHNM</span>

@@ -499,7 +499,7 @@
   function applyInstituteBrand(settings) {
     const source = settings || {};
     state.settings = source;
-    const group = String(source.collegeName || source.siteName || "").trim();
+    const group = String(source.groupName || source.collegeName || source.siteName || "").trim();
     if (!group) return;
     state.brandName = group;
     if (els.cbtBrandName) els.cbtBrandName.textContent = group;

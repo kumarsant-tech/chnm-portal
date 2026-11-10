@@ -20,7 +20,7 @@
 | छात्र/परीक्षा पेज का डिज़ाइन या बटन | `exam/` और `exam/assets/` | हाँ |
 | पढ़ाई की किताब या अध्याय | `study/` या `study/trade/` | हाँ |
 | नई प्रश्न-पत्र template/sample file | `exam/templates/` | हाँ |
-| login, scoring, registration, API | `netlify/lib/` या `netlify/functions/` | हाँ; पहले developer से जाँच कराएँ |
+| login, scoring, registration, API | `api/lib/` या `api/handler.mjs` | हाँ; पहले developer से जाँच कराएँ |
 
 ### एडमिन से होने वाले बदलाव
 
@@ -77,7 +77,7 @@
 | `exam/templates/` | प्रश्न import के नमूने और templates |
 | `study/` | Training Methodology किताब और अध्याय |
 | `study/trade/` | Trade Theory किताब और अध्याय |
-| `netlify/functions/api.mjs`, `netlify/lib/` | साझा API और database logic; संवेदनशील code, बिना विशेषज्ञ सलाह न बदलें |
+| `api/handler.mjs`, `api/lib/` | API और database logic; संवेदनशील code, बिना विशेषज्ञ सलाह न बदलें |
 | `cloudflare/worker.mjs` | Cloudflare Worker: API routing, static files और scheduled काम |
 | `wrangler.jsonc` | Cloudflare Worker/D1 configuration; न बदलें जब तक वजह स्पष्ट न हो |
 | `cloudflare/migrations/` | Database schema बदलने की migrations; गलती से चलाने पर data प्रभावित हो सकता है |

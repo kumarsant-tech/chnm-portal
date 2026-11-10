@@ -87,6 +87,17 @@
     $("#sidebarToggle").addEventListener("click", () => $("#adminSidebar").classList.toggle("open"));
     $("#adminLogoutBtn").addEventListener("click", () => logout(true));
     $("#adminLoginForm").addEventListener("submit", adminLogin);
+    $("#adminForgotOpen").addEventListener("click", () => {
+      $("#adminLoginForm").hidden = true;
+      $("#adminForgotForm").hidden = false;
+      $("#adminForgotMessage").hidden = true;
+    });
+    $("#adminForgotBack").addEventListener("click", () => {
+      $("#adminForgotForm").hidden = true;
+      $("#adminLoginForm").hidden = false;
+    });
+    $("#adminForgotForm").addEventListener("submit", requestAdminReset);
+    $("#adminResetForm").addEventListener("submit", completeAdminReset);
     window.addEventListener("hashchange", () => {
       const route = routeFromHash();
       if (route !== state.route) renderRoute(route);
@@ -94,6 +105,12 @@
 
     if (!state.token) {
       showLogin();
+      const resetToken = new URLSearchParams(window.location.search).get("reset");
+      if (resetToken) {
+        $("#adminLoginForm").hidden = true;
+        $("#adminForgotForm").hidden = true;
+        $("#adminResetForm").hidden = false;
+      }
       return;
     }
     showShell();
@@ -136,6 +153,54 @@
     } catch (err) {
       error.hidden = false;
       error.textContent = err.message || "लॉगिन नहीं हो सका";
+    } finally {
+      UI.setButtonBusy(button, false);
+    }
+  }
+
+  async function requestAdminReset(event) {
+    event.preventDefault();
+    const button = $("#adminForgotBtn");
+    const message = $("#adminForgotMessage");
+    message.hidden = true;
+    UI.setButtonBusy(button, true, "ईमेल भेजा जा रहा है…");
+    try {
+      const data = await UI.call("admin_forgot_password", {});
+      message.className = "notice good";
+      message.textContent = data.message;
+      message.hidden = false;
+    } catch (error) {
+      message.className = "notice bad";
+      message.textContent = error.message || "रीसेट ईमेल नहीं भेजा जा सका।";
+      message.hidden = false;
+    } finally {
+      UI.setButtonBusy(button, false);
+    }
+  }
+
+  async function completeAdminReset(event) {
+    event.preventDefault();
+    const errorNode = $("#adminResetError");
+    errorNode.hidden = true;
+    const password = $("#adminResetPassword").value;
+    if (password !== $("#adminResetConfirm").value) {
+      errorNode.textContent = "दोनों पासवर्ड एक जैसे नहीं हैं।";
+      errorNode.hidden = false;
+      return;
+    }
+    const token = new URLSearchParams(window.location.search).get("reset") || "";
+    const button = $("#adminResetBtn");
+    UI.setButtonBusy(button, true, "पासवर्ड रीसेट हो रहा है…");
+    try {
+      const data = await UI.call("admin_reset_password", { token, newPassword: password });
+      $("#adminResetForm").hidden = true;
+      $("#adminLoginForm").hidden = false;
+      $("#adminPassword").focus();
+      UI.toast(data.message || "पासवर्ड रीसेट हो गया।", "good");
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch (error) {
+      errorNode.textContent = error.message || "पासवर्ड रीसेट नहीं हो सका।";
+      errorNode.hidden = false;
     } finally {
       UI.setButtonBusy(button, false);
     }
@@ -3321,6 +3386,7 @@
       name: "",
       fatherName: "",
       mobile: "",
+      citsNumber: "",
       email: "",
       tradeId: (trades()[0] && trades()[0].id) || "",
       batch: "",
@@ -3352,7 +3418,10 @@
       '<label class="field"><span>पिता का नाम</span><input class="input" id="studentFather" maxlength="60" value="' +
       attr(student.fatherName || "") +
       '"></label>' +
-      '<label class="field"><span>मोबाइल नंबर *</span><input class="input" id="studentMobile" inputmode="numeric" maxlength="10" value="' +
+      '<label class="field"><span>CITS नंबर</span><input class="input" id="studentCits" maxlength="30" value="' +
+      attr(student.citsNumber || "") +
+      '" placeholder="CITS या मोबाइल में से एक आवश्यक"></label>' +
+      '<label class="field"><span>मोबाइल नंबर</span><input class="input" id="studentMobile" inputmode="numeric" maxlength="10" value="' +
       attr(student.mobile || "") +
       '"></label>' +
       '<label class="field"><span>ईमेल</span><input class="input" id="studentEmail" type="email" maxlength="100" value="' +
@@ -3364,7 +3433,7 @@
       '<label class="field"><span>बैच</span><input class="input" id="studentBatch" maxlength="40" value="' +
       attr(student.batch || "") +
       '" placeholder="जैसे: 2026-27"></label>' +
-      '<label class="field"><span>लॉगिन PIN (वैकल्पिक)</span><input class="input" id="studentPin" inputmode="numeric" maxlength="8" placeholder="4–8 अंक"><small>खाली छोड़ें तो PIN नहीं बदलेगा। लॉगिन = Registration ID + मोबाइल' +
+      '<label class="field"><span>पुराना PIN (वैकल्पिक)</span><input class="input" id="studentPin" inputmode="numeric" maxlength="8" placeholder="4–8 अंक"><small>सिर्फ़ पुराने लॉगिन के लिए; पहली बार लॉगिन के बाद छात्र नया पासवर्ड बनाएगा।' +
       (student.hasPin ? " + PIN" : "") +
       "</small></label>" +
       "</div>" +
@@ -3376,7 +3445,7 @@
         ? '<label class="check"><input type="checkbox" id="studentClearPin"><span>मौजूदा PIN हटाएँ</span></label>'
         : "") +
       "</div></div>" +
-      '<div class="notice info small" style="margin-top:12px">विद्यार्थी केवल अपना प्रोफ़ाइल और अपने परिणाम देख सकता है। PIN भेजने के लिए सुरक्षित माध्यम का उपयोग करें।</div>';
+      '<div class="notice info small" style="margin-top:12px">लॉगिन ID CITS नंबर होगा; न होने पर मोबाइल नंबर।</div>';
 
     const modal = UI.modal({
       title: existing ? "विद्यार्थी एडिट करें" : "नया विद्यार्थी",
@@ -3392,13 +3461,22 @@
           onClick: async (handle) => {
             const name = $("#studentName", modal.body).value.trim();
             const mobile = $("#studentMobile", modal.body).value.trim();
+            const citsNumber = $("#studentCits", modal.body).value.trim();
             const tradeId = $("#studentTrade", modal.body).value;
             if (name.length < 2) {
               UI.toast("छात्र का सही नाम दर्ज करें", "bad");
               return;
             }
-            if (!/^[6-9]\d{9}$/.test(mobile.replace(/[\s-]/g, ""))) {
+            if (mobile && !/^[6-9]\d{9}$/.test(mobile.replace(/[\s-]/g, ""))) {
               UI.toast("10 अंकों का सही मोबाइल नंबर दें", "bad");
+              return;
+            }
+            if (!mobile && !citsNumber) {
+              UI.toast("CITS नंबर या मोबाइल नंबर में से एक आवश्यक है", "bad");
+              return;
+            }
+            if (citsNumber && !/^[A-Za-z0-9/-]{2,30}$/.test(citsNumber)) {
+              UI.toast("सही CITS नंबर दर्ज करें", "bad");
               return;
             }
             if (!tradeId) {
@@ -3408,6 +3486,7 @@
             const payload = {
               name: name,
               fatherName: $("#studentFather", modal.body).value.trim(),
+              citsNumber: $("#studentCits", modal.body).value.trim(),
               mobile: mobile,
               email: $("#studentEmail", modal.body).value.trim(),
               tradeId: tradeId,
@@ -4197,8 +4276,8 @@
       '<label class="field"><span>पोर्टल का नाम</span><input class="input" id="setSiteName" maxlength="80" value="' +
       attr(s.siteName || "") +
       '"></label>' +
-      '<label class="field"><span>संस्थान का नाम</span><input class="input" id="setCollegeName" maxlength="80" value="' +
-      attr(s.collegeName || "") +
+      '<label class="field"><span>ग्रुप का नाम</span><input class="input" id="setGroupName" maxlength="80" value="' +
+      attr(s.groupName || s.collegeName || "") +
       '"></label>' +
       '<label class="field"><span>डिफ़ॉल्ट पास प्रतिशत</span><input class="input" id="setPassPct" type="number" min="0" max="100" step="0.5" value="' +
       attr(s.defaultPassPct) +
@@ -4220,20 +4299,29 @@
       esc(s.defaultInstructionsEn || "") +
       "</textarea></label></div>" +
       '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="settingsSaveBtn">सेटिंग्स सेव करें</button></div></form>' +
-      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>सुरक्षा और वातावरण</h3><p class="admin-card-sub">ये मान केवल Netlify Environment Variables में रखें — फ्रंटएंड में कभी नहीं।</p></div></div>' +
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>एडमिन पासवर्ड</h3><p class="admin-card-sub">नया पासवर्ड कम-से-कम 12 अक्षरों का होना चाहिए।</p></div></div>' +
+      '<form id="adminPasswordChangeForm" class="settings-grid">' +
+      '<label class="field"><span>वर्तमान पासवर्ड</span><input class="input" id="adminCurrentPassword" type="password" autocomplete="current-password" maxlength="128" required></label>' +
+      '<label class="field"><span>नया पासवर्ड</span><input class="input" id="adminNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>' +
+      '<label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="adminConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>' +
+      '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="adminPasswordChangeBtn">पासवर्ड बदलें</button></div></form>' +
+      '<p class="tiny muted">भूला हुआ पासवर्ड रीसेट लिंक केवल Cloudflare secret ADMIN_EMAIL पर भेजा जाता है।</p></section>' +
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>Cloudflare सुरक्षा कॉन्फ़िगरेशन</h3><p class="admin-card-sub">Secret values केवल Cloudflare Worker settings में रखें — फ्रंटएंड या GitHub में नहीं।</p></div></div>' +
       '<dl class="detail-list">' +
-      detailRow("ADMIN_PASSWORD", "एडमिन लॉगिन पासवर्ड (अनिवार्य)") +
-      detailRow("ADMIN_SECRET", "टोकन हस्ताक्षर के लिए लंबा रैंडम सीक्रेट (अनिवार्य)") +
-      detailRow("BLOBS_STORE", "वैकल्पिक Blobs स्टोर नाम (डिफ़ॉल्ट chnm-exam-v2)") +
-      detailRow("SESSION_HOURS", "वैकल्पिक सत्र अवधि (डिफ़ॉल्ट 12 घंटे)") +
-      "</dl><div class=\"notice warn\" style=\"margin-top:12px\">ADMIN_PASSWORD बदलने पर सभी पुराने टोकन अमान्य हो जाते हैं। पासवर्ड किसी भी HTML/JS फाइल में न रखें।</div></section>";
+      detailRow("ADMIN_PASSWORD", "शुरुआती पासवर्ड (पासवर्ड बदलने के बाद वैकल्पिक)") +
+      detailRow("ADMIN_SECRET", "सत्र टोकन हस्ताक्षर के लिए स्थिर, 32+ byte secret") +
+      detailRow("ADMIN_EMAIL", "एडमिन रिकवरी ईमेल") +
+      detailRow("RESEND_API_KEY", "ईमेल भेजने की Resend API key") +
+      detailRow("EMAIL_FROM", "Resend में सत्यापित भेजने वाला पता") +
+      detailRow("PUBLIC_BASE_URL", "HTTPS वेबसाइट origin, जैसे https://portal.example") +
+      "</dl><div class=\"notice warn\" style=\"margin-top:12px\">D1 में पासवर्ड का salted hash रखा जाता है; ADMIN_SECRET न बदलें।</div></section>";
 
     $("#settingsForm", content).addEventListener("submit", async (event) => {
       event.preventDefault();
       const button = $("#settingsSaveBtn", content);
       const settings = {
         siteName: $("#setSiteName", content).value.trim(),
-        collegeName: $("#setCollegeName", content).value.trim(),
+        groupName: $("#setGroupName", content).value.trim(),
         registrationOpen: $("#setRegistrationOpen", content).checked,
         defaultPassPct: Number($("#setPassPct", content).value),
         defaultDurationMin: Number($("#setDuration", content).value),
@@ -4252,6 +4340,31 @@
         UI.setButtonBusy(button, false);
       } catch (error) {
         UI.toast(error.message || "सेटिंग्स सेव नहीं हो सकीं", "bad");
+        UI.setButtonBusy(button, false);
+      }
+    });
+
+    $("#adminPasswordChangeForm", content).addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const currentPassword = $("#adminCurrentPassword", content).value;
+      const newPassword = $("#adminNewPassword", content).value;
+      if (newPassword !== $("#adminConfirmPassword", content).value) {
+        UI.toast("दोनों नए पासवर्ड एक जैसे नहीं हैं।", "bad");
+        return;
+      }
+      const button = $("#adminPasswordChangeBtn", content);
+      UI.setButtonBusy(button, true, "पासवर्ड बदला जा रहा है…");
+      try {
+        const result = await api("admin_password_change", { currentPassword, newPassword });
+        state.token = result.token;
+        UI.setAdminSession(result.token);
+        $("#adminCurrentPassword", content).value = "";
+        $("#adminNewPassword", content).value = "";
+        $("#adminConfirmPassword", content).value = "";
+        UI.toast(result.message, "good");
+      } catch (error) {
+        UI.toast(error.message || "पासवर्ड बदला नहीं जा सका।", "bad");
+      } finally {
         UI.setButtonBusy(button, false);
       }
     });
@@ -4280,7 +4393,7 @@
           '</dl><div class="editor-actions"><button class="btn btn-navy btn-sm" type="button" data-legacy-import>पुराना डेटा आयात करें</button></div><div class="notice warn small" style="margin-top:10px">आयात से पहले पूरा JSON बैकअप निकालने की सलाह है। मौजूदा परिणाम नहीं बदले जाएँगे।</div>'
         : '<div class="notice info">इस स्टोर में पुराने पोर्टल का कोई डेटा नहीं मिला।</div>') +
       "</section>" +
-      '<section class="admin-card"><div class="admin-section-head"><div><h3>पूरा डेटा बैकअप</h3><p class="admin-card-sub">Students, Exams, Papers, Questions, Results, Settings</p></div></div><p class="small muted">पूरा डेटा JSON में डाउनलोड करें। इसे सुरक्षित जगह रखें — इसमें छात्रों की जानकारी और परीक्षा पेपर शामिल हैं।</p><div class="backup-actions" style="margin-top:12px"><button class="btn btn-sm" type="button" id="exportAllBtn">JSON बैकअप डाउनलोड</button><a class="btn btn-ghost btn-sm" href="templates/questions-template.xlsx" download>Excel टेम्पलेट</a><a class="btn btn-ghost btn-sm" href="templates/questions-sample.json" download>Sample JSON</a></div><div class="notice info small" style="margin-top:12px">Netlify Blobs का अलग बैकअप Netlify Dashboard से भी निकाला जा सकता है।</div></section></div>' +
+      '<section class="admin-card"><div class="admin-section-head"><div><h3>पूरा डेटा बैकअप</h3><p class="admin-card-sub">Students, Exams, Papers, Questions, Results, Settings</p></div></div><p class="small muted">पूरा डेटा JSON में डाउनलोड करें। इसे सुरक्षित जगह रखें — इसमें छात्रों की जानकारी और परीक्षा पेपर शामिल हैं।</p><div class="backup-actions" style="margin-top:12px"><button class="btn btn-sm" type="button" id="exportAllBtn">JSON बैकअप डाउनलोड</button><a class="btn btn-ghost btn-sm" href="templates/questions-template.xlsx" download>Excel टेम्पलेट</a><a class="btn btn-ghost btn-sm" href="templates/questions-sample.json" download>Sample JSON</a></div></section></div>' +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>ऑडिट लॉग</h3><p class="admin-card-sub">एडमिन की सभी संवेदनशील गतिविधियाँ</p></div><div class="row"><select class="select compact" id="auditLimit">' +
       optionList(
         [

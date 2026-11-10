@@ -9,6 +9,7 @@ export function publicSettings(settings) {
   return {
     siteName: settings.siteName,
     collegeName: settings.collegeName,
+    groupName: settings.groupName || settings.collegeName || "",
     registrationOpen: settings.registrationOpen !== false,
     defaultPassPct: settings.defaultPassPct,
     defaultDurationMin: settings.defaultDurationMin,
@@ -25,12 +26,15 @@ export function studentSelf(student) {
     id: student.id,
     name: student.name,
     fatherName: student.fatherName || "",
+    citsNumber: student.citsNumber || "",
+    loginId: student.citsNumber || student.mobile || "",
     tradeId: student.tradeId,
     batch: student.batch || "",
     mobile: student.mobile,
     email: student.email || "",
     photo: student.photo || "",
     active: student.active !== false,
+    passwordChangeRequired: Boolean(student.mustChangePassword || !student.passwordHash),
     createdAt: student.createdAt,
   };
 }
@@ -41,6 +45,7 @@ export function studentSummary(student, tradeName = "") {
     name: student.name,
     fatherName: student.fatherName || "",
     mobile: student.mobile,
+    citsNumber: student.citsNumber || "",
     email: student.email || "",
     tradeId: student.tradeId,
     tradeName,

@@ -1,32 +1,24 @@
 // Local development + E2E server. Serves the built ./dist site and calls the
-// real Netlify Function handler directly with an in-memory Blobs replacement.
+// API handler directly with an in-memory store.
 import http from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "./build.mjs";
+import { REDIRECTS } from "../cloudflare/redirects.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist");
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 8888);
 
-// netlify.toml के [[redirects]] यहाँ भी लागू करता है ताकि लोकल जाँच production जैसी रहे।
-const TOML = await import("node:fs/promises").then((fs) =>
-  fs.readFile(path.join(ROOT, "netlify.toml"), "utf8")
-);
-const MOVED_PATHS = {};
-for (const m of TOML.matchAll(/from\s*=\s*"([^"]+)"\s*\n\s*to\s*=\s*"([^"]+)"/g)) {
-  MOVED_PATHS[m[1]] = m[2];
-}
-
 process.env.USE_MEMORY_STORE = "1";
 process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin12345";
 process.env.ADMIN_SECRET =
   process.env.ADMIN_SECRET || "local-dev-only-secret-please-change-0123456789abcdef";
 
-const { default: api } = await import("../netlify/functions/api.mjs");
+const { default: api } = await import("../api/handler.mjs");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -191,7 +183,7 @@ const server = http.createServer(async (req, res) => {
     await handleApi(req, res, url);
     return;
   }
-  const moved = MOVED_PATHS[url.pathname];
+  const moved = REDIRECTS.get(url.pathname);
   if (moved) {
     res.writeHead(301, { location: moved, "Cache-Control": "no-store" });
     res.end();

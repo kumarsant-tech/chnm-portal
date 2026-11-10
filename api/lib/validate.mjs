@@ -175,7 +175,18 @@ export function validateStudent(input) {
   const name = clean(input.name, 60);
   if (name.length < 2) throw new HttpError("छात्र का सही नाम दर्ज करें", 400);
   const mobile = phone(input.mobile);
-  if (!mobile) throw new HttpError("10 अंकों का सही मोबाइल नंबर दें", 400);
+  if (input.mobile && !mobile) throw new HttpError("10 अंकों का सही मोबाइल नंबर दें", 400);
+  const citsNumber = clean(input.citsNumber ?? input.cits, 30).toUpperCase();
+  if (citsNumber && !/^[A-Z0-9/-]{2,30}$/.test(citsNumber)) {
+    throw new HttpError("सही CITS नंबर दर्ज करें", 400);
+  }
+  if (!mobile && !citsNumber) {
+    throw new HttpError("CITS नंबर या मोबाइल नंबर में से एक दर्ज करना आवश्यक है", 400);
+  }
+  const dateOfBirth = String(input.dateOfBirth || "");
+  if (dateOfBirth && !validDateOfBirth(dateOfBirth)) {
+    throw new HttpError("जन्मतिथि सही दर्ज करें", 400);
+  }
   const emailAddress = clean(input.email, 100).toLowerCase();
   if (emailAddress && !email(emailAddress)) {
     throw new HttpError("सही ईमेल दर्ज करें", 400);
@@ -187,11 +198,30 @@ export function validateStudent(input) {
     name,
     fatherName: clean(input.fatherName, 60),
     mobile,
+    citsNumber,
+    dateOfBirth,
     email: emailAddress,
     tradeId: clean(input.tradeId, 40) || DEFAULT_TRADE_ID,
     batch: clean(input.batch, 40),
     photo: photo(input.photo),
   };
+}
+
+export function validDateOfBirth(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getTime() <= Date.now()
+  );
+}
+
+export function temporaryPasswordFromDob(value) {
+  if (!validDateOfBirth(value)) throw new HttpError("जन्मतिथि सही दर्ज करें", 400);
+  return value.slice(8, 10) + value.slice(5, 7) + value.slice(0, 4);
 }
 
 export function validateExam(input) {
