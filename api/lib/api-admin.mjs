@@ -1741,9 +1741,13 @@ export async function handleAdminQuestions({ store, req, staff }) {
     .filter((question) => {
       if (body.active === true && question.active === false) return false;
       if (body.active === false && question.active !== false) return false;
-      const setId = exam?.questionSetId || clean(body.setId, 80);
+      const setId = clean(body.setId, 80);
       if (setId && questionSet(question).setId !== setId) return false;
-      if (exam && !exam.questionSetId && !exam.questionIds.includes(question.qid)) return false;
+      if (examOnlyStaff && exam) {
+        const belongsToExamSet =
+          exam.questionSetId && questionSet(question).setId === exam.questionSetId;
+        if (!belongsToExamSet && !exam.questionIds.includes(question.qid)) return false;
+      }
       if (!q) return true;
       return normalizeText(question.text).includes(normalizeText(q)) ||
         String(question.qid).toLowerCase().includes(q);

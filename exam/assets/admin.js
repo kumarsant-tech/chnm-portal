@@ -1197,7 +1197,7 @@
         const data = await api("admin_questions", {
           subjectId: subject === "mixed" ? "" : subject,
           examId: exam.id,
-          setId: exam.questionSetId || $("#pickerSet", root).value,
+          setId: $("#pickerSet", root).value,
           q: $("#pickerSearch", root).value.trim(),
           page: pickerPage,
           pageSize: 30,
@@ -1298,7 +1298,7 @@
           const data = await api("admin_questions", {
             subjectId: subject === "mixed" ? "" : subject,
             examId: exam.id,
-            setId: exam.questionSetId || setId,
+            setId,
             q,
             page,
             pageSize: 100,

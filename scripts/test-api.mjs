@@ -386,6 +386,32 @@ let questionCorrectIndexes = [];
   );
   check("exam created", save.status === 200, JSON.stringify(save.data));
   examId = save.data.exam.id;
+  const examFolderOptions = await call(
+    "admin_questions",
+    { subjectId: "trade-theory", examId, pageSize: 100 },
+    globalThis.adminToken
+  );
+  check(
+    "exam question picker lists imported folders for the selected subject",
+    examFolderOptions.status === 200 &&
+      examFolderOptions.data.sets?.some(
+        (set) => set.setId === imported.data.set.setId && set.count === 3
+      ) &&
+      examFolderOptions.data.total > 3,
+    JSON.stringify({ status: examFolderOptions.status, sets: examFolderOptions.data.sets, total: examFolderOptions.data.total })
+  );
+  const examFolderQuestions = await call(
+    "admin_questions",
+    { subjectId: "trade-theory", examId, setId: imported.data.set.setId, pageSize: 100 },
+    globalThis.adminToken
+  );
+  check(
+    "exam question picker filters by the chosen imported folder",
+    examFolderQuestions.status === 200 &&
+      examFolderQuestions.data.items?.length === 3 &&
+      examFolderQuestions.data.items.every((question) => question.setId === imported.data.set.setId),
+    JSON.stringify({ status: examFolderQuestions.status, total: examFolderQuestions.data.total })
+  );
 
   const duplicateCode = await call(
     "admin_exam_save",
