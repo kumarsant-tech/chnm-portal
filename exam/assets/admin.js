@@ -1076,7 +1076,7 @@
       '<div class="picker-toolbar"><input class="input grow-input" id="pickerSearch" placeholder="प्रश्न खोजें…"><select class="select compact" id="pickerSet"><option value="">सभी फ़ोल्डर</option></select><button class="btn btn-sm btn-ghost" type="button" id="pickerGo">खोजें</button></div>' +
       '<div class="row" style="margin-top:8px"><button class="btn btn-sm btn-soft" type="button" id="pickerAll"' +
       (published ? " disabled" : "") +
-      '>इस फ़ोल्डर के सभी प्रश्न चुनें</button><span class="tiny muted" id="pickerSetHint">फ़ोल्डर चुनें तो सिर्फ़ उसी सेट के प्रश्न जुड़ेंगे।</span></div>' +
+      '>इस फ़ोल्डर के सभी प्रश्न जोड़ें</button><span class="tiny muted" id="pickerSetHint">फ़ोल्डर चुनते ही उसके सभी प्रश्न परीक्षा में जुड़ेंगे।</span></div>' +
       '<div class="picker" id="pickerList"><p class="muted small">प्रश्न लोड हो रहे हैं…</p></div>' +
       '<div id="pickerPager"></div>' +
       (published ? '<p class="palette-note">Published परीक्षा में प्रश्न नहीं जोड़े या हटाए जा सकते।</p>' : "") +
@@ -1271,13 +1271,13 @@
       const allButton = $("#pickerAll", root);
       if (allButton) {
         allButton.textContent = chosen
-          ? "इस फ़ोल्डर के सभी प्रश्न चुनें"
-          : "इस विषय के सभी प्रश्न चुनें";
+          ? "इस फ़ोल्डर के सभी प्रश्न जोड़ें"
+          : "इस विषय के सभी प्रश्न जोड़ें";
       }
       if (hint) {
         hint.textContent = chosen
-          ? "चुना फ़ोल्डर: " + chosen.setName + " — ऊपर वाला बटन इसी सेट के सभी प्रश्न जोड़ेगा।"
-          : "फ़ोल्डर चुनें तो सिर्फ़ उसी सेट के प्रश्न जुड़ेंगे।";
+          ? "चुना फ़ोल्डर: " + chosen.setName + " — इसके सभी प्रश्न एक साथ जोड़ दिए जाएँगे।"
+          : "फ़ोल्डर चुनते ही उसके सभी प्रश्न परीक्षा में जुड़ेंगे।";
       }
     }
 
@@ -1460,7 +1460,11 @@
       pick(input.dataset.pick, input.checked);
     });
     $("#pickerGo", root).addEventListener("click", () => loadPicker(1));
-    $("#pickerSet", root).addEventListener("change", () => loadPicker(1));
+    $("#pickerSet", root).addEventListener("change", async (event) => {
+      const selectedSetId = event.currentTarget.value;
+      await loadPicker(1);
+      if (selectedSetId) await selectAllQuestions();
+    });
     $("#pickerAll", root).addEventListener("click", selectAllQuestions);
     $("#builderPreviewBtn", root).addEventListener("click", () => previewFromEditor(modal));
     $("#pickerSearch", root).addEventListener("keydown", (event) => {
