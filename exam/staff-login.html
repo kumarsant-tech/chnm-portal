@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>स्टाफ लॉगिन · CHNM परीक्षा पोर्टल</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="../assets/modern-ui.css?v=2">
+  <link rel="stylesheet" href="../assets/exam-ui.css?v=2">
+</head>
+<body>
+  <header class="fi-header">
+    <a class="brand" href="../index.html" aria-label="Future Instructor पोर्टल होम">
+      <span class="brand-mark">FI</span>
+      <span class="brand-text"><strong>Future Instructor</strong><small>CHNM परीक्षा पोर्टल</small></span>
+    </a>
+    <div class="header-spacer"></div>
+    <nav class="header-links" aria-label="मुख्य मेन्यू">
+      <a class="header-link" href="index.html">छात्र पोर्टल</a>
+      <a class="header-link" href="../index.html">मुख्य वेबसाइट</a>
+    </nav>
+  </header>
+  <main class="page" style="max-width:760px">
+    <section class="panel">
+      <span class="pill dark">STAFF ACCESS</span>
+      <h1 style="margin-top:12px">स्टाफ लॉगिन</h1>
+      <p class="muted">एडमिन, परीक्षा कंट्रोलर और अन्य स्टाफ के खाते छात्र लॉगिन से अलग हैं।</p>
+      <div id="roleChoices" class="grid-3" style="margin:22px 0">
+        <a class="btn btn-ghost" href="admin.html">एडमिन</a>
+        <button class="btn btn-ghost" type="button" data-role="controller">परीक्षा कंट्रोलर</button>
+        <button class="btn btn-ghost" type="button" data-role="staff">अन्य स्टाफ</button>
+      </div>
+      <form id="staffLoginForm" class="stack" hidden>
+        <h2 id="staffRoleTitle">स्टाफ लॉगिन</h2>
+        <label class="field"><span id="staffIdentifierLabel">ईमेल</span><input class="input" type="text" name="email" autocomplete="username" maxlength="254" required></label>
+        <label class="field"><span>पासवर्ड</span><input class="input" type="password" name="password" autocomplete="current-password" maxlength="128" required></label>
+        <p id="staffLoginError" class="notice bad" hidden></p>
+        <div class="row">
+          <button class="btn btn-navy" id="staffLoginButton" type="submit">लॉगिन करें</button>
+          <button class="btn btn-ghost" id="staffRoleBack" type="button">वापस</button>
+        </div>
+      </form>
+      <form id="staffSetupForm" class="stack" hidden>
+        <h2>अपना पासवर्ड सेट करें</h2>
+        <p class="notice info">आमंत्रण लिंक 24 घंटे में समाप्त होगा और एक बार ही इस्तेमाल किया जा सकता है।</p>
+        <label class="field"><span>नया पासवर्ड (कम-से-कम 12 अक्षर)</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="field"><span>पासवर्ड दोबारा लिखें</span><input class="input" type="password" name="confirmPassword" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <p id="staffSetupError" class="notice bad" hidden></p>
+        <button class="btn btn-navy" id="staffSetupButton" type="submit">पासवर्ड सेव करें</button>
+      </form>
+    </section>
+  </main>
+  <footer class="site-foot"><span>Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span></footer>
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+  <script src="assets/ui.js"></script>
+  <script src="assets/staff-login.js"></script>
+</body>
+</html>

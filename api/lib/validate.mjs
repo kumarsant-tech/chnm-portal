@@ -253,6 +253,8 @@ export function validateExam(input) {
   const endAt = dateIso(input.endAt);
   if (input.startAt && !startAt) throw new HttpError("Exam Start Time गलत है", 400);
   if (input.endAt && !endAt) throw new HttpError("Exam End Time गलत है", 400);
+  if (!startAt) throw new HttpError("Exam Start Time अनिवार्य है", 400);
+  if (!endAt) throw new HttpError("Exam End Time अनिवार्य है", 400);
   if (startAt && endAt && new Date(startAt) >= new Date(endAt)) {
     throw new HttpError("Exam End Time, Start Time के बाद होना चाहिए", 400);
   }

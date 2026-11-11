@@ -141,6 +141,22 @@
     writeStorage("localStorage", ADMIN_TOKEN_KEY, token || null);
     writeStorage("sessionStorage", ADMIN_TOKEN_KEY, token || null);
   }
+  function staffToken() {
+    return readStorage("sessionStorage", "fig.staff.token");
+  }
+  function setStaffSession(token, profile) {
+    writeStorage("sessionStorage", "fig.staff.token", token || null);
+    writeStorage("sessionStorage", "fig.staff.profile", profile ? JSON.stringify(profile) : null);
+  }
+  function staffProfile() {
+    const raw = readStorage("sessionStorage", "fig.staff.profile");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
 
   /* ---------- API ---------- */
   class ApiError extends Error {
@@ -755,6 +771,9 @@
     studentData: studentData,
     adminToken: adminToken,
     setAdminSession: setAdminSession,
+    staffToken: staffToken,
+    setStaffSession: setStaffSession,
+    staffProfile: staffProfile,
     toast: toast,
     modal: modal,
     confirm: confirmDialog,

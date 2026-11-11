@@ -243,6 +243,8 @@ const examPayload = {
   marksPerQuestion: 1,
   negativeMarks: 0.25,
   instructions: "सभी प्रश्न अनिवार्य हैं।",
+  startAt: new Date(Date.now() - 60 * 1000).toISOString(),
+  endAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   type: "final",
   attemptsAllowed: 1,
   releaseResults: false,
@@ -1979,6 +1981,181 @@ if (testD1) {
   await worker.scheduled({}, runtimeEnv);
   check("Cloudflare scheduled expiry handler runs", true);
 }
+
+console.log("\n19. Exam controller migration and exam settings");
+{
+  const legacyPassword = TEST_PASSWORD_1;
+  await putJson(store, K.examController(), {
+    username: "legacy-controller",
+    displayName: "Legacy Controller",
+    passwordHash: await hashPassword(legacyPassword),
+    active: true,
+    mustChangePassword: false,
+    authVersion: 1,
+  });
+  const legacyLogin = await call(
+    "exam_controller_login",
+    { username: "legacy-controller", password: legacyPassword },
+    "",
+    "203.0.113.21"
+  );
+  check("legacy controller login requires profile upgrade", legacyLogin.status === 200 && legacyLogin.data.mustUpgradeAccount);
+  const upgraded = await call(
+    "controller_account_upgrade",
+    {
+      profile: {
+        currentPassword: legacyPassword,
+        displayName: "Upgraded Controller",
+        email: "controller-upgrade@example.test",
+        mobile: "9876500088",
+        newPassword: TEST_PASSWORD_2,
+      },
+    },
+    legacyLogin.data.token,
+    "203.0.113.21"
+  );
+  const migratedController = await getJson(store, K.examController());
+  const migratedUser = upgraded.status === 200
+    ? await getJson(store, K.staffUser(upgraded.data.profile.id))
+    : null;
+  check(
+    "account upgrade preserves the legacy controller record and its migration link",
+    upgraded.status === 200 &&
+      migratedController?.active === false &&
+      migratedController?.migratedTo === upgraded.data.profile.id &&
+      migratedController?.passwordHash === null &&
+      migratedUser?.email === "controller-upgrade@example.test"
+  );
+  const upgradedLogin = await call(
+    "staff_login",
+    { email: "controller-upgrade@example.test", password: TEST_PASSWORD_2, expectedType: "controller" },
+    "",
+    "203.0.113.22"
+  );
+  check("upgraded controller can sign in through staff login", upgradedLogin.status === 200);
+
+  const previousSettings = (await getJson(store, K.settings())) || {};
+  const defaults = {
+    ...previousSettings,
+    defaultDurationMin: 75,
+    defaultPassPct: 62,
+    defaultInstructions: "परीक्षा के निर्देश",
+    defaultInstructionsEn: "Exam instructions",
+    resultsReleaseDefault: true,
+  };
+  await putJson(store, K.settings(), defaults);
+  const currentPassword = TEST_PASSWORD_3;
+  await putJson(store, K.examController(), {
+    username: "current-controller",
+    displayName: "Current Controller",
+    email: "current-controller@example.test",
+    profileVersion: 2,
+    passwordHash: await hashPassword(currentPassword),
+    active: true,
+    mustChangePassword: false,
+    authVersion: 1,
+  });
+  const controllerLogin = await call(
+    "exam_controller_login",
+    { username: "current-controller", password: currentPassword },
+    "",
+    "203.0.113.23"
+  );
+  const controllerCatalog = await call("controller_catalog", {}, controllerLogin.data.token, "203.0.113.23");
+  check(
+    "controller catalog exposes configured defaults",
+    controllerCatalog.status === 200 &&
+      controllerCatalog.data.defaults?.durationMin === 75 &&
+      controllerCatalog.data.defaults?.passPct === 62 &&
+      controllerCatalog.data.defaults?.releaseResults === true
+  );
+  const startAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const endAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const defaultExam = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Controller Defaults",
+        code: "CTRL-DEFAULTS",
+        subjectId: "trade-theory",
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  const defaultStored = defaultExam.status === 200
+    ? await getJson(store, K.exams(defaultExam.data.exam.id))
+    : null;
+  check(
+    "controller exam creation uses configured defaults",
+    defaultExam.status === 200 &&
+      defaultStored?.durationMin === 75 &&
+      defaultStored?.passPct === 62 &&
+      defaultStored?.instructions === "परीक्षा के निर्देश" &&
+      defaultStored?.instructionsEn === "Exam instructions" &&
+      defaultStored?.releaseResults === true,
+    JSON.stringify({ status: defaultExam.status, response: defaultExam.data, stored: defaultStored })
+  );
+  const customExam = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Controller Options",
+        code: "CTRL-OPTIONS",
+        subjectId: "trade-theory",
+        durationMin: 90,
+        type: "practice",
+        attemptsAllowed: 4,
+        passPct: 68,
+        marksPerQuestion: 2.5,
+        negativeMarks: 0.5,
+        instructions: "हिंदी निर्देश",
+        instructionsEn: "English instructions",
+        releaseResults: false,
+        releaseAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  const customStored = customExam.status === 200
+    ? await getJson(store, K.exams(customExam.data.exam.id))
+    : null;
+  check(
+    "controller exam creation persists advanced settings",
+    customExam.status === 200 &&
+      customStored?.durationMin === 90 &&
+      customStored?.attemptsAllowed === 4 &&
+      customStored?.passPct === 68 &&
+      customStored?.marksPerQuestion === 2.5 &&
+      customStored?.negativeMarks === 0.5 &&
+      customStored?.instructions === "हिंदी निर्देश" &&
+      customStored?.instructionsEn === "English instructions" &&
+      customStored?.releaseResults === false &&
+      Boolean(customStored?.releaseAt)
+  );
+  const invalidRelease = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Invalid Release",
+        code: "CTRL-INVALID-RELEASE",
+        subjectId: "trade-theory",
+        releaseAt: "not-a-date",
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  check("invalid result release timestamp is rejected", invalidRelease.status === 400);
+}
+
 console.log(`\n===== ${passed} passed, ${failed} failed =====`);
 if (failed) {
   console.log("Failures:", failures.join(", "));

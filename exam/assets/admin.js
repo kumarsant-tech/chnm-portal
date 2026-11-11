@@ -8,8 +8,30 @@
   const esc = UI.esc;
   const attr = UI.attr;
 
+  async function readProfilePhoto(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return undefined;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10 * 1024 * 1024) {
+      throw new Error("JPG, PNG या WebP फोटो चुनें (अधिकतम 10 MB)");
+    }
+    const image = await createImageBitmap(file);
+    const scale = Math.min(1, 320 / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    image.close();
+    const photo = canvas.toDataURL("image/jpeg", 0.78);
+    if (photo.length > 350_000) throw new Error("फोटो compress नहीं हो पाई; छोटी फोटो चुनें");
+    return photo;
+  }
+
+  const staffMode = new URLSearchParams(window.location.search).get("staff") === "1";
   const state = {
-    token: UI.adminToken(),
+    token: staffMode ? UI.staffToken() : UI.adminToken(),
+    staffMode,
+    staffProfile: null,
+    forceStaffPasswordChange: false,
     route: "",
     overview: null,
     exams: null,
@@ -52,8 +74,30 @@
     tools: { title: "टूल्स", crumb: "पुराना डेटा, बैकअप और ऑडिट लॉग", render: renderTools },
   };
 
+  const STAFF_ROUTE_PERMISSIONS = {
+    live: ["exams"],
+    exams: ["exams"],
+    questions: ["questions"],
+    results: [],
+    students: ["students"],
+    notify: ["notices"],
+    catalog: ["questions"],
+    stats: ["reports"],
+    settings: [],
+    tools: ["tools"],
+  };
+  const STAFF_ROUTE_ORDER = ["exams", "questions", "live", "students", "notify", "stats", "tools", "catalog"];
+  const STAFF_PERMISSION_OPTIONS = [
+    ["exams", "परीक्षाएँ"],
+    ["questions", "प्रश्न"],
+    ["students", "विद्यार्थी"],
+    ["notices", "सूचना और चैट"],
+    ["reports", "रिपोर्ट"],
+    ["tools", "टूल्स"],
+  ];
+
   /* ---------- boot ---------- */
-  function boot() {
+  async function boot() {
     $$("[data-login-icon]").forEach((node) => {
       node.innerHTML = UI.icon(node.dataset.loginIcon);
     });
@@ -105,6 +149,25 @@
       if (route !== state.route) renderRoute(route);
     });
 
+    if (staffMode) {
+      if (!state.token) {
+        window.location.replace("staff-login.html");
+        return;
+      }
+      try {
+        const data = await UI.call("staff_me", {}, state.token);
+        state.staffProfile = data.profile;
+        state.forceStaffPasswordChange = Boolean(data.mustChangePassword);
+        UI.setStaffSession(state.token, state.staffProfile);
+        configureStaffShell();
+        showShell();
+        await renderRoute(routeFromHash(), true);
+      } catch {
+        UI.setStaffSession("", null);
+        window.location.replace("staff-login.html");
+      }
+      return;
+    }
     if (!state.token) {
       showLogin();
       const resetToken = new URLSearchParams(window.location.search).get("reset");
@@ -117,6 +180,38 @@
     }
     showShell();
     renderRoute(routeFromHash(), true);
+  }
+
+  function configureStaffShell() {
+    const permissions = state.staffProfile?.permissions || [];
+    $$("[data-nav]").forEach((button) => {
+      const required = STAFF_ROUTE_PERMISSIONS[button.dataset.nav];
+      button.hidden = !required || !required.some((permission) => permissions.includes(permission));
+    });
+    $$("#adminSidebar .admin-nav a").forEach((link) => {
+      link.hidden = true;
+    });
+    const brand = $("#adminSidebar .admin-brand");
+    if (brand) {
+      brand.querySelector("b").textContent = state.staffProfile?.displayName || "स्टाफ";
+      brand.querySelector("small").textContent = "सीमित अनुमति";
+    }
+    const siteName = $("#adminSiteName");
+    if (siteName) siteName.textContent = state.staffProfile?.displayName || "स्टाफ";
+  }
+
+  function staffRouteAllowed(route) {
+    if (!state.staffMode) return true;
+    const required = STAFF_ROUTE_PERMISSIONS[route];
+    return Boolean(
+      required &&
+      required.length &&
+      required.some((permission) => state.staffProfile?.permissions?.includes(permission))
+    );
+  }
+
+  function firstStaffRoute() {
+    return STAFF_ROUTE_ORDER.find(staffRouteAllowed) || "exams";
   }
 
   function routeFromHash() {
@@ -165,9 +260,17 @@
     const button = $("#adminForgotBtn");
     const message = $("#adminForgotMessage");
     message.hidden = true;
+    const email = $("#adminForgotEmail").value.trim();
+    const mobile = $("#adminForgotMobile").value.trim();
+    if (!email && !mobile) {
+      message.className = "notice bad";
+      message.textContent = "एडमिन खाते में दर्ज ईमेल या मोबाइल में से एक दर्ज करें।";
+      message.hidden = false;
+      return;
+    }
     UI.setButtonBusy(button, true, "ईमेल भेजा जा रहा है…");
     try {
-      const data = await UI.call("admin_forgot_password", {});
+      const data = await UI.call("admin_forgot_password", { email, mobile });
       message.className = "notice good";
       message.textContent = data.message;
       message.hidden = false;
@@ -213,10 +316,15 @@
       state.token = "";
       state.overview = null;
       state.exams = null;
-      UI.setAdminSession("");
+      if (state.staffMode) UI.setStaffSession("", null);
+      else UI.setAdminSession("");
       showLogin();
       $("#adminContent").innerHTML = "";
       window.location.hash = "";
+      if (state.staffMode) {
+        window.location.replace("staff-login.html");
+        return;
+      }
       UI.toast("लॉगआउट हो गया", "good");
     };
     if (!confirmFirst) {
@@ -239,9 +347,11 @@
     } catch (error) {
       if (error && error.status === 401) {
         state.token = "";
-        UI.setAdminSession("");
+        if (state.staffMode) UI.setStaffSession("", null);
+        else UI.setAdminSession("");
         showLogin();
-        UI.toast("एडमिन सत्र समाप्त हो गया — दोबारा लॉगिन करें", "bad");
+        if (state.staffMode) window.location.replace("staff-login.html");
+        else UI.toast("एडमिन सत्र समाप्त हो गया — दोबारा लॉगिन करें", "bad");
       }
       throw error;
     }
@@ -249,7 +359,11 @@
 
   /* ---------- routing ---------- */
   async function goRoute(name, replace) {
-    const route = ROUTES[name] ? name : "dashboard";
+    const route = ROUTES[name] && staffRouteAllowed(name)
+      ? name
+      : state.staffMode
+        ? firstStaffRoute()
+        : "dashboard";
     if (replace) {
       const url = window.location.pathname + window.location.search + "#" + route;
       window.history.replaceState(null, "", url);
@@ -261,7 +375,11 @@
   }
 
   async function renderRoute(name, force) {
-    const route = ROUTES[name] ? name : "dashboard";
+    const route = ROUTES[name] && staffRouteAllowed(name)
+      ? name
+      : state.staffMode
+        ? firstStaffRoute()
+        : "dashboard";
     if (liveTimer) {
       clearInterval(liveTimer);
       liveTimer = 0;
@@ -275,6 +393,10 @@
       else button.removeAttribute("aria-current");
     });
     const content = $("#adminContent");
+    if (state.forceStaffPasswordChange) {
+      renderForcedStaffPassword(content);
+      return;
+    }
     content.innerHTML = '<div class="admin-loading"><div class="brand-mark">FI</div><p>लोड हो रहा है…</p></div>';
     try {
       await meta.render(content, force);
@@ -284,6 +406,44 @@
       UI.showError(content, error.message || "डेटा लोड नहीं हो सका");
       const retry = content.querySelector("[data-retry]");
       if (retry) retry.addEventListener("click", () => renderRoute(route, true));
+    }
+
+    function renderForcedStaffPassword(content) {
+      content.innerHTML =
+        '<section class="admin-card" style="max-width:620px;margin:24px auto"><span class="pill warn">आवश्यक सुरक्षा अपडेट</span><h2 style="margin-top:14px">पहले अपना पासवर्ड अपडेट करें</h2><p class="muted">नया पासवर्ड सेव होने तक पोर्टल के अन्य विकल्प उपलब्ध नहीं होंगे।</p>' +
+        '<form id="staffPasswordChangeForm" class="stack" style="margin-top:18px"><label class="field"><span>वर्तमान पासवर्ड</span><input class="input" type="password" name="currentPassword" autocomplete="current-password" maxlength="128" required></label><label class="field"><span>नया पासवर्ड (कम-से-कम 12 अक्षर)</span><input class="input" type="password" name="newPassword" autocomplete="new-password" minlength="12" maxlength="128" required></label><label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" type="password" name="confirmPassword" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="notice bad" data-password-error hidden></p><button class="btn btn-navy" type="submit">पासवर्ड अपडेट करें</button></form></section>';
+      $("#staffPasswordChangeForm", content).addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const errorNode = form.querySelector("[data-password-error]");
+        const values = new FormData(form);
+        if (values.get("newPassword") !== values.get("confirmPassword")) {
+          errorNode.textContent = "दोनों नए पासवर्ड एक जैसे नहीं हैं।";
+          errorNode.hidden = false;
+          return;
+        }
+        const button = form.querySelector("button[type=submit]");
+        UI.setButtonBusy(button, true, "अपडेट हो रहा है…");
+        errorNode.hidden = true;
+        try {
+          const result = await UI.call(
+            "staff_password_change",
+            { currentPassword: values.get("currentPassword"), newPassword: values.get("newPassword") },
+            state.token
+          );
+          state.token = result.token;
+          state.staffProfile = result.profile;
+          state.forceStaffPasswordChange = false;
+          UI.setStaffSession(result.token, result.profile);
+          UI.toast(result.message, "good");
+          await renderRoute(firstStaffRoute(), true);
+        } catch (error) {
+          errorNode.textContent = error.message || "पासवर्ड अपडेट नहीं हो सका।";
+          errorNode.hidden = false;
+        } finally {
+          UI.setButtonBusy(button, false);
+        }
+      });
     }
   }
 
@@ -843,6 +1003,9 @@
           : "<strong>Draft:</strong> प्रश्न जोड़ें, सेव करें, फिर पेपर Lock और Publish करें।") +
       (exam.id ? " · ID: <b>" + esc(exam.id) + "</b>" : "") +
       "</div>" +
+      (!existing
+        ? '<div class="notice info" style="margin-bottom:14px"><b>अलग प्रश्न-पत्र:</b> यह नई परीक्षा अभी किसी पुराने प्रश्न से नहीं जुड़ी है। पहले परीक्षा सेव करें; उसके बाद इसी परीक्षा के लिए प्रश्न-पत्र अपलोड करें।</div>'
+        : "") +
       '<form id="examEditorForm" autocomplete="off"><div class="editor-grid"><div class="editor-card">' +
       '<div class="form-grid">' +
       '<label class="field full"><span>परीक्षा शीर्षक *</span><input class="input" id="examTitle" required value="' + attr(exam.title) + '" placeholder="जैसे: Trade Theory Final Test"></label>' +
@@ -873,9 +1036,11 @@
       '<label class="field"><span>प्रति प्रश्न अंक</span><input class="input" id="examMarks" type="number" min="0.1" max="100" step="0.01" value="' + attr(exam.marksPerQuestion) + '"' + (published ? " disabled" : "") + "></label>" +
       '<label class="field"><span>ऋणात्मक अंक</span><input class="input" id="examNegative" type="number" min="0" max="100" step="0.01" value="' + attr(exam.negativeMarks) + '"' + (published ? " disabled" : "") + "></label>" +
       '<label class="field"><span>अनुमत प्रयास</span><input class="input" id="examAttempts" type="number" min="1" max="50" value="' + attr(exam.attemptsAllowed) + '"></label>' +
-      '<label class="field"><span>शुरू होने का समय (वैकल्पिक)</span><input class="input" id="examStartAt" type="datetime-local" value="' + attr(UI.toLocalInput(exam.startAt)) + '"></label>' +
-      '<label class="field"><span>समाप्ति समय (वैकल्पिक)</span><input class="input" id="examEndAt" type="datetime-local" value="' + attr(UI.toLocalInput(exam.endAt)) + '"></label>' +
-      '<label class="field"><span>परिणाम जारी समय (वैकल्पिक)</span><input class="input" id="examReleaseAt" type="datetime-local" value="' + attr(UI.toLocalInput(exam.releaseAt)) + '"></label>' +
+      '<label class="field"><span>परीक्षा शुरू होने की तारीख और समय *</span><input class="input" id="examStartAt" type="datetime-local" required value="' + attr(UI.toLocalInput(exam.startAt)) + '"></label>' +
+      '<label class="field"><span>परीक्षा समाप्त होने की तारीख और समय *</span><input class="input" id="examEndAt" type="datetime-local" required value="' + attr(UI.toLocalInput(exam.endAt)) + '"></label>' +
+      (!state.staffMode
+        ? '<label class="field"><span>परिणाम जारी समय (वैकल्पिक)</span><input class="input" id="examReleaseAt" type="datetime-local" value="' + attr(UI.toLocalInput(exam.releaseAt)) + '"></label>'
+        : "") +
       '<label class="field full"><span>निर्देश (हिंदी)</span><textarea class="textarea" id="examInstructions" rows="4">' +
       esc(exam.instructions) +
       "</textarea></label>" +
@@ -883,7 +1048,9 @@
       esc(exam.instructionsEn || "") +
       '</textarea><small>छात्रों को निर्देश हिंदी और अंग्रेज़ी दोनों में दिखते हैं — यहाँ अंग्रेज़ी रूप लिखें।</small></label>' +
       '</div><div class="editor-section"><div class="stack">' +
-      '<label class="check"><input type="checkbox" id="examReleaseResults"' + (exam.releaseResults ? " checked" : "") + "><span>सबमिट के बाद परिणाम घोषित करें (Final + उत्तर-कुंजी)</span></label>" +
+      (!state.staffMode
+        ? '<label class="check"><input type="checkbox" id="examReleaseResults"' + (exam.releaseResults ? " checked" : "") + "><span>सबमिट के बाद परिणाम घोषित करें (Final + उत्तर-कुंजी)</span></label>"
+        : "") +
       '<label class="check"><input type="checkbox" id="examActive"' + (exam.active !== false ? " checked" : "") + "><span>परीक्षा सक्रिय रखें</span></label>" +
       "</div></div></div>" +
       '<div class="editor-card paper-builder"><div class="admin-section-head"><div><h3>प्रश्न पत्र</h3><p class="admin-card-sub">क्रम और चयन</p></div><span class="badge-count" id="builderCount">0</span></div>' +
@@ -941,6 +1108,16 @@
     const selectedList = $("#selectedList", root);
     const pickerList = $("#pickerList", root);
     const pickerPager = $("#pickerPager", root);
+    if (!existing) {
+      const builder = root.querySelector(".paper-builder");
+      if (builder) {
+        builder.hidden = true;
+        builder.insertAdjacentHTML(
+          "beforebegin",
+          '<div class="editor-card" id="examQuestionUploadPrompt"><h3>प्रश्न-पत्र अपलोड</h3><p class="muted">परीक्षा सेव करने के बाद प्रश्न-पत्र इसी परीक्षा से जुड़ेगा। दूसरे परीक्षा के प्रश्न यहाँ अपने-आप नहीं आएँगे।</p></div>'
+        );
+      }
+    }
 
     function currentSubject() {
       return $("#examSubject", root).value;
@@ -1019,7 +1196,8 @@
       try {
         const data = await api("admin_questions", {
           subjectId: subject === "mixed" ? "" : subject,
-          setId: $("#pickerSet", root).value,
+          examId: exam.id,
+          setId: exam.questionSetId || $("#pickerSet", root).value,
           q: $("#pickerSearch", root).value.trim(),
           page: pickerPage,
           pageSize: 30,
@@ -1119,7 +1297,8 @@
         do {
           const data = await api("admin_questions", {
             subjectId: subject === "mixed" ? "" : subject,
-            setId,
+            examId: exam.id,
+            setId: exam.questionSetId || setId,
             q,
             page,
             pageSize: 100,
@@ -1168,7 +1347,7 @@
       }
       board.innerHTML = '<p class="muted small">टॉपिक गिने जा रहे हैं…</p>';
       try {
-        const data = await api("admin_topics", { subjectId: subject });
+        const data = await api("admin_topics", { subjectId: subject, examId: existing?.id });
         const rows = data.topics || [];
         if (!rows.length) {
           board.innerHTML = emptyBox("इस विषय में अभी प्रश्न नहीं हैं — पहले प्रश्न जोड़ें", true);
@@ -1216,6 +1395,7 @@
       try {
         const data = await api("admin_paper_build", {
           subjectId: currentSubject(),
+          examId: existing?.id,
           plan,
           randomize: $("#topicRandom", root).checked,
         });
@@ -1339,11 +1519,11 @@
         attemptsAllowed: Number($("#examAttempts", root).value),
         startAt: UI.fromLocalInput($("#examStartAt", root).value),
         endAt: UI.fromLocalInput($("#examEndAt", root).value),
-        releaseAt: UI.fromLocalInput($("#examReleaseAt", root).value),
+        releaseAt: state.staffMode ? null : UI.fromLocalInput($("#examReleaseAt", root).value),
         instructions: $("#examInstructions", root).value,
         instructionsEn: $("#examInstructionsEn", root).value,
-        releaseResults: $("#examReleaseResults", root).checked,
-        showAnswers: $("#examReleaseResults", root).checked,
+        releaseResults: !state.staffMode && $("#examReleaseResults", root).checked,
+        showAnswers: !state.staffMode && $("#examReleaseResults", root).checked,
         active: $("#examActive", root).checked,
       };
       if (existing) payload.id = existing.id;
@@ -1360,6 +1540,7 @@
         handle.close();
         UI.toast(existing ? "परीक्षा अपडेट हुई" : "परीक्षा बन गई", "good");
         await afterExamChange(result.exam && result.exam.id);
+        if (!existing && result.exam?.id) openImport(result.exam.id);
       } catch (error) {
         UI.toast(error.message || "परीक्षा सेव नहीं हो सकी", "bad");
       } finally {
@@ -1392,8 +1573,10 @@
     }
 
     renderSelected();
-    loadPicker(1);
-    loadTopicBoard();
+    if (existing) {
+      loadPicker(1);
+      loadTopicBoard();
+    }
   }
 
   /* ---------- CBT series (CBT1, CBT2 …) ---------- */
@@ -1580,6 +1763,7 @@
     const exam = data.exam;
     const stats = data.stats || {};
     const published = exam.status === "published";
+    const staffView = state.staffMode;
 
     const body =
       '<div class="row-between" style="margin-bottom:14px"><div class="row">' +
@@ -1589,7 +1773,9 @@
       (exam.tradeName ? " · " + esc(exam.tradeName) : "") +
       '</span><span class="pill">' +
       esc(UI.fmtDuration(exam.durationMin)) +
-      "</span></div><div class=\"row\"><button class=\"btn btn-sm btn-ghost\" type=\"button\" id=\"examEditBtn\">एडिट</button><button class=\"btn btn-sm btn-ghost\" type=\"button\" id=\"examPreviewBtn\">पूरा पेपर देखें</button></div></div>" +
+      "</span></div><div class=\"row\"><button class=\"btn btn-sm btn-ghost\" type=\"button\" id=\"examEditBtn\">एडिट</button>" +
+      (!published ? '<button class="btn btn-sm btn-soft" type="button" id="examUploadBtn">इस परीक्षा का प्रश्न पत्र अपलोड करें</button>' : "") +
+      '<button class="btn btn-sm btn-ghost" type="button" id="examPreviewBtn">पूरा पेपर देखें</button></div></div>' +
       '<div class="grid-2"><div><dl class="detail-list">' +
       detailRow("परीक्षा कोड", exam.code) +
       detailRow("प्रश्न / पूर्णांक", (exam.totalQuestions ?? exam.questionCount ?? 0) + " प्रश्न · " + UI.trimNumber(exam.totalMarks) + " अंक") +
@@ -1597,14 +1783,16 @@
       detailRow("पास प्रतिशत", UI.trimNumber(exam.passPct) + "%") +
       detailRow("अनुमत प्रयास", exam.attemptsAllowed) +
       detailRow("पेपर वर्ज़न", exam.paperVersion ? "v" + exam.paperVersion + (exam.paperLockedAt ? " · लॉक " + UI.fmtDateTime(exam.paperLockedAt) : "") : "अभी लॉक नहीं") +
-      detailRow("परिणाम जारी", exam.releaseResults ? (exam.releaseAt ? UI.fmtDateTime(exam.releaseAt) + " से" : "हाँ") : "नहीं") +
-      detailRow("उत्तर-कुंजी", exam.releaseResults ? "परिणाम के साथ दिख रही है" : "परिणाम जारी होने पर दिखेगी") +
+      (!staffView ? detailRow("परिणाम जारी", exam.releaseResults ? (exam.releaseAt ? UI.fmtDateTime(exam.releaseAt) + " से" : "हाँ") : "नहीं") : "") +
+      (!staffView ? detailRow("उत्तर-कुंजी", exam.releaseResults ? "परिणाम के साथ दिख रही है" : "परिणाम जारी होने पर दिखेगी") : "") +
       detailRow("प्रकाशित", exam.publishedAt ? UI.fmtDateTime(exam.publishedAt) : "—") +
       "</dl></div><div><div class=\"stat-grid\" style=\"grid-template-columns:1fr 1fr;margin-bottom:0\">" +
-      statCard("परिणाम", stats.count || 0, "जमा") +
-      statCard("सक्रिय प्रयास", exam.activeAttempts || 0, "अभी चालू") +
-      statCard("औसत", UI.trimNumber(stats.average || 0) + "%", "") +
-      statCard("पास दर", UI.trimNumber(stats.passRate || 0) + "%", "") +
+      (!staffView
+        ? statCard("परिणाम", stats.count || 0, "जमा") +
+          statCard("सक्रिय प्रयास", exam.activeAttempts || 0, "अभी चालू") +
+          statCard("औसत", UI.trimNumber(stats.average || 0) + "%", "") +
+          statCard("पास दर", UI.trimNumber(stats.passRate || 0) + "%", "")
+        : '<div class="notice info">परीक्षा की तैयारी और प्रश्न-पत्र प्रबंधन</div>') +
       "</div></div></div>" +
       (exam.instructions || exam.instructionsEn
         ? '<div class="editor-section"><h4>निर्देश / Instructions</h4>' +
@@ -1614,7 +1802,7 @@
             : "") +
           "</div>"
         : "") +
-      '<div class="editor-section"><div class="admin-section-head"><div><h4 style="margin:0">सक्रिय प्रयास</h4><p class="admin-card-sub">आवश्यक होने पर प्रयास अभी समाप्त करें</p></div></div>' +
+      (!staffView ? '<div class="editor-section"><div class="admin-section-head"><div><h4 style="margin:0">सक्रिय प्रयास</h4><p class="admin-card-sub">आवश्यक होने पर प्रयास अभी समाप्त करें</p></div></div>' +
       (data.attempts.length
         ? '<div class="attempt-list">' +
           data.attempts
@@ -1670,7 +1858,7 @@
       (exam.status === "draft"
         ? '<button class="btn btn-sm btn-bad" type="button" id="examDeleteBtn">Draft हटाएँ</button>'
         : '<span class="small muted">परिणाम/प्रयास मौजूद होने पर परीक्षा हटाना सुरक्षित रूप से रोका गया है।</span>') +
-      "</div>";
+      "</div>" : "");
 
     const actions = [{ label: "बंद करें", ghost: true, onClick: (handle) => handle.close() }];
     if (!published) {
@@ -1689,7 +1877,7 @@
         },
       });
     }
-    if (exam.status === "locked") {
+    if (!staffView && exam.status === "locked") {
       actions.push({
         label: "प्रकाशित करें",
         tone: "",
@@ -1706,7 +1894,7 @@
         },
       });
     }
-    if (published) {
+    if (!staffView && published) {
       actions.push({
         label: "Unpublish करें",
         tone: "btn-warn",
@@ -1740,11 +1928,22 @@
       openExamEditor(exam.id);
     });
     $("#examPreviewBtn", root).addEventListener("click", () => openExamPreview(exam.id));
-    $("#examReleaseBtn", root).addEventListener("click", () => openReleaseModal(exam));
+    const uploadButton = $("#examUploadBtn", root);
+    if (uploadButton) {
+      uploadButton.addEventListener("click", () => {
+        if (detailModal) detailModal.close();
+        detailModal = null;
+        openImport(exam.id);
+      });
+    }
+    const releaseButton = $("#examReleaseBtn", root);
+    if (releaseButton) releaseButton.addEventListener("click", () => openReleaseModal(exam));
     const examNoticeBtn = $("#examNoticeBtn", root);
     if (examNoticeBtn) examNoticeBtn.addEventListener("click", () => openResultNoticeModal(exam));
-    $("#examCsvBtn", root).addEventListener("click", () => exportResultsCsv({ examId: exam.id }));
-    $("#examResultsBtn", root).addEventListener("click", () => {
+    const csvButton = $("#examCsvBtn", root);
+    if (csvButton) csvButton.addEventListener("click", () => exportResultsCsv({ examId: exam.id }));
+    const resultsButton = $("#examResultsBtn", root);
+    if (resultsButton) resultsButton.addEventListener("click", () => {
       state.resultFilter = { examId: exam.id, subjectId: "", tradeId: "", type: "", q: "", page: 1 };
       if (detailModal) detailModal.close();
       detailModal = null;
@@ -2618,6 +2817,7 @@
     await ensureOverview();
     const exams = await loadExams();
     const usableExams = exams.filter((exam) => exam.status !== "published" && exam.status !== "archived");
+    const presetExam = usableExams.find((exam) => exam.id === presetExamId);
     const importState = { rows: null, ready: 0, warnings: 0, fileName: "", imported: false };
 
     const body =
@@ -2632,7 +2832,11 @@
         ""
       ) +
       "</select></label>" +
-      '<label class="field"><span>सीधे परीक्षा में जोड़ें (वैकल्पिक)</span><select class="select" id="importExam">' +
+      '<label class="field"><span>' +
+      (presetExam ? "केवल इस परीक्षा में जोड़ें" : "सीधे परीक्षा में जोड़ें (वैकल्पिक)") +
+      '</span><select class="select" id="importExam"' +
+      (presetExam ? " disabled" : "") +
+      ">" +
       optionList(
         [{ value: "", label: "केवल प्रश्न बैंक में" }].concat(
           usableExams.map((exam) => ({
@@ -2643,8 +2847,14 @@
         presetExamId || ""
       ) +
       "</select></label>" +
-      '<label class="field"><span>फ़ोल्डर (सेट) का नाम *</span><input class="input" id="importSetName" maxlength="120" placeholder="जैसे CHNM Set-11 (नवंबर)"></label>' +
-      '<div class="field full"><span class="tiny muted">इस फाइल के सभी प्रश्न इसी फ़ोल्डर में जाएँगे। अगली बार आयात करने पर नया फ़ोल्डर बनेगा — इसलिए अलग-अलग सेट आपस में नहीं मिलेंगे।</span></div></div>' +
+      '<label class="field"><span>फ़ोल्डर (सेट) का नाम *</span><input class="input" id="importSetName" maxlength="120" value="' +
+      attr(presetExam?.title || "") +
+      '" placeholder="जैसे CHNM Set-11 (नवंबर)"></label>' +
+      '<div class="field full"><span class="tiny muted">' +
+      (presetExam
+        ? "इस अपलोड के प्रश्न सिर्फ़ " + esc(presetExam.title) + " परीक्षा से जुड़ेंगे; पुराने प्रश्न अपने-आप इसमें शामिल नहीं होंगे।"
+        : "इस फाइल के सभी प्रश्न इसी फ़ोल्डर में जाएँगे। अगली बार आयात करने पर नया फ़ोल्डर बनेगा — इसलिए अलग-अलग सेट आपस में नहीं मिलेंगे।") +
+      "</span></div></div>" +
       '<label class="dropzone" id="dropzone" for="importFile"><input type="file" id="importFile" accept=".xlsx,.xls,.csv,.json,.html,.htm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,application/json,text/html">' +
       "<strong>फाइल चुनें या यहाँ खींचकर छोड़ें</strong><span>XLSX, XLS, CSV, JSON या HTML · अधिकतम 1000 प्रश्न</span>" +
       '<div class="file-picked" id="filePicked" hidden></div></label>' +
@@ -4368,12 +4578,128 @@
   }
 
   /* ---------- settings ---------- */
+  function staffPermissionFields(selected, prefix) {
+    const permissions = Array.isArray(selected) ? selected : [];
+    return STAFF_PERMISSION_OPTIONS.map(
+      ([value, label]) =>
+        '<label class="check"><input type="checkbox" name="permissions" value="' +
+        attr(value) +
+        '"' +
+        (permissions.includes(value) ? " checked" : "") +
+        '><span>' +
+        esc(label) +
+        "</span></label>"
+    ).join("");
+  }
+
+  function staffManagementHtml(users) {
+    const rows = (users || []).map((user) => {
+      if (user.legacy) {
+        return (
+          '<article class="admin-card" style="margin-top:12px"><div class="row-between"><div><b>' +
+          esc(user.displayName || "पुराना परीक्षा कंट्रोलर") +
+          '</b><div class="t-sub">पहले से मौजूद खाता · यूज़रनेम ' +
+          esc(user.username || "—") +
+          "</div></div><span class=\"pill " +
+          (user.active ? "good" : "warn") +
+          '">' +
+          (user.migrated ? "नई प्रोफ़ाइल में बदला गया" : user.active ? "सुरक्षित रखा गया" : "निष्क्रिय") +
+          '</span></div><p class="tiny muted">' +
+          (user.migrated
+            ? "पुराना लॉगिन बंद है; नई प्रोफ़ाइल नीचे संपादित करें। पुराना रिकॉर्ड सुरक्षित है।"
+            : user.active
+              ? "पहले लॉगिन पर नाम, ईमेल, मोबाइल और नया पासवर्ड अपडेट करना अनिवार्य है।"
+              : "खाता निष्क्रिय है; मूल रिकॉर्ड सुरक्षित है।") +
+          "</p></article>"
+        );
+      }
+      return (
+        '<form class="admin-card stack" data-staff-edit data-user="' +
+        attr(user.id) +
+        '" style="margin-top:12px"><div class="row"><div class="profile-avatar-wrap">' +
+        UI.avatar(user.photo, user.displayName, "avatar-lg") +
+        '</div><div class="grow"><b>' +
+        esc(user.displayName) +
+        '</b><div class="t-sub">' +
+        esc(user.email) +
+        (user.mobile ? " · " + esc(user.mobile) : "") +
+        '</div></div><span class="pill ' +
+        (user.status === "active" ? "good" : "info") +
+        '">' +
+        (user.status === "active" ? "सक्रिय" : user.status === "inactive" ? "निष्क्रिय" : user.inviteSentAt ? "पासवर्ड सेटअप लंबित" : "ईमेल फिर भेजें") +
+        '</span></div><div class="settings-grid"><label class="field"><span>नाम</span><input class="input" name="displayName" maxlength="60" value="' +
+        attr(user.displayName) +
+        '" required></label><label class="field"><span>ईमेल</span><input class="input" type="email" name="email" maxlength="254" value="' +
+        attr(user.email) +
+        '" required></label><label class="field"><span>मोबाइल नंबर</span><input class="input" name="mobile" inputmode="tel" maxlength="14" value="' +
+        attr(user.mobile || "") +
+        '" required></label><label class="field"><span>खाते का प्रकार</span><select class="select" name="type"><option value="controller"' +
+        (user.type === "controller" ? " selected" : "") +
+        '>परीक्षा कंट्रोलर</option><option value="staff"' +
+        (user.type === "staff" ? " selected" : "") +
+        '>अन्य स्टाफ</option></select></label></div><div class="grid-3">' +
+        staffPermissionFields(user.permissions) +
+        '</div><div class="settings-grid"><label class="field"><span>प्रोफ़ाइल फोटो (JPG/PNG/WebP)</span><input class="input" type="file" name="photo" accept="image/jpeg,image/png,image/webp"><small>फोन से चुनी फोटो अपने-आप छोटी होगी।</small></label>' +
+        (user.photo ? '<label class="check"><input type="checkbox" name="removePhoto"> मौजूदा फोटो हटाएँ</label>' : "") +
+        '</div><label class="check"><input type="checkbox" name="active"' +
+        (user.active ? " checked" : "") +
+        '> खाता चालू रखें</label><div class="row"><button class="btn btn-navy btn-sm" type="submit">अनुमति सेव करें</button>' +
+        (user.active ? '<button class="btn btn-warn btn-sm" type="button" data-staff-remove>खाता हटाएँ</button>' : "") +
+        (user.status === "pending" && user.active
+          ? '<button class="btn btn-ghost btn-sm" type="button" data-staff-invite="' + attr(user.id) + '">सेटअप ईमेल फिर भेजें</button>'
+          : "") +
+        "</div></form>"
+      );
+    }).join("");
+    return (
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>स्टाफ और कंट्रोलर खाते</h3><p class="admin-card-sub">हर खाते को केवल चुने गए मॉड्यूल मिलेंगे। परिणाम, सेटिंग्स, स्टाफ प्रबंधन और परीक्षा प्रकाशन एडमिन के पास रहेंगे। पहले से बना कंट्रोलर खाता हटाया नहीं गया है।</p></div><a class="btn btn-ghost btn-sm" href="staff-login.html">स्टाफ लॉगिन</a></div>' +
+      '<form id="staffCreateForm" class="settings-grid"><label class="field"><span>नाम</span><input class="input" name="displayName" maxlength="60" required></label><label class="field"><span>ईमेल</span><input class="input" name="email" type="email" maxlength="254" required></label><label class="field"><span>मोबाइल नंबर</span><input class="input" name="mobile" inputmode="tel" maxlength="14" required></label><label class="field"><span>प्रोफ़ाइल फोटो</span><input class="input" type="file" name="photo" accept="image/jpeg,image/png,image/webp"><small>वैकल्पिक · JPG/PNG/WebP</small></label><label class="field"><span>खाते का प्रकार</span><select class="select" name="type"><option value="controller">परीक्षा कंट्रोलर</option><option value="staff">अन्य स्टाफ</option></select></label><div class="field full"><span>अनुमतियाँ चुनें</span><div class="grid-3">' +
+      staffPermissionFields(["exams"]) +
+      '</div></div><p class="tiny muted full">खाता बनते ही पासवर्ड सेट करने का एक बार उपयोग होने वाला लिंक ईमेल पर जाएगा। पासवर्ड ईमेल नहीं किया जाएगा।</p><div class="editor-actions"><button class="btn btn-navy" type="submit">खाता बनाएँ और लिंक भेजें</button></div></form>' +
+      (users?.length ? '<div style="margin-top:18px"><h4>मौजूदा खाते</h4>' + rows + "</div>" : '<div style="margin-top:16px">' + emptyBox("अभी कोई स्टाफ खाता नहीं है", true) + "</div>") +
+      "</section>"
+    );
+  }
+
   async function renderSettings(content) {
-    const ov = await ensureOverview(true);
+    const [ov, controllerData, staffData, adminProfileData] = await Promise.all([
+      ensureOverview(true),
+      api("admin_exam_controller_get"),
+      api("admin_staff_list"),
+      api("admin_profile_get"),
+    ]);
     const s = ov.settings;
+    const controller = controllerData.controller;
+    const adminProfile = adminProfileData.profile || {};
+    const legacyControllerSection = controller?.migrated
+      ? '<section class="admin-card profile-management-card"><div class="admin-section-head"><div><h3>पुराना कंट्रोलर खाता</h3><p class="admin-card-sub">यह खाता नई ईमेल-आधारित स्टाफ प्रोफ़ाइल में बदला जा चुका है। नीचे नई प्रोफ़ाइल से इसकी अनुमतियाँ संपादित करें।</p></div><span class="pill info">अपडेट किया गया</span></div><p class="tiny muted">पुराना यूज़रनेम: ' +
+        esc(controller.username) +
+        " · मूल रिकॉर्ड सुरक्षित है।</p></section>"
+      : '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>पुराना परीक्षा कंट्रोलर खाता</h3><p class="admin-card-sub">पहले से मौजूद कंट्रोलर खाता यहाँ संपादित या निष्क्रिय करें। नए कंट्रोलर खाते नीचे ईमेल और अनुमतियों के साथ बनाएँ।</p></div><a class="btn btn-ghost btn-sm" href="controller.html">पुराना लॉगिन पेज</a></div>' +
+        (controller
+          ? '<form id="examControllerForm" class="settings-grid"><label class="field"><span>कंट्रोलर नाम</span><input class="input" id="controllerDisplayName" maxlength="60" value="' +
+            attr(controller.displayName || "") +
+            '" required></label><label class="field"><span>यूज़रनेम</span><input class="input" id="controllerUsername" minlength="3" maxlength="32" value="' +
+            attr(controller.username || "") +
+            '" autocomplete="username" required></label><label class="field"><span>नया पासवर्ड (वैकल्पिक)</span><input class="input" id="controllerPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password"><small>खाली छोड़ने पर पासवर्ड नहीं बदलेगा।</small></label><label class="check"><input type="checkbox" id="controllerActive"' +
+            (controller.active !== false ? " checked" : "") +
+            '> पुराना लॉगिन चालू रखें</label><div class="editor-actions"><button class="btn btn-navy" type="submit" id="controllerSaveBtn">बदलाव सेव करें</button>' +
+            (controller.active !== false ? '<button class="btn btn-warn" type="button" id="controllerRemoveBtn">पहुँच हटाएँ</button>' : "") +
+            '</div></form><p class="tiny muted">इस पुराने खाते का अगला लॉगिन नई जानकारी अपडेट करने के लिए रोका जाएगा।</p>'
+          : '<p class="muted">पुराना अलग कंट्रोलर खाता नहीं है। नया खाता नीचे बनाएँ।</p>') +
+        "</section>";
 
     content.innerHTML =
       '<div class="admin-section-head"><div><h1>सेटिंग्स</h1><p>नई परीक्षाओं के डिफ़ॉल्ट, पंजीकरण और परिणाम जारी करने की नीति।</p></div></div>' +
+      '<section class="admin-card profile-management-card"><div class="admin-section-head"><div><h3>एडमिन प्रोफ़ाइल</h3><p class="admin-card-sub">अपना फोटो और संपर्क मोबाइल नंबर अपडेट करें।</p></div>' +
+      UI.avatar(adminProfile.photo, adminProfile.displayName || "एडमिन", "avatar-lg") +
+      '</div><form id="adminProfileForm" class="settings-grid"><label class="field"><span>नाम</span><input class="input" name="displayName" maxlength="60" value="' +
+      attr(adminProfile.displayName || "") +
+      '" required></label><label class="field"><span>मोबाइल नंबर</span><input class="input" name="mobile" inputmode="tel" maxlength="14" value="' +
+      attr(adminProfile.mobile || "") +
+      '" required></label><label class="field"><span>प्रोफ़ाइल फोटो (JPG/PNG/WebP)</span><input class="input" type="file" name="photo" accept="image/jpeg,image/png,image/webp"><small>फोन से चुनी फोटो अपने-आप छोटी होगी।</small></label>' +
+      (adminProfile.photo ? '<label class="check"><input type="checkbox" name="removePhoto"> मौजूदा फोटो हटाएँ</label>' : "") +
+      '<div class="editor-actions"><button class="btn btn-navy" type="submit">प्रोफ़ाइल सेव करें</button></div></form></section>' +
       '<form id="settingsForm" class="admin-card"><div class="settings-grid">' +
       '<label class="field"><span>पोर्टल का नाम</span><input class="input" id="setSiteName" maxlength="80" value="' +
       attr(s.siteName || "") +
@@ -4408,6 +4734,8 @@
       '<label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="adminConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>' +
       '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="adminPasswordChangeBtn">पासवर्ड बदलें</button></div></form>' +
       '<p class="tiny muted">भूला हुआ पासवर्ड रीसेट लिंक केवल Cloudflare secret ADMIN_EMAIL पर भेजा जाता है।</p></section>' +
+      legacyControllerSection +
+      staffManagementHtml(staffData.users) +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>Cloudflare सुरक्षा कॉन्फ़िगरेशन</h3><p class="admin-card-sub">Secret values केवल Cloudflare Worker settings में रखें — फ्रंटएंड या GitHub में नहीं।</p></div></div>' +
       '<dl class="detail-list">' +
       detailRow("ADMIN_PASSWORD", "शुरुआती पासवर्ड (पासवर्ड बदलने के बाद वैकल्पिक)") +
@@ -4420,6 +4748,124 @@
       detailRow("EMAIL_FROM", "Resend के लिए सत्यापित sender; Gmail में आवश्यक नहीं") +
       detailRow("PUBLIC_BASE_URL", "HTTPS वेबसाइट origin, जैसे https://portal.example") +
       "</dl><div class=\"notice warn\" style=\"margin-top:12px\">D1 में पासवर्ड का salted hash रखा जाता है; ADMIN_SECRET न बदलें।</div></section>";
+
+    $("#staffCreateForm", content).addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      UI.setButtonBusy(button, true, "खाता बनाया जा रहा है…");
+      try {
+        const photo = await readProfilePhoto(form.elements.photo);
+        const result = await api("admin_staff_save", {
+          staff: {
+            displayName: form.elements.displayName.value.trim(),
+            email: form.elements.email.value.trim(),
+            mobile: form.elements.mobile.value.trim(),
+            type: form.elements.type.value,
+            permissions: [...form.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
+            photo,
+          },
+        });
+        UI.toast("खाता बन गया और सेटअप ईमेल भेज दिया गया।", "good");
+        await renderSettings(content);
+      } catch (error) {
+        UI.toast(error.message || "स्टाफ खाता नहीं बन सका।", "bad");
+        await renderSettings(content);
+      } finally {
+        UI.setButtonBusy(button, false);
+      }
+    });
+    $$("[data-staff-edit]", content).forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const editForm = event.currentTarget;
+        const button = editForm.querySelector('button[type="submit"]');
+        UI.setButtonBusy(button, true, "सेव हो रहा है…");
+        try {
+          const photo = editForm.elements.removePhoto?.checked
+            ? null
+            : await readProfilePhoto(editForm.elements.photo);
+          const staff = {
+            id: editForm.dataset.user,
+            displayName: editForm.elements.displayName.value.trim(),
+            email: editForm.elements.email.value.trim(),
+            mobile: editForm.elements.mobile.value.trim(),
+            type: editForm.elements.type.value,
+            active: editForm.elements.active.checked,
+            permissions: [...editForm.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
+          };
+          if (photo !== undefined) staff.photo = photo;
+          await api("admin_staff_save", { staff });
+          UI.toast("स्टाफ अनुमति अपडेट हो गई।", "good");
+          await renderSettings(content);
+        } catch (error) {
+          UI.toast(error.message || "स्टाफ खाता अपडेट नहीं हुआ।", "bad");
+        } finally {
+          UI.setButtonBusy(button, false);
+        }
+      });
+    });
+    $$("[data-staff-remove]", content).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const form = button.closest("[data-staff-edit]");
+        if (!form || !window.confirm("इस खाते की लॉगिन पहुँच बंद करें? रिकॉर्ड और पुराना डेटा सुरक्षित रहेगा।")) return;
+        UI.setButtonBusy(button, true, "पहुँच हटाई जा रही है…");
+        try {
+          await api("admin_staff_save", {
+            staff: {
+              id: form.dataset.user,
+              displayName: form.elements.displayName.value.trim(),
+              email: form.elements.email.value.trim(),
+              mobile: form.elements.mobile.value.trim(),
+              type: form.elements.type.value,
+              active: false,
+              permissions: [...form.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
+            },
+          });
+          UI.toast("खाते की पहुँच हटा दी गई; रिकॉर्ड सुरक्षित है।", "good");
+          await renderSettings(content);
+        } catch (error) {
+          UI.toast(error.message || "खाते की पहुँच नहीं हटाई जा सकी।", "bad");
+          UI.setButtonBusy(button, false);
+        }
+      });
+    });
+    $$("[data-staff-invite]", content).forEach((button) => {
+      button.addEventListener("click", async () => {
+        UI.setButtonBusy(button, true, "ईमेल भेजा जा रहा है…");
+        try {
+          await api("admin_staff_invite", { userId: button.dataset.staffInvite });
+          UI.toast("सेटअप लिंक फिर से भेज दिया गया।", "good");
+        } catch (error) {
+          UI.toast(error.message || "सेटअप ईमेल नहीं भेजा जा सका।", "bad");
+        } finally {
+          UI.setButtonBusy(button, false);
+        }
+      });
+    });
+
+    $("#adminProfileForm", content).addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      UI.setButtonBusy(button, true, "प्रोफ़ाइल सेव हो रही है…");
+      try {
+        const photo = form.elements.removePhoto?.checked
+          ? null
+          : await readProfilePhoto(form.elements.photo);
+        const profile = {
+          displayName: form.elements.displayName.value.trim(),
+          mobile: form.elements.mobile.value.trim(),
+        };
+        if (photo !== undefined) profile.photo = photo;
+        await api("admin_profile_save", { profile });
+        UI.toast("एडमिन प्रोफ़ाइल अपडेट हो गई।", "good");
+        await renderSettings(content);
+      } catch (error) {
+        UI.toast(error.message || "प्रोफ़ाइल सेव नहीं हुई।", "bad");
+        UI.setButtonBusy(button, false);
+      }
+    });
 
     $("#settingsForm", content).addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -4446,6 +4892,51 @@
       } catch (error) {
         UI.toast(error.message || "सेटिंग्स सेव नहीं हो सकीं", "bad");
         UI.setButtonBusy(button, false);
+      }
+    });
+
+    const examControllerForm = $("#examControllerForm", content);
+    if (examControllerForm) examControllerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = $("#controllerSaveBtn", content);
+      UI.setButtonBusy(button, true, "सेव हो रहा है…");
+      try {
+        const result = await api("admin_exam_controller_save", {
+          controller: {
+            displayName: $("#controllerDisplayName", content).value.trim(),
+            username: $("#controllerUsername", content).value.trim(),
+            password: $("#controllerPassword", content).value,
+            active: $("#controllerActive", content).checked,
+          },
+        });
+        $("#controllerPassword", content).value = "";
+        UI.toast("परीक्षा कंट्रोलर खाता सेव हो गया", "good");
+        const note = $("#examControllerForm + p", content);
+        if (note) note.textContent = "वर्तमान यूज़रनेम: " + result.controller.username;
+      } catch (error) {
+        UI.toast(error.message || "कंट्रोलर खाता सेव नहीं हो सका", "bad");
+      } finally {
+        UI.setButtonBusy(button, false);
+      }
+    });
+    const controllerRemoveButton = $("#controllerRemoveBtn", content);
+    if (controllerRemoveButton) controllerRemoveButton.addEventListener("click", async () => {
+      if (!window.confirm("पुराने कंट्रोलर की लॉगिन पहुँच बंद करें? उसका रिकॉर्ड सुरक्षित रहेगा।")) return;
+      UI.setButtonBusy(controllerRemoveButton, true, "पहुँच हटाई जा रही है…");
+      try {
+        await api("admin_exam_controller_save", {
+          controller: {
+            displayName: $("#controllerDisplayName", content).value.trim(),
+            username: $("#controllerUsername", content).value.trim(),
+            password: "",
+            active: false,
+          },
+        });
+        UI.toast("पुराने कंट्रोलर की पहुँच हटा दी गई।", "good");
+        await renderSettings(content);
+      } catch (error) {
+        UI.toast(error.message || "कंट्रोलर की पहुँच नहीं हटाई जा सकी।", "bad");
+        UI.setButtonBusy(controllerRemoveButton, false);
       }
     });
 
@@ -4477,26 +4968,36 @@
 
   /* ---------- tools ---------- */
   async function renderTools(content) {
-    const [legacyData, auditData] = await Promise.all([
+    const [legacyResult, auditResult] = await Promise.allSettled([
       api("admin_legacy_preview"),
       api("admin_audit", { limit: 100 }),
     ]);
-    const legacy = legacyData.legacy || {};
+    const legacyData = legacyResult.status === "fulfilled" ? legacyResult.value : null;
+    const auditData = auditResult.status === "fulfilled" ? auditResult.value : null;
+    const legacy = (legacyData && legacyData.legacy) || {};
     const legacyCount = (legacy.students || 0) + (legacy.results || 0) + (legacy.activeAttempts || 0);
 
     content.innerHTML =
       '<div class="admin-section-head"><div><h1>टूल्स</h1><p>पुराने डेटा का सुरक्षित आयात, पूरा बैकअप और ऑडिट लॉग।</p></div></div>' +
       '<div class="grid-2">' +
       '<section class="admin-card"><div class="admin-section-head"><div><h3>पुराने पोर्टल का डेटा</h3><p class="admin-card-sub">दोबारा चलाने पर डुप्लिकेट नहीं बनते (idempotent)</p></div></div>' +
-      (legacyCount
-        ? '<dl class="detail-list">' +
+      (!legacyData
+        ? '<div class="notice warn">' +
+          esc(
+            legacyResult.reason && legacyResult.reason.message
+              ? legacyResult.reason.message
+              : "पुराने पोर्टल का डेटा उपलब्ध नहीं है।"
+          ) +
+          '</div><p class="small muted">पुराने डेटा का आयात उपलब्ध न होने पर भी बैकअप और ऑडिट लॉग अलग से काम करते हैं।</p>'
+        : legacyCount
+          ? '<dl class="detail-list">' +
           detailRow("विद्यार्थी", legacy.students || 0) +
           detailRow("परिणाम", legacy.results || 0) +
           detailRow("सक्रिय प्रयास", legacy.activeAttempts || 0) +
           detailRow("पुराना विषय", (legacy.config && legacy.config.subject) || "—") +
           detailRow("स्टोर", legacy.store || "—") +
           '</dl><div class="editor-actions"><button class="btn btn-navy btn-sm" type="button" data-legacy-import>पुराना डेटा आयात करें</button></div><div class="notice warn small" style="margin-top:10px">आयात से पहले पूरा JSON बैकअप निकालने की सलाह है। मौजूदा परिणाम नहीं बदले जाएँगे।</div>'
-        : '<div class="notice info">इस स्टोर में पुराने पोर्टल का कोई डेटा नहीं मिला।</div>') +
+          : '<div class="notice info">इस स्टोर में पुराने पोर्टल का कोई डेटा नहीं मिला।</div>') +
       "</section>" +
       '<section class="admin-card"><div class="admin-section-head"><div><h3>पूरा डेटा बैकअप</h3><p class="admin-card-sub">Students, Exams, Papers, Questions, Results, Settings</p></div></div><p class="small muted">पूरा डेटा JSON में डाउनलोड करें। इसे सुरक्षित जगह रखें — इसमें छात्रों की जानकारी और परीक्षा पेपर शामिल हैं।</p><div class="backup-actions" style="margin-top:12px"><button class="btn btn-sm" type="button" id="exportAllBtn">JSON बैकअप डाउनलोड</button><a class="btn btn-ghost btn-sm" href="templates/questions-template.xlsx" download>Excel टेम्पलेट</a><a class="btn btn-ghost btn-sm" href="templates/questions-sample.json" download>Sample JSON</a></div></section></div>' +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>ऑडिट लॉग</h3><p class="admin-card-sub">एडमिन की सभी संवेदनशील गतिविधियाँ</p></div><div class="row"><select class="select compact" id="auditLimit">' +
@@ -4509,10 +5010,18 @@
         "100"
       ) +
       '<button class="btn btn-sm btn-ghost" type="button" id="auditRefreshBtn">रिफ़्रेश</button></div></div><div id="auditBox">' +
-      (auditData.entries.length ? auditList(auditData.entries) : emptyBox("कोई गतिविधि दर्ज नहीं", true)) +
+      (auditData
+        ? auditData.entries.length
+          ? auditList(auditData.entries)
+          : emptyBox("कोई गतिविधि दर्ज नहीं", true)
+        : emptyBox(
+            auditResult.reason && auditResult.reason.message
+              ? auditResult.reason.message
+              : "ऑडिट लॉग लोड नहीं हो सका"
+          )) +
       "</div></section>" +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>सुरक्षा जाँच सूची</h3></div></div><div class="stack small">' +
-      '<div class="check"><span>✔ एडमिन पासवर्ड केवल Netlify Environment Variable में है</span></div>' +
+      '<div class="check"><span>✔ पासवर्ड salted hash या Cloudflare secret में सुरक्षित है</span></div>' +
       '<div class="check"><span>✔ हर एडमिन API सर्वर पर Bearer टोकन जाँचता है</span></div>' +
       '<div class="check"><span>✔ टाइमर, स्कोरिंग और प्रकाशन-स्थिति सर्वर पर लागू होती है</span></div>' +
       '<div class="check"><span>✔ विद्यार्थी केवल अपना परिणाम और अपने उत्तर देख सकता है</span></div>' +

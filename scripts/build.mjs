@@ -69,7 +69,7 @@ export async function build() {
     copied.push(item);
   }
 
-  for (const required of ["index.html", "exam/index.html", "exam/admin.html", "exam/test.html", "exam/result.html", "study/index.html", "study/chapter.html"]) {
+  for (const required of ["index.html", "exam/index.html", "exam/admin.html", "exam/controller.html", "exam/staff-login.html", "exam/test.html", "exam/result.html", "study/index.html", "study/chapter.html"]) {
     if (!existsSync(path.join(DIST, required))) {
       throw new Error("Build आउटपुट में आवश्यक फ़ाइल नहीं है: " + required);
     }
