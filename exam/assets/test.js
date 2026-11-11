@@ -485,6 +485,13 @@
     return data;
   }
 
+  function logExamEvent(event) {
+    if (!state.started || state.submitted || !state.examParam) return;
+    window.ExamGuard.report(event, state.examParam, state.token).catch((error) => {
+      console.warn("Exam event could not be recorded", error && error.status);
+    });
+  }
+
   function serverNow() {
     return Date.now() + state.offset;
   }
@@ -864,6 +871,7 @@
     fsEnter()
       .then(() => renderFsUi())
       .catch(() => {
+        logExamEvent("fullscreen_enter_failed");
         if (withHint) {
           UI.toast("फ़ुल स्क्रीन अपने आप नहीं खुली — “फ़ुल स्क्रीन करें” बटन दबाएँ / Full screen did not open — press the Full Screen button", "warn");
         }
@@ -880,7 +888,10 @@
   }
 
   function onFsChange() {
-    if (!fsNode() && state.started && !state.submitted) state.fsExits += 1;
+    if (!fsNode() && state.started && !state.submitted) {
+      state.fsExits += 1;
+      logExamEvent("fullscreen_exit");
+    }
     renderFsUi();
   }
 
@@ -1608,6 +1619,7 @@
 
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden" && state.started && !state.submitted) {
+        logExamEvent("visibility_hidden");
         persistShadow();
         saveNow();
       } else {

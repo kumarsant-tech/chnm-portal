@@ -22,10 +22,11 @@ process.env.ADMIN_SECRET = crypto.randomBytes(32).toString("base64url");
 
 const { default: api } = await import("../api/handler.mjs");
 const { handleRegister } = await import("../api/lib/api-public.mjs");
-const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
+const { K, getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
 const { rateLimit, hashPassword, checkPassword, hashPin, checkPin } = await import("../api/lib/auth.mjs");
 const { emailConfigured, sendEmail } = await import("../api/lib/email.mjs");
 const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
+const { default: resourceApi } = await import("../api/lib/api-resources.mjs");
 let apiEnv;
 let sqlite;
 
@@ -142,7 +143,7 @@ async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
         ip
       );
       if (changed.status === 200) {
-        data.token = login.data.token;
+        data.token = changed.data.token;
         data.student = changed.data.student;
       }
     }
@@ -522,6 +523,7 @@ let resultId;
     studentToken
   );
   check("first-login password change succeeds", changedPassword.status === 200 && !changedPassword.data.student.passwordChangeRequired);
+  studentToken = changedPassword.data.token;
   const mobileLogin = await call(
     "student_login",
     { identifier: "9876500001", password: TEST_PASSWORD_2 }
@@ -564,6 +566,111 @@ let resultId;
   check("exam started", started.status === 200, JSON.stringify(started.data));
   const attemptId = started.data.attempt.attemptId;
   check("paper has no correct answers", started.data.paper.questions.every((q) => q.correctIndex === undefined));
+  const eventLog = await call("student_exam_event", { examId, event: "visibility_hidden" }, studentToken);
+  check("active exam security event accepted", eventLog.status === 200 && eventLog.data.ok === true);
+  const invalidEvent = await call("student_exam_event", { examId, event: "admin_login" }, studentToken);
+  check("unknown exam event rejected", invalidEvent.status === 400);
+
+  const resourceObjects = new Map();
+  const bucket = {
+    async put(key, value) {
+      resourceObjects.set(key, Buffer.from(value));
+    },
+    async get(key) {
+      const value = resourceObjects.get(key);
+      return value ? { body: new Blob([value]).stream(), size: value.length } : null;
+    },
+    async delete(key) {
+      resourceObjects.delete(key);
+    },
+  };
+  const resourceEnv = {
+    ...(apiEnv || {}),
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    ADMIN_SECRET: process.env.ADMIN_SECRET,
+    RESOURCES: bucket,
+  };
+  const uploadForm = new FormData();
+  uploadForm.set("title", "Test PDF");
+  uploadForm.set("description", "Private student resource");
+  uploadForm.set("file", new Blob(["%PDF-1.7\nsample"]), "study.pdf");
+  const uploadResponse = await resourceApi(
+    new Request("https://portal.example/api/resources", {
+      method: "POST",
+      headers: { authorization: `Bearer ${globalThis.adminToken}` },
+      body: uploadForm,
+    }),
+    { env: resourceEnv }
+  );
+  const uploaded = await uploadResponse.json();
+  check("admin can upload a valid PDF to private storage", uploadResponse.status === 201);
+  const uploadedId = uploaded.resource?.id || "RES-00000000000000000000";
+  const studentResourcesResponse = await resourceApi(
+    new Request("https://portal.example/api/resources", {
+      headers: { authorization: `Bearer ${studentToken}` },
+    }),
+    { env: resourceEnv }
+  );
+  const studentResources = await studentResourcesResponse.json();
+  check(
+    "student library lists the uploaded resource",
+    studentResourcesResponse.status === 200 &&
+      studentResources.resources?.some((item) => item.id === uploadedId) &&
+      Boolean(uploaded.resource?.id)
+  );
+  const adminOnlyResources = await resourceApi(
+    new Request("https://portal.example/api/resources?admin=1", {
+      headers: { authorization: `Bearer ${studentToken}` },
+    }),
+    { env: resourceEnv }
+  );
+  check("student cannot access admin resource listing", adminOnlyResources.status === 401);
+  const invalidForm = new FormData();
+  invalidForm.set("title", "Invalid file");
+  invalidForm.set("file", new Blob(["not a PDF"]), "invalid.pdf");
+  const invalidUpload = await resourceApi(
+    new Request("https://portal.example/api/resources", {
+      method: "POST",
+      headers: { authorization: `Bearer ${globalThis.adminToken}` },
+      body: invalidForm,
+    }),
+    { env: resourceEnv }
+  );
+  check("invalid file signature is rejected", invalidUpload.status === 415);
+  const fileResponse = await resourceApi(
+    new Request(`https://portal.example/api/resources/${uploadedId}`, {
+      headers: { authorization: `Bearer ${studentToken}` },
+    }),
+    { env: resourceEnv }
+  );
+  check(
+    "student resource download is authenticated and not cacheable",
+    fileResponse.status === 200 &&
+      fileResponse.headers.get("cache-control").includes("no-store") &&
+      (await fileResponse.text()).startsWith("%PDF-1.7")
+  );
+  const removedResponse = await resourceApi(
+    new Request(`https://portal.example/api/resources?id=${uploadedId}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${globalThis.adminToken}` },
+    }),
+    { env: resourceEnv }
+  );
+  check("admin can remove a resource", removedResponse.status === 200);
+  const privateResource = await resourceApi(
+    new Request(`https://portal.example/api/resources/${uploadedId}`, {
+      headers: { authorization: `Bearer ${studentToken}` },
+    }),
+    { env: resourceEnv }
+  );
+  check("deleted resource cannot be downloaded", privateResource.status === 404);
+  const noBucket = await resourceApi(
+    new Request("https://portal.example/api/resources", {
+      headers: { authorization: `Bearer ${studentToken}` },
+    }),
+    { env: { ...(apiEnv || {}), ADMIN_SECRET: process.env.ADMIN_SECRET } }
+  );
+  check("missing R2 binding is reported clearly", noBucket.status === 503);
 
   const saved = await call(
     "student_autosave",
@@ -927,7 +1034,7 @@ console.log("\n7. Legacy data import");
     login.data.token
   );
   check("legacy account can set its first password", legacyPassword.status === 200);
-  const dash = await call("student_dashboard", {}, login.data.token);
+  const dash = await call("student_dashboard", {}, legacyPassword.data.token);
   const legacyResult = dash.data.results?.find((result) => result.resultId === "RES-LEGACY-FIG-99999");
   check("legacy result visible", Boolean(legacyResult), JSON.stringify(dash.data.results));
   check("legacy score preserved", legacyResult?.percentage === 70, legacyResult?.percentage);
@@ -1592,6 +1699,205 @@ console.log("\n11. Registration email and admin password recovery");
       "10.0.10.7"
     );
     check("changed admin password is active", finalAdminLogin.status === 200);
+
+    const wrongAdminAttempts = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      wrongAdminAttempts.push(
+        await call(
+          "admin_login",
+          { password: TEST_PASSWORD_3 },
+          "",
+          `10.0.10.${31 + attempt}`
+        )
+      );
+    }
+    check(
+      "three incorrect admin passwords trigger the one-hour lockout",
+      wrongAdminAttempts[0].status === 401 &&
+        wrongAdminAttempts[1].status === 401 &&
+        wrongAdminAttempts[2].status === 429
+    );
+    const lockedAdminLogin = await call(
+      "admin_login",
+      { password: TEST_PASSWORD_12 },
+      "",
+      "10.0.10.34"
+    );
+    const lockedAdminForgot = await call(
+      "admin_forgot_password",
+      { email: "admin@example.com" },
+      "",
+      "10.0.10.35"
+    );
+    const lockedAdminReset = await call(
+      "admin_reset_password",
+      {
+        token: crypto.randomBytes(32).toString("base64url"),
+        newPassword: TEST_PASSWORD_11,
+      },
+      "",
+      "10.0.10.36"
+    );
+    check(
+      "admin login and both recovery steps are blocked during lockout",
+      lockedAdminLogin.status === 429 &&
+        lockedAdminForgot.status === 429 &&
+        lockedAdminReset.status === 429
+    );
+    for (const prefix of ["auth/lockout/admin/", "auth/failures/admin/"]) {
+      for (const key of await listKeys(store, prefix)) await store.delete(key);
+    }
+
+    const recoveryRegistration = await call(
+      "register",
+      {
+        name: "Recovery Student",
+        mobile: "9876500092",
+        citsNumber: "CITS-RECOVERY",
+        email: "recovery@example.com",
+        dateOfBirth: "1998-06-07",
+        consent: true,
+        skipSetup: true,
+      },
+      "",
+      "10.0.10.12"
+    );
+    const recoveryStudentId = recoveryRegistration.data.student?.id;
+    check("recovery fixture student is registered", recoveryRegistration.status === 200 && recoveryStudentId);
+    const recoveryLogin = await call(
+      "student_login",
+      { identifier: "CITS-RECOVERY", password: "07061998" },
+      "",
+      "10.0.10.13"
+    );
+    check(
+      "recovery fixture starts with a temporary DOB password",
+      recoveryLogin.status === 200 && recoveryLogin.data.requiresPasswordChange
+    );
+    const recoveryEmailStart = sentEmails.length;
+    const studentForgot = await call(
+      "student_forgot_password",
+      { identifier: "CITS-RECOVERY", email: "recovery@example.com" },
+      "",
+      "10.0.10.14"
+    );
+    const studentResetEmail = sentEmails
+      .slice(recoveryEmailStart)
+      .find((sent) => sent.body.subject === "छात्र पासवर्ड रीसेट");
+    check(
+      "student recovery returns a non-enumerating success",
+      studentForgot.status === 200 &&
+        studentForgot.data.message ===
+          "यदि दी गई जानकारी किसी खाते से मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।"
+    );
+    check("student reset link goes only to the registered email", studentResetEmail?.body.to?.[0] === "recovery@example.com");
+    const studentResetToken = studentResetEmail?.body.text.match(/reset=([A-Za-z0-9_-]+)/)?.[1] || "";
+    check("student reset email contains a reset link", Boolean(studentResetToken));
+    const emailCountBeforeEnumerationChecks = sentEmails.length;
+    const unknownStudentForgot = await call(
+      "student_forgot_password",
+      { identifier: "CITS-UNKNOWN", email: "recovery@example.com" },
+      "",
+      "10.0.10.15"
+    );
+    const mismatchedStudentForgot = await call(
+      "student_forgot_password",
+      { identifier: "CITS-RECOVERY", email: "other@example.com" },
+      "",
+      "10.0.10.16"
+    );
+    check(
+      "unknown and mismatched student recovery details return the same response",
+      unknownStudentForgot.status === 200 &&
+        mismatchedStudentForgot.status === 200 &&
+        unknownStudentForgot.data.message === studentForgot.data.message &&
+        mismatchedStudentForgot.data.message === studentForgot.data.message
+    );
+    check("mismatched recovery details do not send an email", sentEmails.length === emailCountBeforeEnumerationChecks);
+
+    const wrongRecoveryAttempts = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      wrongRecoveryAttempts.push(
+        await call(
+          "student_login",
+          { identifier: "CITS-RECOVERY", password: TEST_PASSWORD_3 },
+          "",
+          `10.0.10.${20 + attempt}`
+        )
+      );
+    }
+    check(
+      "three incorrect student passwords trigger the one-hour lockout",
+      wrongRecoveryAttempts[0].status === 401 &&
+        wrongRecoveryAttempts[1].status === 401 &&
+        wrongRecoveryAttempts[2].status === 429
+    );
+    const lockedStudentLogin = await call(
+      "student_login",
+      { identifier: "9876500092", password: "07061998" },
+      "",
+      "10.0.10.23"
+    );
+    const lockedStudentForgot = await call(
+      "student_forgot_password",
+      { identifier: "CITS-RECOVERY", email: "recovery@example.com" },
+      "",
+      "10.0.10.24"
+    );
+    const lockedStudentReset = await call(
+      "student_reset_password",
+      { token: studentResetToken, newPassword: TEST_PASSWORD_11 },
+      "",
+      "10.0.10.25"
+    );
+    check(
+      "student login, recovery, and reset are blocked during lockout",
+      lockedStudentLogin.status === 429 &&
+        lockedStudentForgot.status === 429 &&
+        lockedStudentReset.status === 429
+    );
+    for (const prefix of ["auth/lockout/student/", "auth/failures/student/"]) {
+      for (const key of await listKeys(store, prefix)) await store.delete(key);
+    }
+
+    const expiredStudentToken = crypto.randomBytes(32).toString("base64url");
+    const expiredStudentHash = crypto.createHash("sha256").update(expiredStudentToken).digest("hex");
+    await putJson(store, K.studentPasswordReset(expiredStudentHash), {
+      studentId: recoveryStudentId,
+      expiresAt: Date.now() - 1,
+    });
+    const expiredStudentReset = await call(
+      "student_reset_password",
+      { token: expiredStudentToken, newPassword: TEST_PASSWORD_11 },
+      "",
+      "10.0.10.26"
+    );
+    check("expired student reset links are rejected", expiredStudentReset.status === 400);
+    const completedStudentReset = await call(
+      "student_reset_password",
+      { token: studentResetToken, newPassword: TEST_PASSWORD_11 },
+      "",
+      "10.0.10.27"
+    );
+    check("student reset link updates the password", completedStudentReset.status === 200);
+    check(
+      "student reset invalidates existing sessions",
+      (await call("student_dashboard", {}, recoveryLogin.data.token)).status === 401
+    );
+    const reusedStudentReset = await call(
+      "student_reset_password",
+      { token: studentResetToken, newPassword: TEST_PASSWORD_12 },
+      "",
+      "10.0.10.28"
+    );
+    check("student reset link is single-use", reusedStudentReset.status === 400);
+    const resetStudentLogin = await call(
+      "student_login",
+      { identifier: "CITS-RECOVERY", password: TEST_PASSWORD_11 },
+      "",
+      "10.0.10.29"
+    );
+    check("student can sign in with the reset password", resetStudentLogin.status === 200);
 
     const releaseEmailStart = sentEmails.length;
     await call("admin_exam_release", { examId, releaseResults: false }, finalAdminLogin.data.token);

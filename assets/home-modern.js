@@ -257,27 +257,12 @@
     document.body.insertBefore(a, document.body.firstChild);
   }
 
-  /* ---------- 4b. फ़ोटो गैलरी का छोटा संकेत (तस्वीरें ज्यों की त्यों रहती हैं) ---------- */
-  function galHint() {
-    var gal = document.querySelector(".v8-gal");
-    if (!gal || document.querySelector(".hm-gal-hint")) return;
-    var n = gal.querySelectorAll("img").length;
-    if (!n) return;
-    var half = Math.round(n / 2);
-    var h = document.createElement("p");
-    h.className = "hm-gal-hint";
-    h.innerHTML = "<i aria-hidden=\"true\">📸</i>" +
-      pair("फ़ोटो गैलरी — " + half + " तस्वीरें (सब वैसी ही हैं)", "Photo gallery — " + half + " photos (all unchanged)");
-    gal.parentNode.insertBefore(h, gal);
-    if (window.__applyLang) window.__applyLang(h);
-  }
-
   /* ---------- 5. शुरू ---------- */
   var busyUntil = 0, pending = 0;
   function refresh() {
     if (Date.now() < busyUntil) return;
     if (pending) return;
-    pending = setTimeout(function () { pending = 0; reveal(); glow(); galHint(); sweep(); }, 700);
+    pending = setTimeout(function () { pending = 0; reveal(); glow(); sweep(); }, 700);
   }
 
   function start() {
@@ -292,7 +277,6 @@
       Array.prototype.slice.call(document.querySelectorAll(SAFE)).forEach(function (n) { n.classList.add("hm-in"); });
     }
     glow();
-    galHint();
     setTimeout(sweep, 400);
     setInterval(function () { if (document.visibilityState === "visible") sweep(); }, 1500);
     ripple();

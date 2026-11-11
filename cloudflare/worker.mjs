@@ -2,6 +2,7 @@ import api from "../api/handler.mjs";
 import { getDb, listJson } from "../api/lib/db.mjs";
 import { finalizeExpiredForExam } from "../api/lib/scoring.mjs";
 import { processResultReleaseEmails } from "../api/lib/result-notifications.mjs";
+import resourceApi from "../api/lib/api-resources.mjs";
 import { REDIRECTS } from "./redirects.mjs";
 
 const EXAM_CSP =
@@ -30,6 +31,17 @@ function secure(response, pathname) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const studyChapter = url.pathname.match(/^\/study\/chapter\/(\d{1,2})\/?$/);
+    if (studyChapter && Number(studyChapter[1]) >= 1 && Number(studyChapter[1]) <= 16) {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = "/study/chapter.html";
+      assetUrl.search = `?m=${studyChapter[1]}`;
+      const response = await env.ASSETS.fetch(new Request(assetUrl, request));
+      return secure(response, url.pathname);
+    }
+    if (url.pathname === "/api/resources" || url.pathname.startsWith("/api/resources/")) {
+      return resourceApi(request, { env });
+    }
     const redirect = REDIRECTS.get(url.pathname);
     if (redirect) {
       return new Response(null, {

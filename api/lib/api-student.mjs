@@ -109,6 +109,7 @@ export async function handleStudentDashboard({ store, student }) {
     const key = `${result.examId}:${result.examType}`;
     if (!resultByExam.has(key)) resultByExam.set(key, result);
   }
+
   const active = await findActiveAttempts(store, student.id);
   const attemptByExam = new Map(active.map((attempt) => [attempt.examId, attempt]));
 
@@ -196,6 +197,31 @@ export async function handleStudentDashboard({ store, student }) {
     results: resultEntries,
     serverNow: Date.now(),
   });
+}
+
+const EXAM_SECURITY_EVENTS = new Set([
+  "visibility_hidden",
+  "fullscreen_exit",
+  "fullscreen_enter_failed",
+]);
+
+export async function handleStudentExamEvent({ req, store, student }) {
+  const body = await readJson(req);
+  const examId = String(body.examId || "").trim().slice(0, 60);
+  const event = String(body.event || "");
+  if (!examId || !EXAM_SECURITY_EVENTS.has(event)) {
+    throw new HttpError("परीक्षा सुरक्षा घटना अमान्य है", 400);
+  }
+  await rateLimit(store, "exam-event", student.id, 30, 60 * 1000);
+  const [exam, attempt] = await Promise.all([
+    getJson(store, K.exams(examId)),
+    getJson(store, K.attempt(examId, student.id)),
+  ]);
+  if (!exam || !attempt || attempt.status !== "active") {
+    throw new HttpError("सक्रिय परीक्षा प्रयास नहीं मिला", 404);
+  }
+  await audit(store, `exam.security.${event}`, student.id, { examId });
+  return json({ ok: true });
 }
 
 export async function handleStudentExamGet({ store, student, req }) {

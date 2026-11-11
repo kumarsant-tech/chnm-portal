@@ -10,6 +10,10 @@ const DIST = path.join(ROOT, "dist");
 export const SITE_ITEMS = [
   "index.html",
   "assets",
+  "service-worker.js",
+  "offline.html",
+  "privacy.html",
+  "terms.html",
   "Computer-Lab",
   "SMPS-Lab",
   "exam",

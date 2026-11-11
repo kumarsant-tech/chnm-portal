@@ -7,6 +7,7 @@
 - Live URL: <https://chnm-portal.kumarsant1947.workers.dev>
 - Hosting/API: Cloudflare Worker `chnm-portal` और Static Assets
 - Database: Cloudflare D1 (`DB` binding)
+- Student resources: private Cloudflare R2 bucket (`RESOURCES` binding)
 - GitHub repository: <https://github.com/kumarsant-tech/chnm-portal> (private)
 - Production branch: `main`
 - Configuration file: [wrangler.jsonc](../wrangler.jsonc)
@@ -32,6 +33,16 @@ npm run test:d1
 ```
 
 दोनों सफल हों तभी बदलाव push करें। छोटे content/design बदलाव के लिए बदला हुआ page स्थानीय रूप से खोलकर जाँचें।
+
+## छात्र संसाधन लाइब्रेरी
+
+नए deployment में `RESOURCES` binding के लिए Cloudflare R2 bucket पहले बनाएँ:
+
+```powershell
+npx wrangler r2 bucket create chnm-portal-resources
+```
+
+Bucket private रखें; सार्वजनिक access सक्षम न करें। `wrangler.jsonc` में binding पहले से इसी नाम पर कॉन्फ़िगर है। Admin panel से PDF/PPT/PPTX अपलोड करें; authenticated छात्र अपने ट्रेड की सामग्री डाउनलोड कर सकते हैं। Files R2 में और सूची metadata D1 में रहता है।
 
 ## Admin secrets और database सुरक्षा
 

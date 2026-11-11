@@ -215,15 +215,20 @@ export const K = {
   examResultIndex: (examId, attemptId) => `idx/exam-results/${examId}/${attemptId}`,
   resultReleaseEmail: (examId, studentId) => `emails/result-release/${examId}/${studentId}`,
   rateLimit: (scope, id) => `rl/${scope}/${id}`,
+  authFailures: (scope, id) => `auth/failures/${scope}/${id}`,
+  authLockout: (scope, id) => `auth/lockout/${scope}/${id}`,
   adminPasswordOverride: () => "auth/admin-password-override",
   adminAuthVersion: () => "auth/admin-auth-version",
   adminPasswordReset: (tokenHash) => `auth/admin-password-reset/${tokenHash}`,
+  studentPasswordReset: (tokenHash) => `auth/student-password-reset/${tokenHash}`,
+  studentPasswordResetIndex: (studentId) => `auth/student-password-reset-index/${studentId}`,
   studentCitsIndex: (cits) => `idx/cits/${cits}`,
   audit: (id) => `audit/${id}`,
   registrationSeq: () => "meta/registration-seq",
   notice: (id) => `notices/${id}`,
   noticeRead: (studentId, noticeId) => `idx/notice-read/${studentId}/${noticeId}`,
   chatMessage: (id) => `chat/${id}`,
+  resource: (id) => `resources/${id}`,
 };
 
 export async function getJson(store, key, fallback = null) {

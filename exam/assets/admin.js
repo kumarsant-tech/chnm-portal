@@ -29,6 +29,7 @@
     questions: "layers",
     results: "chart",
     students: "users",
+    resources: "archive",
     notify: "bell",
     catalog: "book",
     stats: "stats",
@@ -43,6 +44,7 @@
     questions: { title: "प्रश्न बैंक", crumb: "विषय-वार प्रश्न, Excel/CSV आयात और सत्यापन", render: renderQuestions },
     results: { title: "परिणाम", crumb: "परीक्षा, विषय और ट्रेड के अनुसार परिणाम", render: renderResults },
     students: { title: "विद्यार्थी", crumb: "पंजीकरण, प्रोफ़ाइल और परीक्षा प्रयास", render: renderStudents },
+    resources: { title: "अध्ययन सामग्री", crumb: "छात्रों के लिए PDF और PowerPoint", render: renderResources },
     notify: { title: "सूचना और चैट", crumb: "सभी छात्रों को सूचना भेजें और समूह चैट देखें", render: renderNotify },
     catalog: { title: "विषय और ट्रेड", crumb: "विषय तथा ट्रेड प्रबंधन", render: renderCatalog },
     stats: { title: "आँकड़े", crumb: "परीक्षा, विषय और ट्रेड-वार प्रदर्शन", render: renderStats },
@@ -4263,6 +4265,106 @@
       statCard("पास दर", UI.trimNumber(data.practice.passRate || 0) + "%", (data.practice.pass || 0) + " पास") +
       statCard("उच्चतम", UI.trimNumber(data.practice.highest || 0) + "%", "न्यूनतम " + UI.trimNumber(data.practice.lowest || 0) + "%") +
       "</div></section>";
+  }
+
+  function resourceSize(bytes) {
+    const size = Number(bytes) || 0;
+    return size >= 1024 * 1024
+      ? (size / (1024 * 1024)).toFixed(1) + " MB"
+      : Math.max(1, Math.round(size / 1024)) + " KB";
+  }
+
+  async function renderResources(content) {
+    await ensureOverview(false);
+    const data = await UI.resourceCall("?admin=1", {}, state.token);
+    const resources = data.resources || [];
+    const renderResourceFolder = (kind, title) => {
+      const items = resources.filter((resource) =>
+        kind === "pdf"
+          ? String(resource.fileName || "").toLowerCase().endsWith(".pdf")
+          : /\.(ppt|pptx)$/i.test(String(resource.fileName || ""))
+      );
+      return '<section class="resource-folder"><h3><span>' + title + '</span><small>' +
+        items.length + ' फ़ाइल</small></h3>' +
+        (items.length
+          ? '<div class="resource-list">' + items.map((resource) =>
+            '<article class="resource-row"><div class="grow"><strong>' + esc(resource.title) +
+            '</strong><p class="small muted">' + esc(resource.description || resource.fileName) +
+            '</p><small>' + esc(resource.fileName) + ' · ' + resourceSize(resource.size) + '</small></div>' +
+            '<div class="row"><button class="btn btn-sm btn-ghost" type="button" data-resource-download="' + attr(resource.id) + '">डाउनलोड</button>' +
+            '<button class="btn btn-sm btn-bad" type="button" data-resource-delete="' + attr(resource.id) + '">हटाएँ</button></div></article>'
+          ).join("") + '</div>'
+          : '<div class="resource-folder-empty">इस फ़ोल्डर में अभी कोई फ़ाइल नहीं</div>') +
+        '</section>';
+    };
+    content.innerHTML =
+      '<div class="admin-section-head"><div><h1>अध्ययन सामग्री</h1><p>पंजीकृत छात्र अपने ट्रेड की साझा PDF और PowerPoint फ़ाइलें डाउनलोड कर सकते हैं।</p></div></div>' +
+      '<form id="resourceUploadForm" class="admin-card settings-grid">' +
+      '<label class="field"><span>शीर्षक *</span><input class="input" name="title" maxlength="120" required></label>' +
+      '<label class="field"><span>ट्रेड (वैकल्पिक)</span><select class="select" name="tradeId">' +
+      optionList(trades(), "", "सभी ट्रेड") +
+      '</select></label>' +
+      '<label class="field full"><span>विवरण</span><textarea class="textarea" name="description" rows="3" maxlength="500"></textarea></label>' +
+      '<label class="field full"><span>PDF / PPT / PPTX फ़ाइल (अधिकतम 20 MB)</span><input class="input" name="file" type="file" accept=".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required></label>' +
+      '<div class="editor-actions"><button class="btn btn-navy" id="resourceUploadBtn" type="submit">छात्र लाइब्रेरी में जोड़ें</button></div></form>' +
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>अपलोड की गई फ़ाइलें</h3><p class="admin-card-sub">फ़ाइलें private Cloudflare R2 storage में हैं; केवल लॉगिन किया छात्र डाउनलोड कर सकता है।</p></div></div>' +
+      '<div class="resource-folders">' +
+      renderResourceFolder("pdf", "📄 PDF फ़ोल्डर") +
+      renderResourceFolder("ppt", "📊 PPT फ़ोल्डर") +
+      '</div>' +
+      "</section>";
+
+    const form = $("#resourceUploadForm", content);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const file = form.elements.file.files[0];
+      if (!file) return;
+      const payload = new FormData(form);
+      const button = $("#resourceUploadBtn", form);
+      UI.setButtonBusy(button, true, "अपलोड हो रहा है…");
+      try {
+        await UI.resourceCall("", { method: "POST", body: payload }, state.token);
+        UI.toast("अध्ययन सामग्री अपलोड हो गई", "good");
+        await renderRoute("resources", true);
+      } catch (error) {
+        UI.toast(error.message || "फ़ाइल अपलोड नहीं हो सकी", "bad");
+        UI.setButtonBusy(button, false);
+      }
+    });
+    content.addEventListener("click", async (event) => {
+      const download = event.target.closest("[data-resource-download]");
+      if (download) {
+        try {
+          const result = await UI.resourceCall(
+            "/" + encodeURIComponent(download.dataset.resourceDownload) + "?admin=1",
+            {},
+            state.token
+          );
+          UI.downloadBlob(result.blob, result.filename);
+        } catch (error) {
+          UI.toast(error.message || "फ़ाइल डाउनलोड नहीं हो सकी", "bad");
+        }
+        return;
+      }
+      const remove = event.target.closest("[data-resource-delete]");
+      if (!remove) return;
+      const yes = await UI.confirm({
+        title: "फ़ाइल हटाएँ?",
+        message: "यह फ़ाइल छात्र लाइब्रेरी से हट जाएगी।",
+        confirmText: "हटाएँ",
+        tone: "btn-bad",
+      });
+      if (!yes) return;
+      try {
+        await UI.resourceCall("?id=" + encodeURIComponent(remove.dataset.resourceDelete), {
+          method: "DELETE",
+        }, state.token);
+        UI.toast("फ़ाइल हटा दी गई", "good");
+        await renderRoute("resources", true);
+      } catch (error) {
+        UI.toast(error.message || "फ़ाइल नहीं हटाई जा सकी", "bad");
+      }
+    });
   }
 
   /* ---------- settings ---------- */

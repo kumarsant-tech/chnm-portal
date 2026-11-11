@@ -1,10 +1,13 @@
 import { K, getJson, putJson, listJson } from "./db.mjs";
 import { HttpError, json, readJson, getIp } from "./http.mjs";
-import { clean, validateStudent, phone, temporaryPasswordFromDob } from "./validate.mjs";
+import { clean, email, validateStudent, phone, temporaryPasswordFromDob } from "./validate.mjs";
 import {
   issueStudentToken,
   rateLimit,
   clearRateLimit,
+  assertAuthUnlocked,
+  recordAuthFailure,
+  clearAuthFailures,
   audit,
   checkPin,
   checkPassword,
@@ -13,7 +16,8 @@ import {
 import { publicSettings, studentSelf } from "./serializers.mjs";
 import { loadCatalog, nextRegistrationId, publicSubject, publicTrade } from "./domain.mjs";
 import { DEFAULT_SETTINGS } from "./seed.mjs";
-import { sendEmail, escapeEmailHtml } from "./email.mjs";
+import { sendEmail, escapeEmailHtml, emailConfigured } from "./email.mjs";
+import { createResetToken, hashResetToken, resetBaseUrl, validResetToken } from "./recovery.mjs";
 
 function registrationLoginUrl(env) {
   const fallback = "https://futureinstructor.in/exam/index.html";
@@ -226,23 +230,56 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
   if (!/^[A-Z0-9][A-Z0-9_/-]{1,39}$/.test(identifier)) {
     throw new HttpError("CITS नंबर या पंजीकृत मोबाइल नंबर दर्ज करें", 400);
   }
-  await rateLimit(store, "student-login-id", identifier, 8, 15 * 60 * 1000);
   const student = await findStudentByIdentifier(store, identifier);
-  if (!student) throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
+  const authIdentities = studentAuthIdentities(student, identifier);
+  const counterIdentity = student ? `student:${student.id}` : `identifier:${identifier}`;
+  await assertAuthUnlocked(store, "student", authIdentities);
+  await rateLimit(store, "student-login-id", identifier, 8, 15 * 60 * 1000);
+  if (!student) {
+    if (await recordAuthFailure(store, "student", counterIdentity, authIdentities)) {
+      throw new HttpError(
+        "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+        429,
+        { retryAfter: 3600 }
+      );
+    }
+    throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
+  }
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय है — एडमिन से संपर्क करें", 403);
   }
   if (student.passwordHash) {
     if (!(await checkPassword(password, student.passwordHash))) {
+      if (await recordAuthFailure(store, "student", counterIdentity, authIdentities)) {
+        throw new HttpError(
+          "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+          429,
+          { retryAfter: 3600 }
+        );
+      }
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
   } else {
     const legacyIdMatches = identifier === String(student.id).toUpperCase() ||
       identifier === String(student.mobile || "");
     if (!legacyIdMatches || !mobile || mobile !== student.mobile) {
+      if (await recordAuthFailure(store, "student", counterIdentity, authIdentities)) {
+        throw new HttpError(
+          "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+          429,
+          { retryAfter: 3600 }
+        );
+      }
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
     if (student.pinHash && !(await checkPin(password, student.pinHash))) {
+      if (await recordAuthFailure(store, "student", counterIdentity, authIdentities)) {
+        throw new HttpError(
+          "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+          429,
+          { retryAfter: 3600 }
+        );
+      }
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
     if (!student.mustChangePassword) {
@@ -251,13 +288,24 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
     }
   }
   await clearRateLimit(store, "student-login-id", identifier);
+  await clearAuthFailures(store, "student", authIdentities);
   await audit(store, "student.login", student.id, { ip });
   return json({
     ok: true,
-    token: issueStudentToken(student.id, env),
+    token: issueStudentToken(student.id, env, student.authVersion),
     student: studentSelf(student),
     requiresPasswordChange: Boolean(student.mustChangePassword || !student.passwordHash),
   });
+}
+
+function studentAuthIdentities(student, identifier) {
+  if (!student) return [`identifier:${identifier}`];
+  return [
+    `student:${student.id}`,
+    student.citsNumber ? `cits:${String(student.citsNumber).toUpperCase()}` : "",
+    student.mobile ? `mobile:${student.mobile}` : "",
+    `identifier:${identifier}`,
+  ].filter(Boolean);
 }
 
 async function findStudentByIdentifier(store, identifier) {
@@ -282,7 +330,7 @@ async function findStudentByIdentifier(store, identifier) {
   ) || null;
 }
 
-export async function handleStudentPasswordChange({ req, ctx, store, student }) {
+export async function handleStudentPasswordChange({ req, ctx, store, env, student }) {
   const body = await readJson(req);
   await rateLimit(store, "student-password-change", student.id, 6, 15 * 60 * 1000);
   const newPassword = String(body.newPassword || "");
@@ -301,9 +349,122 @@ export async function handleStudentPasswordChange({ req, ctx, store, student }) 
   }
   student.passwordHash = await hashPassword(newPassword);
   student.mustChangePassword = false;
+  student.authVersion = (Number(student.authVersion) || 0) + 1;
   delete student.pinHash;
   student.updatedAt = new Date().toISOString();
   await putJson(store, K.students(student.id), student);
   await audit(store, "student.password.change", student.id, { ip: getIp(req, ctx) });
-  return json({ ok: true, student: studentSelf(student) });
+  return json({
+    ok: true,
+    token: issueStudentToken(student.id, env, student.authVersion),
+    student: studentSelf(student),
+  });
+}
+
+const STUDENT_RESET_TTL = 30 * 60 * 1000;
+const GENERIC_STUDENT_RESET_MESSAGE =
+  "यदि दी गई जानकारी किसी खाते से मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।";
+
+export async function handleStudentForgotPassword({ req, ctx, store, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "student-forgot-password-ip", ip, 5, 60 * 60 * 1000);
+  const body = await readJson(req);
+  const identifier = clean(body.identifier ?? body.id, 40).toUpperCase();
+  const emailAddress = email(body.email);
+  if (!/^[A-Z0-9][A-Z0-9_/-]{1,39}$/.test(identifier) || !emailAddress) {
+    throw new HttpError("पंजीकृत CITS/मोबाइल और सही ईमेल दर्ज करें", 400);
+  }
+  await rateLimit(store, "student-forgot-password-id", identifier, 5, 60 * 60 * 1000);
+
+  const baseUrl = resetBaseUrl(env);
+  if (!baseUrl || !emailConfigured(env)) {
+    throw new HttpError(
+      "पासवर्ड रिकवरी उपलब्ध नहीं है। PUBLIC_BASE_URL और Resend (RESEND_API_KEY, EMAIL_FROM) configure करें।",
+      503
+    );
+  }
+
+  const student = await findStudentByIdentifier(store, identifier);
+  const authIdentities = studentAuthIdentities(student, identifier);
+  await assertAuthUnlocked(store, "student", authIdentities);
+  if (!student || !student.email || email(student.email) !== emailAddress) {
+    return json({ ok: true, message: GENERIC_STUDENT_RESET_MESSAGE });
+  }
+
+  const previous = await getJson(store, K.studentPasswordResetIndex(student.id));
+  if (previous?.tokenHash) {
+    await store.delete(K.studentPasswordReset(previous.tokenHash));
+  }
+  const token = createResetToken();
+  const tokenHash = hashResetToken(token);
+  const expiresAt = Date.now() + STUDENT_RESET_TTL;
+  await putJson(store, K.studentPasswordReset(tokenHash), {
+    studentId: student.id,
+    expiresAt,
+  });
+  await putJson(store, K.studentPasswordResetIndex(student.id), { tokenHash });
+  const resetUrl = `${baseUrl}/exam/index.html?reset=${encodeURIComponent(token)}`;
+  const delivery = await sendEmail(env, {
+    to: student.email,
+    subject: "छात्र पासवर्ड रीसेट",
+    text: [
+      `नमस्ते ${student.name},`,
+      "पासवर्ड रीसेट करने के लिए इस लिंक को 30 मिनट के भीतर खोलें:",
+      resetUrl,
+      "यदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।",
+    ].join("\n\n"),
+    html: `<p>नमस्ते ${escapeEmailHtml(student.name)},</p><p>पासवर्ड रीसेट करने के लिए <a href="${escapeEmailHtml(resetUrl)}">इस लिंक</a> को 30 मिनट के भीतर खोलें।</p><p>यदि आपने यह अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।</p>`,
+  });
+  if (!delivery.sent) {
+    await store.delete(K.studentPasswordReset(tokenHash));
+    await store.delete(K.studentPasswordResetIndex(student.id));
+    throw new HttpError(
+      "रीसेट ईमेल नहीं भेजा जा सका। ईमेल provider configuration जाँचकर फिर प्रयास करें।",
+      503
+    );
+  }
+  return json({ ok: true, message: GENERIC_STUDENT_RESET_MESSAGE });
+}
+
+export async function handleStudentResetPassword({ req, ctx, store }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "student-reset-password", ip, 8, 15 * 60 * 1000);
+  const body = await readJson(req);
+  const token = String(body.token || "");
+  const newPassword = String(body.newPassword || "");
+  if (!validResetToken(token)) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  if (newPassword.length < 10 || newPassword.length > 128) {
+    throw new HttpError("नया पासवर्ड 10 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  const tokenHash = hashResetToken(token);
+  const resetKey = K.studentPasswordReset(tokenHash);
+  const pending = await getJson(store, resetKey);
+  if (!pending || Number(pending.expiresAt) <= Date.now()) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  const student = await getJson(store, K.students(pending.studentId));
+  if (!student || student.active === false) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  const authIdentities = studentAuthIdentities(student, `student:${student.id}`);
+  await assertAuthUnlocked(store, "student", authIdentities);
+  const currentIndex = await getJson(store, K.studentPasswordResetIndex(student.id));
+  if (currentIndex?.tokenHash !== tokenHash) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  const consumed = await store.consumeResetToken(resetKey, Date.now());
+  if (!consumed) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+
+  student.passwordHash = await hashPassword(newPassword);
+  student.mustChangePassword = false;
+  student.authVersion = (Number(student.authVersion) || 0) + 1;
+  delete student.pinHash;
+  student.updatedAt = new Date().toISOString();
+  await putJson(store, K.students(student.id), student);
+  await store.delete(K.studentPasswordResetIndex(student.id));
+  await clearAuthFailures(store, "student", authIdentities);
+  await audit(store, "student.password.reset", student.id, { ip });
+  return json({ ok: true, message: "पासवर्ड रीसेट हो गया है। अब नए पासवर्ड से लॉगिन करें।" });
 }

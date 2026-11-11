@@ -10,7 +10,8 @@
   if (!article) return;
 
   var params = new URLSearchParams(window.location.search);
-  var requested = parseInt(params.get("m"), 10);
+  var chapterPath = window.location.pathname.match(/\/chapter\/(\d{1,2})\/?$/);
+  var requested = chapterPath ? Number(chapterPath[1]) : parseInt(params.get("m"), 10);
   var current = modules.filter(function (m) { return m.id === requested; })[0];
   if (!current) {
     article.innerHTML =
@@ -113,7 +114,7 @@
     navList.innerHTML = "";
     modules.forEach(function (m) {
       var link = document.createElement("a");
-      link.href = "chapter.html?m=" + m.id;
+      link.href = "chapter/" + m.id;
       if (m.id === current.id) link.setAttribute("aria-current", "page");
       link.setAttribute("data-nav-id", String(m.id));
       var num = document.createElement("span");
@@ -167,10 +168,10 @@
     var footNav =
       '<nav class="chapter-footnav" aria-label="अध्याय नेविगेशन">' +
       (prev
-        ? '<a class="btn btn-ghost" href="chapter.html?m=' + prev.id + '">पिछला: ' + esc(prev.title) + "</a>"
+        ? '<a class="btn btn-ghost" href="chapter/' + prev.id + '">पिछला: ' + esc(prev.title) + "</a>"
         : '<a class="btn btn-ghost" href="index.html">सभी अध्याय</a>') +
       (next
-        ? '<a class="btn" href="chapter.html?m=' + next.id + '">अगला: ' + esc(next.title) + "</a>"
+        ? '<a class="btn" href="chapter/' + next.id + '">अगला: ' + esc(next.title) + "</a>"
         : '<a class="btn" href="index.html">अध्ययन केंद्र पर लौटें</a>') +
       "</nav>";
 

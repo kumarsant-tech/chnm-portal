@@ -33,6 +33,16 @@ node scripts/dev-server.mjs
 
 Server restart पर memory-store data मिट जाता है। Production जैसा D1 test चलाने के लिए `npm run test:d1` उपयोग करें।
 
+## छात्र अध्ययन सामग्री (Cloudflare R2)
+
+अध्ययन लाइब्रेरी PDF, PPT और PPTX फ़ाइलों को private R2 bucket में रखती है। Cloudflare account में bucket एक बार बनाएँ:
+
+```powershell
+npx wrangler r2 bucket create chnm-portal-resources
+```
+
+`wrangler.jsonc` में `RESOURCES` binding उसी bucket से जुड़ी है। हर फ़ाइल 20 MB तक हो सकती है। Upload और download केवल authenticated admin/student API से होते हैं; फ़ाइलें public URL पर उपलब्ध नहीं होतीं। R2 bucket बनाए बिना लाइब्रेरी endpoints स्पष्ट configuration error देंगे।
+
 ## पुराने Netlify Blobs data का migration
 
 Netlify deployment/runtime support हटा दिया गया है। `@netlify/blobs` dependency केवल पुरानी Netlify Blobs site से backup export करने वाले one-off `npm run export:netlify-blobs` migration tool के लिए रहती है। `npm run import:cloudflare-db` उस backup को खाली Cloudflare D1 database में import करता है। Migration backup में छात्र और परीक्षा की संवेदनशील जानकारी हो सकती है—इसे private, access-controlled storage में रखें। Migration utilities को सामान्य Worker runtime में इस्तेमाल नहीं किया जाता।

@@ -126,9 +126,6 @@
 .v8-card img{transition:transform .45s var(--hm-ease)}
 .v8-card:hover img{transform:scale(1.07)}
 .v8-gal{border-radius:18px}
-.hm-gal-hint{display:flex;gap:7px;align-items:center;font-size:12px;font-weight:700;color:var(--muted);margin:2px 0 0}
-.hm-gal-hint i{font-style:normal}
-
 /* ---------- गति/एनिमेशन बंद ---------- */
 :root.hm-no-motion .hm-aurora{display:none}
 :root.hm-no-motion .home-hero h1,:root.hm-no-motion .home-hero .home-hero-sub,:root.hm-no-motion .hn,:root.hm-no-motion .ha,

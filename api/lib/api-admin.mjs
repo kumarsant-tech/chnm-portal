@@ -32,12 +32,21 @@ import {
   adminAuthVersion,
   bumpAdminAuthVersion,
   clearRateLimit,
+  assertAuthUnlocked,
+  recordAuthFailure,
+  clearAuthFailures,
   rateLimit,
   audit,
   recentAudit,
   hashPin,
 } from "./auth.mjs";
 import { emailConfigured, sendEmail } from "./email.mjs";
+import {
+  createResetToken,
+  hashResetToken,
+  resetBaseUrl,
+  validResetToken,
+} from "./recovery.mjs";
 import { processResultReleaseEmails } from "./result-notifications.mjs";
 import {
   examSummary,
@@ -251,6 +260,7 @@ function paged(items, body, defaultSize = 25) {
 
 export async function handleAdminLogin({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
+  await assertAuthUnlocked(store, "admin", ["admin"]);
   await rateLimit(store, "admin-login", ip, 8, ADMIN_LOGIN_WINDOW);
   if (!(await hasAdminCredential(env, store))) {
     throw new HttpError(
@@ -260,9 +270,17 @@ export async function handleAdminLogin({ req, ctx, store, env }) {
   }
   const body = await readJson(req);
   if (!(await checkAdminPassword(body.password, env, store))) {
+    if (await recordAuthFailure(store, "admin", "admin", ["admin"])) {
+      throw new HttpError(
+        "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+        429,
+        { retryAfter: 3600 }
+      );
+    }
     throw new HttpError("गलत पासवर्ड", 401);
   }
   await clearRateLimit(store, "admin-login", ip);
+  await clearAuthFailures(store, "admin", ["admin"]);
   await audit(store, "admin.login", "admin", { ip });
   return json({
     ok: true,
@@ -292,6 +310,7 @@ export async function handleAdminPasswordChange({ req, ctx, store, env }) {
   }
   await putJson(store, K.adminPasswordOverride(), await hashPassword(newPassword));
   const authVersion = await bumpAdminAuthVersion(store);
+  await clearAuthFailures(store, "admin", ["admin"]);
   await audit(store, "admin.password.change", "admin", { ip });
   return json({
     ok: true,
@@ -300,23 +319,9 @@ export async function handleAdminPasswordChange({ req, ctx, store, env }) {
   });
 }
 
-function resetBaseUrl(env) {
-  const configured = String(env?.PUBLIC_BASE_URL || "");
-  try {
-    const url = new URL(configured);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return "";
-    return url.origin;
-  } catch {
-    return "";
-  }
-}
-
-function hashResetToken(token) {
-  return crypto.createHash("sha256").update(String(token)).digest("hex");
-}
-
 export async function handleAdminForgotPassword({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
+  await assertAuthUnlocked(store, "admin", ["admin"]);
   await rateLimit(store, "admin-forgot-password", ip, 5, 60 * 60 * 1000);
   await rateLimit(store, "admin-forgot-password-global", "admin", 3, 60 * 60 * 1000);
   const recipient = String(env?.ADMIN_EMAIL || "").trim().toLowerCase();
@@ -327,7 +332,7 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
       503
     );
   }
-  const token = crypto.randomBytes(32).toString("base64url");
+  const token = createResetToken();
   const tokenHash = hashResetToken(token);
   const resetKey = K.adminPasswordReset(tokenHash);
   const expiresAt = Date.now() + 30 * 60 * 1000;
@@ -354,11 +359,12 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
 
 export async function handleAdminResetPassword({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
+  await assertAuthUnlocked(store, "admin", ["admin"]);
   await rateLimit(store, "admin-reset-password", ip, 8, 15 * 60 * 1000);
   const body = await readJson(req);
   const token = String(body.token || "");
   const newPassword = String(body.newPassword || "");
-  if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) {
+  if (!validResetToken(token)) {
     throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
   }
   if (!validNewAdminPassword(newPassword)) {
@@ -369,6 +375,7 @@ export async function handleAdminResetPassword({ req, ctx, store, env }) {
   if (!reset) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
   await putJson(store, K.adminPasswordOverride(), await hashPassword(newPassword));
   await bumpAdminAuthVersion(store);
+  await clearAuthFailures(store, "admin", ["admin"]);
   await audit(store, "admin.password.reset", "admin", { ip });
   return json({ ok: true, message: "एडमिन पासवर्ड रीसेट हो गया है।" });
 }

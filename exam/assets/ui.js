@@ -228,6 +228,35 @@
     return { blob: await res.blob(), filename: filename };
   }
 
+  async function resourceCall(path, options, token) {
+    const opts = options || {};
+    let response;
+    try {
+      response = await fetch("/api/resources" + (path || ""), {
+        method: opts.method || "GET",
+        headers: {
+          ...(opts.body instanceof FormData ? {} : { "content-type": "application/json" }),
+          ...(token ? { authorization: "Bearer " + token } : {}),
+        },
+        body: opts.body,
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+    } catch {
+      throw new ApiError("इंटरनेट या सर्वर से कनेक्शन नहीं हुआ — दोबारा प्रयास करें", 0);
+    }
+    if (!response.ok) return parseResponse(response);
+    if ((response.headers.get("content-type") || "").includes("application/json")) {
+      return response.json();
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+    const filename = match
+      ? decodeURIComponent(match[1] || match[2])
+      : "chnm-resource";
+    return { blob: await response.blob(), filename };
+  }
+
   let bootstrapPromise = null;
   function bootstrap(force) {
     if (force || !bootstrapPromise) {
@@ -716,6 +745,7 @@
     icon: icon,
     call: call,
     apiBlob: apiBlob,
+    resourceCall: resourceCall,
     download: download,
     downloadBlob: downloadBlob,
     bootstrap: bootstrap,

@@ -5,13 +5,16 @@ import { requireAdmin, requireStudent } from "./lib/auth.mjs";
 import {
   handleBootstrap,
   handleRegister,
+  handleStudentForgotPassword,
   handleStudentLogin,
+  handleStudentResetPassword,
   handleStudentPasswordChange,
 } from "./lib/api-public.mjs";
 import {
   handleStudentAutosave,
   handleStudentDashboard,
   handleStudentExamGet,
+  handleStudentExamEvent,
   handleStudentExamPaper,
   handleStudentResultGet,
   handleStudentResults,
@@ -81,6 +84,8 @@ import {
 const PUBLIC_ACTIONS = {
   bootstrap: handleBootstrap,
   register: handleRegister,
+  student_forgot_password: handleStudentForgotPassword,
+  student_reset_password: handleStudentResetPassword,
   student_login: handleStudentLogin,
   admin_login: handleAdminLogin,
   admin_forgot_password: handleAdminForgotPassword,
@@ -92,6 +97,7 @@ const STUDENT_ACTIONS = {
   student_password_change: handleStudentPasswordChange,
   student_dashboard: handleStudentDashboard,
   student_exam_get: handleStudentExamGet,
+  student_exam_event: handleStudentExamEvent,
   student_start: handleStudentStart,
   student_exam_paper: handleStudentExamPaper,
   student_autosave: handleStudentAutosave,

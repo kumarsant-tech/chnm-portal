@@ -19,6 +19,25 @@ process.env.ADMIN_SECRET =
   process.env.ADMIN_SECRET || "local-dev-only-secret-please-change-0123456789abcdef";
 
 const { default: api } = await import("../api/handler.mjs");
+const { default: resourceApi } = await import("../api/lib/api-resources.mjs");
+const localResourceObjects = new Map();
+const localResourceBucket = {
+  async put(key, value) {
+    localResourceObjects.set(key, Buffer.from(value));
+  },
+  async get(key) {
+    const value = localResourceObjects.get(key);
+    return value ? { body: new Blob([value]).stream(), size: value.length } : null;
+  },
+  async delete(key) {
+    localResourceObjects.delete(key);
+  },
+};
+const resourceEnv = {
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  ADMIN_SECRET: process.env.ADMIN_SECRET,
+  RESOURCES: localResourceBucket,
+};
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -67,7 +86,7 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
-async function handleApi(req, res, url) {
+async function handleApi(req, res, url, handler = api, context = {}) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   const body = Buffer.concat(chunks);
@@ -88,7 +107,10 @@ async function handleApi(req, res, url) {
     body: req.method === "GET" || req.method === "HEAD" ? undefined : body,
   });
   try {
-    const response = await api(request, { ip: req.socket.remoteAddress || "127.0.0.1" });
+    const response = await handler(request, {
+      ip: req.socket.remoteAddress || "127.0.0.1",
+      ...context,
+    });
     res.statusCode = response.status;
     response.headers.forEach((value, key) => {
       res.setHeader(key, value);
@@ -115,7 +137,11 @@ async function handleStatic(req, res, url) {
     return;
   }
   const rel = pathname.replace(/^\/+/, "");
-  let filePath = path.resolve(DIST, rel);
+  const studyChapter = pathname.match(/^\/study\/chapter\/(\d{1,2})\/?$/);
+  let filePath =
+    studyChapter && Number(studyChapter[1]) >= 1 && Number(studyChapter[1]) <= 16
+      ? path.join(DIST, "study", "chapter.html")
+      : path.resolve(DIST, rel);
   if (filePath !== DIST && !filePath.startsWith(DIST + path.sep)) {
     sendJson(res, 403, { error: "पहुँच नहीं" });
     return;
@@ -177,6 +203,10 @@ const server = http.createServer(async (req, res) => {
     url = new URL(req.url || "/", "http://" + (req.headers.host || "127.0.0.1"));
   } catch {
     sendJson(res, 400, { error: "गलत URL" });
+    return;
+  }
+  if (url.pathname === "/api/resources" || url.pathname.startsWith("/api/resources/")) {
+    await handleApi(req, res, url, resourceApi, { env: resourceEnv });
     return;
   }
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {

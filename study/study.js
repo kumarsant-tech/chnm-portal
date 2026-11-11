@@ -13,6 +13,10 @@
 
   var state = { filter: "all", query: "" };
 
+  function chapterHref(id) {
+    return "chapter/" + id;
+  }
+
   if (simCount) simCount.textContent = String(modules.reduce(function (total, m) {
     return total + (m.sim ? 1 : 0) + (Array.isArray(m.sims) ? m.sims.length : 0);
   }, 0));
@@ -53,7 +57,7 @@
 
     var heading = document.createElement("h3");
     var link = document.createElement("a");
-    link.href = "chapter.html?m=" + module.id;
+    link.href = chapterHref(module.id);
     link.textContent = module.title;
     heading.appendChild(link);
 
@@ -84,7 +88,7 @@
     quizState.textContent = quizLabel(progress, module.id);
     var action = document.createElement("a");
     action.className = "btn btn-sm " + (isRead ? "btn-soft" : "");
-    action.href = "chapter.html?m=" + module.id;
+    action.href = chapterHref(module.id);
     action.textContent = isRead ? "दोबारा पढ़ें" : "पढ़ें";
     foot.appendChild(quizState);
     foot.appendChild(action);
@@ -135,10 +139,10 @@
     if (resumeBtn) {
       var last = modules.filter(function (m) { return m.id === stats.last; })[0];
       if (last) {
-        resumeBtn.href = "chapter.html?m=" + last.id;
+        resumeBtn.href = chapterHref(last.id);
         resumeBtn.textContent = "जहाँ से छोड़ा था: अध्याय " + pad(last.id);
       } else {
-        resumeBtn.href = "chapter.html?m=1";
+        resumeBtn.href = chapterHref(1);
         resumeBtn.textContent = "पढ़ना शुरू करें";
       }
     }

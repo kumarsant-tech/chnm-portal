@@ -57,8 +57,6 @@
     var toggle = document.getElementById("hnMotionToggle");
     var legacyContent = document.getElementById("student-mode");
     var syncFestival = function () {};
-    var welcomeBand = document.querySelector('.v7-band[aria-label="स्वागत / Welcome"]');
-    if (welcomeBand && stage) home.insertBefore(welcomeBand, stage);
     var galleryDescription = document.querySelector(".v8-gal + p");
     if (galleryDescription) galleryDescription.remove();
 

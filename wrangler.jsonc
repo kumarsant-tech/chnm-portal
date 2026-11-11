@@ -3,7 +3,8 @@
   "name": "chnm-portal",
   "main": "cloudflare/worker.mjs",
   "vars": {
-    "EMAIL_FROM": "Future Instructor <notice@futureinstructor.in>"
+    "EMAIL_FROM": "Future Instructor <notice@futureinstructor.in>",
+    "PUBLIC_BASE_URL": "https://futureinstructor.in"
   },
   "workers_dev": true,
   "preview_urls": true,
@@ -24,6 +25,12 @@
       "database_name": "chnm-portal",
       "database_id": "b5f45c14-3e4d-440b-8b75-b7ebb14140b2",
       "migrations_dir": "cloudflare/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RESOURCES",
+      "bucket_name": "chnm-portal-resources"
     }
   ],
   "triggers": {

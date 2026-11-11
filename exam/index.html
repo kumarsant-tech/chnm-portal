@@ -6,6 +6,7 @@
   <title>छात्र पोर्टल · Future Instructor CHNM</title>
   <meta name="description" content="Future Instructor CHNM / CITS ऑनलाइन परीक्षा — छात्र लॉगिन, रजिस्ट्रेशन, अभ्यास परीक्षा, फाइनल परीक्षा और परिणाम।">
   <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/resource-library.css">
 <link rel="stylesheet" href="./../assets/modern-ui.css?v=2">
 <link rel="stylesheet" href="./../assets/exam-ui.css?v=2">
 </head>
@@ -78,6 +79,26 @@
             <p class="notice bad" id="loginError" hidden></p>
             <button class="btn btn-lg btn-block" id="loginBtn" type="submit">लॉगिन करें</button>
             <p class="tiny muted" style="margin:0">पहली बार पासवर्ड आपकी जन्मतिथि DDMMYYYY है।</p>
+            <button class="btn btn-ghost btn-sm" id="studentForgotOpen" type="button">पासवर्ड भूल गए?</button>
+          </form>
+
+          <form id="studentForgotForm" class="stack" hidden novalidate>
+            <h3>पासवर्ड रीसेट</h3>
+            <p class="muted small">अपना पंजीकृत CITS/मोबाइल नंबर और उसी खाते का ईमेल दर्ज करें। लिंक केवल रजिस्ट्रेशन वाले ईमेल पर भेजा जाएगा।</p>
+            <label class="field"><span>CITS नंबर या मोबाइल नंबर</span><input class="input" id="studentForgotId" autocomplete="username" maxlength="40" required></label>
+            <label class="field"><span>पंजीकृत ईमेल</span><input class="input" id="studentForgotEmail" type="email" autocomplete="email" maxlength="100" required></label>
+            <p class="notice bad" id="studentForgotError" hidden></p>
+            <button class="btn btn-lg btn-block" id="studentForgotBtn" type="submit">रीसेट लिंक भेजें</button>
+            <button class="btn btn-ghost btn-sm" id="studentForgotBack" type="button">लॉगिन पर वापस जाएँ</button>
+          </form>
+
+          <form id="studentResetForm" class="stack" hidden novalidate>
+            <h3>नया पासवर्ड बनाएँ</h3>
+            <p class="muted small">कम-से-कम 10 अक्षरों का नया पासवर्ड रखें।</p>
+            <label class="field"><span>नया पासवर्ड</span><input class="input" id="studentResetNewPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="studentResetConfirmPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+            <p class="notice bad" id="studentResetError" hidden></p>
+            <button class="btn btn-lg btn-block" id="studentResetBtn" type="submit">पासवर्ड रीसेट करें</button>
           </form>
 
           <form id="passwordChangePanel" class="stack" hidden novalidate>
@@ -180,6 +201,7 @@
         <button type="button" role="tab" aria-selected="false" data-dash-tab="upcoming"><span data-i18n="tabUpcoming">आगामी</span> <span class="count" data-count="upcoming">0</span></button>
         <button type="button" role="tab" aria-selected="false" data-dash-tab="completed"><span data-i18n="tabCompleted">पूर्ण</span> <span class="count" data-count="completed">0</span></button>
         <button type="button" role="tab" aria-selected="false" data-dash-tab="results"><span data-i18n="tabResults">परिणाम</span> <span class="count" data-count="results">0</span></button>
+        <button type="button" role="tab" aria-selected="false" data-dash-tab="resources"><span data-i18n="tabResources">अध्ययन सामग्री</span></button>
         <button type="button" role="tab" aria-selected="false" data-dash-tab="notices"><span data-i18n="notices">सूचनाएँ</span> <span class="count" data-count="notices">0</span></button>
         <button type="button" role="tab" aria-selected="false" data-dash-tab="chat"><span data-i18n="chat">समूह चैट</span> <span class="count" data-count="chat">0</span></button>
       </div>
@@ -194,6 +216,8 @@
       <span class="row">
         <a href="../index.html">मुख्य पोर्टल</a>
         <a href="admin.html">एडमिन</a>
+        <a href="../privacy.html">गोपनीयता</a>
+        <a href="../terms.html">शर्तें</a>
       </span>
     </div>
   </footer>

@@ -21,6 +21,7 @@
       tabUpcoming: "आगामी",
       tabCompleted: "पूर्ण",
       tabResults: "परिणाम",
+      tabResources: "अध्ययन सामग्री",
       statExams: "उपलब्ध परीक्षा",
       statPractice: "अभ्यास परीक्षा",
       statCompleted: "पूर्ण परीक्षा",
@@ -92,6 +93,14 @@
       retry: "दोबारा प्रयास करें",
       notices: "सूचनाएँ",
       chat: "समूह चैट",
+      resourcesSub: "एडमिन द्वारा साझा किए गए आपके ट्रेड के अध्ययन दस्तावेज़।",
+      resourcesEmpty: "अभी कोई अध्ययन फ़ाइल उपलब्ध नहीं",
+      resourcesEmptySub: "नई सामग्री साझा होने पर यहाँ दिखाई देगी।",
+      pdfFolder: "PDF फ़ोल्डर",
+      pptFolder: "PPT फ़ोल्डर",
+      folderEmpty: "इस फ़ोल्डर में अभी कोई फ़ाइल नहीं",
+      resourcesLoadError: "अध्ययन सामग्री लोड नहीं हो सकी",
+      downloadResource: "डाउनलोड",
       noticeOpen: "पूरा पढ़ें",
       tabNoticesSub: "एडमिन द्वारा भेजी गई सूचनाएँ — नई सूचना आते ही यहाँ दिखती है।",
       emptyNotices: "अभी कोई सूचना नहीं",
@@ -124,6 +133,7 @@
       tabUpcoming: "Upcoming",
       tabCompleted: "Completed",
       tabResults: "Results",
+      tabResources: "Study files",
       statExams: "Available exams",
       statPractice: "Practice exams",
       statCompleted: "Completed",
@@ -195,6 +205,14 @@
       retry: "Try again",
       notices: "Notices",
       chat: "Group chat",
+      resourcesSub: "Study documents shared for your trade.",
+      resourcesEmpty: "No study files are available yet",
+      resourcesEmptySub: "New files will appear here when shared.",
+      pdfFolder: "PDF folder",
+      pptFolder: "PPT folder",
+      folderEmpty: "This folder is empty",
+      resourcesLoadError: "Study files could not be loaded",
+      downloadResource: "Download",
       noticeOpen: "Read full",
       tabNoticesSub: "Notices sent by the admin — new ones appear here as soon as they are posted.",
       emptyNotices: "No notice yet",
@@ -221,6 +239,62 @@
     lang = localStorage.getItem(LANG_KEY) === "en" ? "en" : "hi";
   } catch (error) {
     lang = "hi";
+  }
+
+  function renderResourceList(node) {
+    node.innerHTML =
+      '<p class="section-sub">' + esc(t("resourcesSub")) + "</p>" +
+      '<div class="empty"><strong>' + esc(t("mapLoaded")) + "</strong></div>";
+    UI.resourceCall("", {}, UI.studentToken()).then((data) => {
+      const resources = data.resources || [];
+      const renderFolder = (kind, title) => {
+        const items = resources.filter((resource) =>
+          kind === "pdf"
+            ? String(resource.fileName || "").toLowerCase().endsWith(".pdf")
+            : /\.(ppt|pptx)$/i.test(String(resource.fileName || ""))
+        );
+        return '<section class="resource-folder"><h3><span>' + esc(title) + '</span><small>' +
+          items.length + '</small></h3>' +
+          (items.length
+            ? '<div class="resource-list">' + items.map((resource) =>
+              '<article class="resource-row"><div class="grow"><strong>' + esc(resource.title) +
+              '</strong><p class="small muted">' + esc(resource.description || resource.fileName) +
+              '</p><small>' + esc(resource.fileName) + ' · ' +
+              esc(resource.size >= 1024 * 1024
+                ? (resource.size / (1024 * 1024)).toFixed(1) + " MB"
+                : Math.max(1, Math.round(resource.size / 1024)) + " KB") +
+              '</small></div><button class="btn btn-sm" type="button" data-resource-download="' +
+              esc(resource.id) + '">' + esc(t("downloadResource")) + "</button></article>"
+            ).join("") + '</div>'
+            : '<div class="resource-folder-empty">' + esc(t("folderEmpty")) + "</div>") +
+          "</section>";
+      };
+      node.innerHTML =
+        '<p class="section-sub">' + esc(t("resourcesSub")) + "</p>" +
+        '<div class="resource-folders">' +
+        renderFolder("pdf", t("pdfFolder")) +
+        renderFolder("ppt", t("pptFolder")) +
+        "</div>";
+      $$("[data-resource-download]", node).forEach((button) => {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const result = await UI.resourceCall(
+              "/" + encodeURIComponent(button.dataset.resourceDownload),
+              {},
+              UI.studentToken()
+            );
+            UI.downloadBlob(result.blob, result.filename);
+          } catch (error) {
+            UI.toast(error.message || t("resourcesLoadError"), "bad");
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+    }).catch((error) => {
+      node.innerHTML = emptyState(t("resourcesLoadError"), error.message || t("failSub"));
+    });
   }
 
   function t(key, vars) {
@@ -301,6 +375,8 @@
     hide($("#authView"), false);
     hide($(".auth-tabs"), true);
     hide($("#loginForm"), true);
+    hide($("#studentForgotForm"), true);
+    hide($("#studentResetForm"), true);
     hide($("#registerForm"), true);
     hide($("#registerSuccess"), true);
     hide($("#passwordChangePanel"), false);
@@ -327,6 +403,8 @@
       button.setAttribute("aria-selected", button.dataset.authTab === tab ? "true" : "false");
     });
     hide($("#loginForm"), tab !== "login");
+    hide($("#studentForgotForm"), true);
+    hide($("#studentResetForm"), true);
     hide($("#registerForm"), tab !== "register");
     hide($("#passwordChangePanel"), true);
     hide($("#registerSuccess"), true);
@@ -1017,6 +1095,10 @@
       renderChatPanel(node);
       return;
     }
+    if (tab === "resources") {
+      renderResourceList(node);
+      return;
+    }
     if (tab === "results") {
       const results = data.results || [];
       node.innerHTML = results.length
@@ -1158,6 +1240,67 @@
       }, "लॉगिन हो रहा है…");
     });
 
+    const forgotOpen = $("#studentForgotOpen");
+    const forgotForm = $("#studentForgotForm");
+    const resetForm = $("#studentResetForm");
+    const resetToken = new URLSearchParams(location.search).get("reset") || "";
+    if (forgotOpen && forgotForm) {
+      forgotOpen.addEventListener("click", () => {
+        hide(form, true);
+        hide($(".auth-tabs"), true);
+        hide(forgotForm, false);
+        $("#authTitle").textContent = "पासवर्ड रीसेट";
+        $("#authSub").textContent = "पंजीकृत जानकारी की पुष्टि करें।";
+      });
+      $("#studentForgotBack").addEventListener("click", () => showAuth("login"));
+      forgotForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setError("#studentForgotError", "");
+        $("#studentForgotError").className = "notice bad";
+        const identifier = $("#studentForgotId").value.trim().toUpperCase();
+        const email = $("#studentForgotEmail").value.trim();
+        await UI.withBusy($("#studentForgotBtn"), async () => {
+          try {
+            const data = await UI.call("student_forgot_password", { identifier, email });
+            const note = $("#studentForgotError");
+            note.className = "notice info";
+            note.hidden = false;
+            note.textContent = data.message || "यदि जानकारी मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।";
+          } catch (error) {
+            setError("#studentForgotError", error.message || "रीसेट लिंक नहीं भेजा जा सका।");
+          }
+        }, "जानकारी जाँची जा रही है…");
+      });
+    }
+
+    if (resetForm) {
+      resetForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setError("#studentResetError", "");
+        $("#studentResetError").className = "notice bad";
+        const newPassword = $("#studentResetNewPassword").value;
+        if (newPassword.length < 10) {
+          setError("#studentResetError", "नया पासवर्ड कम-से-कम 10 अक्षरों का रखें।");
+          return;
+        }
+        if (newPassword !== $("#studentResetConfirmPassword").value) {
+          setError("#studentResetError", "दोनों नए पासवर्ड एक जैसे नहीं हैं।");
+          return;
+        }
+        await UI.withBusy($("#studentResetBtn"), async () => {
+          try {
+            await UI.call("student_reset_password", { token: resetToken, newPassword });
+            UI.clearStudentSession();
+            history.replaceState(null, "", location.pathname);
+            showAuth("login");
+            setNotice("#authNotice", "पासवर्ड रीसेट हो गया है। अब नए पासवर्ड से लॉगिन करें।", "good");
+          } catch (error) {
+            setError("#studentResetError", error.message || "पासवर्ड रीसेट नहीं हो सका।");
+          }
+        }, "पासवर्ड रीसेट हो रहा है…");
+      });
+    }
+
     const changeForm = $("#passwordChangePanel");
     if (changeForm) {
       changeForm.addEventListener("submit", async (event) => {
@@ -1180,7 +1323,7 @@
               { currentPassword, newPassword },
               UI.studentToken()
             );
-            UI.setStudentSession(UI.studentToken(), data.student);
+            UI.setStudentSession(data.token, data.student);
             $("#changeCurrentPassword").value = "";
             $("#changeNewPassword").value = "";
             $("#changeConfirmPassword").value = "";
@@ -1344,7 +1487,7 @@
   async function init() {
     applyLanguage();
     const hash = (location.hash || "").replace("#", "").toLowerCase();
-    const DASH_TABS = ["exams", "practice", "upcoming", "completed", "results", "notices", "chat"];
+    const DASH_TABS = ["exams", "practice", "upcoming", "completed", "results", "resources", "notices", "chat"];
     if (DASH_TABS.includes(hash)) state.tab = hash;
     if (!registerOnly) wireAuthTabs();
     wireLogin();
@@ -1367,6 +1510,17 @@
       }
     } catch (error) {
       setNotice("#authNotice", error.message || "सर्वर से जानकारी नहीं मिल सकी।", "bad");
+    }
+
+    const resetToken = new URLSearchParams(location.search).get("reset");
+    if (resetToken && !registerOnly) {
+      showAuth("login");
+      hide($(".auth-tabs"), true);
+      hide($("#loginForm"), true);
+      hide($("#studentResetForm"), false);
+      $("#authTitle").textContent = "नया पासवर्ड बनाएँ";
+      $("#authSub").textContent = "रीसेट लिंक का उपयोग करके नया पासवर्ड सेट करें।";
+      return;
     }
 
     const token = UI.studentToken();

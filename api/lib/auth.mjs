@@ -3,6 +3,8 @@ import { HttpError } from "./http.mjs";
 import { K, getJson, putJson } from "./db.mjs";
 
 const HOUR = 3600000;
+const PASSWORD_FAILURE_LIMIT = 3;
+const PASSWORD_LOCKOUT_MS = HOUR;
 
 function configValue(env, key) {
   return String(env?.[key] || process.env[key] || "");
@@ -71,10 +73,11 @@ export async function bumpAdminAuthVersion(store) {
   return store.increment(K.adminAuthVersion());
 }
 
-export function issueStudentToken(studentId, env) {
+export function issueStudentToken(studentId, env, authVersion = 0) {
   return signPayload({
     r: "student",
     sid: String(studentId),
+    sv: Number(authVersion) || 0,
     exp: Date.now() + 12 * HOUR,
   }, env);
 }
@@ -189,6 +192,9 @@ export async function requireStudent(req, store, env, allowPasswordChange = fals
   }
   const student = await getJson(store, K.students(payload.sid));
   if (!student) throw new HttpError("छात्र रिकॉर्ड नहीं मिला", 401);
+  if (Number(payload.sv ?? 0) !== (Number(student.authVersion) || 0)) {
+    throw new HttpError("छात्र सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
+  }
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय कर दिया गया है", 403);
   }
@@ -219,6 +225,71 @@ export async function rateLimit(store, scope, identity, max, windowMs) {
 export async function clearRateLimit(store, scope, identity) {
   const id = digest(identity).toString("hex").slice(0, 32);
   await store.delete(K.rateLimit(scope, id));
+}
+
+function authIdentityKeys(scope, identities) {
+  return [...new Set(identities.filter(Boolean).map((identity) => {
+    const id = digest(`${scope}:${String(identity).trim().toLowerCase()}`)
+      .toString("hex")
+      .slice(0, 32);
+    return id;
+  }))];
+}
+
+export async function assertAuthUnlocked(store, scope, identities) {
+  const now = Date.now();
+  let latestExpiration = 0;
+  const identityKeys = authIdentityKeys(scope, identities);
+  for (const id of identityKeys) {
+    const lockKey = K.authLockout(scope, id);
+    const lock = await getJson(store, lockKey);
+    const expiresAt = Number(lock?.expiresAt) || 0;
+    if (expiresAt > now) {
+      latestExpiration = Math.max(latestExpiration, expiresAt);
+    } else if (lock) {
+      await store.delete(lockKey);
+      await store.delete(K.authFailures(scope, id));
+    }
+  }
+  if (latestExpiration > now) {
+    const retryAfter = Math.ceil((latestExpiration - now) / 1000);
+    throw new HttpError(
+      "तीन गलत प्रयासों के बाद लॉगिन और पासवर्ड रीसेट एक घंटे के लिए लॉक है",
+      429,
+      { retryAfter }
+    );
+  }
+}
+
+export async function recordAuthFailure(store, scope, counterIdentity, lockIdentities) {
+  if (typeof store.consumeRateLimit !== "function") {
+    throw new Error("Storage provider does not support atomic authentication counters");
+  }
+  const now = Date.now();
+  const counterId = authIdentityKeys(scope, [counterIdentity])[0];
+  const record = await store.consumeRateLimit(
+    K.authFailures(scope, counterId),
+    now,
+    Number.MAX_SAFE_INTEGER,
+    PASSWORD_LOCKOUT_MS
+  );
+  if (record.n < PASSWORD_FAILURE_LIMIT) return false;
+  const expiresAt = now + PASSWORD_LOCKOUT_MS;
+  const lockIds = authIdentityKeys(scope, lockIdentities);
+  await Promise.all(
+    lockIds.map((id) => store.setJSON(K.authLockout(scope, id), { expiresAt }))
+  );
+  return true;
+}
+
+export async function clearAuthFailures(store, scope, identities) {
+  const identityKeys = authIdentityKeys(scope, identities);
+  await Promise.all(
+    identityKeys.flatMap((id) => [
+      store.delete(K.authFailures(scope, id)),
+      store.delete(K.authLockout(scope, id)),
+    ])
+  );
 }
 
 export async function audit(store, action, actor, details = {}) {
