@@ -46,6 +46,8 @@ import {
   handleAdminExamControllerSave,
   handleExamControllerLogin,
   handleStaffLogin,
+  handleStaffForgotPassword,
+  handleStaffResetPassword,
   handleStaffSetupPassword,
   handleStaffMe,
   handleStaffPasswordChange,
@@ -120,6 +122,8 @@ const PUBLIC_ACTIONS = {
   admin_reset_password: handleAdminResetPassword,
   exam_controller_login: handleExamControllerLogin,
   staff_login: handleStaffLogin,
+  staff_forgot_password: handleStaffForgotPassword,
+  staff_reset_password: handleStaffResetPassword,
   staff_setup_password: handleStaffSetupPassword,
   site_notices: handleSiteNotices,
 };

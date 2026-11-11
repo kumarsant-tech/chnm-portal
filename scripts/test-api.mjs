@@ -1834,6 +1834,113 @@ console.log("\n11. Registration email and admin password recovery");
       for (const key of await listKeys(store, prefix)) await store.delete(key);
     }
 
+    const controllerEmail = "controller-recovery@example.test";
+    const controllerEmailHash = crypto.createHash("sha256").update(controllerEmail).digest("hex");
+    const controllerUserId = crypto.randomUUID();
+    const controllerUser = {
+      id: controllerUserId,
+      displayName: "Recovery Controller",
+      email: controllerEmail,
+      emailHash: controllerEmailHash,
+      type: "controller",
+      permissions: ["exams"],
+      active: true,
+      passwordHash: await hashPassword(TEST_PASSWORD_5),
+      mustChangePassword: false,
+      authVersion: 1,
+    };
+    await putJson(store, K.staffUser(controllerUserId), controllerUser);
+    await putJson(store, K.staffEmailIndex(controllerEmailHash), controllerUserId);
+    const controllerLogin = await call(
+      "staff_login",
+      { email: controllerEmail, password: TEST_PASSWORD_5, expectedType: "controller" },
+      "",
+      "10.0.10.40"
+    );
+    const controllerResetEmailStart = sentEmails.length;
+    const controllerForgot = await call(
+      "staff_forgot_password",
+      { email: controllerEmail, expectedType: "controller" },
+      "",
+      "10.0.10.41"
+    );
+    const controllerResetEmail = sentEmails
+      .slice(controllerResetEmailStart)
+      .find((sent) => sent.body.subject === "स्टाफ पासवर्ड रीसेट");
+    const controllerResetToken =
+      controllerResetEmail?.body.text.match(/reset=([A-Za-z0-9_-]+)/)?.[1] || "";
+    check(
+      "controller password recovery sends a reset link to the registered address",
+      controllerForgot.status === 200 &&
+        controllerResetEmail?.body.to?.[0] === controllerEmail &&
+        Boolean(controllerResetToken)
+    );
+    const resetEmailCount = sentEmails.length;
+    const unknownStaffForgot = await call(
+      "staff_forgot_password",
+      { email: "unknown-controller@example.test", expectedType: "controller" },
+      "",
+      "10.0.10.42"
+    );
+    const wrongRoleForgot = await call(
+      "staff_forgot_password",
+      { email: controllerEmail, expectedType: "staff" },
+      "",
+      "10.0.10.43"
+    );
+    check(
+      "controller recovery does not reveal unknown email or account type",
+      unknownStaffForgot.status === 200 &&
+        wrongRoleForgot.status === 200 &&
+        unknownStaffForgot.data.message === controllerForgot.data.message &&
+        wrongRoleForgot.data.message === controllerForgot.data.message &&
+        sentEmails.length === resetEmailCount
+    );
+    const expiredStaffToken = crypto.randomBytes(32).toString("base64url");
+    const expiredStaffHash = crypto.createHash("sha256").update(expiredStaffToken).digest("hex");
+    await putJson(store, K.staffPasswordReset(expiredStaffHash), {
+      staffId: controllerUserId,
+      tokenHash: expiredStaffHash,
+      expiresAt: Date.now() - 1,
+    });
+    const expiredStaffReset = await call(
+      "staff_reset_password",
+      { token: expiredStaffToken, newPassword: TEST_PASSWORD_6 },
+      "",
+      "10.0.10.44"
+    );
+    check("expired controller reset links are rejected", expiredStaffReset.status === 400);
+    const controllerPasswordReset = await call(
+      "staff_reset_password",
+      { token: controllerResetToken, newPassword: TEST_PASSWORD_6 },
+      "",
+      "10.0.10.45"
+    );
+    check(
+      "controller reset updates the password and invalidates active sessions",
+      controllerPasswordReset.status === 200 &&
+        controllerPasswordReset.data.profile?.type === "controller" &&
+        (await call("staff_me", {}, controllerLogin.data.token)).status === 401
+    );
+    check(
+      "controller can log in with the reset password",
+      (await call(
+        "staff_login",
+        { email: controllerEmail, password: TEST_PASSWORD_6, expectedType: "controller" },
+        "",
+        "10.0.10.46"
+      )).status === 200
+    );
+    check(
+      "controller reset link cannot be reused",
+      (await call(
+        "staff_reset_password",
+        { token: controllerResetToken, newPassword: TEST_PASSWORD_7 },
+        "",
+        "10.0.10.47"
+      )).status === 400
+    );
+
     const recoveryRegistration = await call(
       "register",
       {
