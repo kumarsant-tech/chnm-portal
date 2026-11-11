@@ -40,6 +40,25 @@
           <button class="btn btn-navy" id="staffLoginButton" type="submit">लॉगिन करें</button>
           <button class="btn btn-ghost" id="staffRoleBack" type="button">वापस</button>
         </div>
+        <button class="btn btn-ghost" id="staffForgotPassword" type="button">पासवर्ड भूल गए?</button>
+      </form>
+      <form id="staffRecoveryForm" class="stack" hidden>
+        <h2>पासवर्ड रीसेट लिंक पाएँ</h2>
+        <p class="muted">लिंक केवल खाते में पहले से दर्ज ईमेल पर भेजा जाएगा।</p>
+        <label class="field"><span>पंजीकृत ईमेल</span><input class="input" type="email" name="email" autocomplete="email" maxlength="254" required></label>
+        <p id="staffRecoveryMessage" class="notice info" hidden></p>
+        <div class="row">
+          <button class="btn btn-navy" id="staffRecoveryButton" type="submit">रीसेट लिंक भेजें</button>
+          <button class="btn btn-ghost" id="staffRecoveryBack" type="button">लॉगिन पर वापस</button>
+        </div>
+      </form>
+      <form id="staffResetForm" class="stack" hidden>
+        <h2>नया पासवर्ड बनाएँ</h2>
+        <p class="notice info">यह रीसेट लिंक 30 मिनट में समाप्त होगा और एक बार ही इस्तेमाल किया जा सकता है।</p>
+        <label class="field"><span>नया पासवर्ड (कम-से-कम 12 अक्षर)</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="field"><span>पासवर्ड दोबारा लिखें</span><input class="input" type="password" name="confirmPassword" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <p id="staffResetError" class="notice bad" hidden></p>
+        <button class="btn btn-navy" id="staffResetButton" type="submit">पासवर्ड रीसेट करें</button>
       </form>
       <form id="staffSetupForm" class="stack" hidden>
         <h2>अपना पासवर्ड सेट करें</h2>

@@ -373,6 +373,114 @@ export async function handleStaffLogin({ req, ctx, store, env }) {
   });
 }
 
+export async function handleStaffForgotPassword({ req, ctx, store, env }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  const email = String(body.email || "").trim().toLowerCase();
+  const expectedType = String(body.expectedType || "");
+  const emailHash = crypto.createHash("sha256").update(email).digest("hex");
+  await rateLimit(store, "staff-forgot-password-ip", ip, 5, 60 * 60 * 1000);
+  await rateLimit(store, "staff-forgot-password-email", emailHash || "invalid", 3, 60 * 60 * 1000);
+
+  const baseUrl = resetBaseUrl(env);
+  if (!baseUrl || !emailConfigured(env)) {
+    throw new HttpError(
+      "पासवर्ड रिकवरी उपलब्ध नहीं है। PUBLIC_BASE_URL और Gmail या Resend ईमेल कॉन्फ़िगरेशन जाँचें।",
+      503
+    );
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !["staff", "controller"].includes(expectedType)) {
+    return json({
+      ok: true,
+      message: "यदि जानकारी किसी सक्रिय खाते से मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।",
+    });
+  }
+
+  const userId = await getJson(store, K.staffEmailIndex(emailHash));
+  const user = userId ? await getJson(store, K.staffUser(userId)) : null;
+  if (
+    !user ||
+    user.active === false ||
+    user.type !== expectedType ||
+    !user.passwordHash ||
+    user.emailHash !== emailHash
+  ) {
+    return json({
+      ok: true,
+      message: "यदि जानकारी किसी सक्रिय खाते से मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।",
+    });
+  }
+
+  const token = createResetToken();
+  const tokenHash = hashResetToken(token);
+  const resetKey = K.staffPasswordReset(tokenHash);
+  const indexKey = K.staffPasswordResetIndex(user.id);
+  const previousHash = await getJson(store, indexKey);
+  const expiresAt = Date.now() + 30 * 60 * 1000;
+  await putJson(store, resetKey, { staffId: user.id, tokenHash, expiresAt });
+  await putJson(store, indexKey, tokenHash);
+  if (typeof previousHash === "string" && /^[a-f0-9]{64}$/.test(previousHash)) {
+    await del(store, K.staffPasswordReset(previousHash));
+  }
+
+  const resetUrl = `${baseUrl}/exam/staff-login.html?reset=${encodeURIComponent(token)}`;
+  const delivery = await sendEmail(env, {
+    to: user.email,
+    subject: "स्टाफ पासवर्ड रीसेट",
+    text: `अपना पासवर्ड रीसेट करने के लिए इस लिंक को 30 मिनट के भीतर खोलें:\n${resetUrl}\n\nयदि आपने अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।`,
+    html: `<p>अपना पासवर्ड रीसेट करने के लिए <a href="${resetUrl}">इस लिंक</a> को 30 मिनट के भीतर खोलें।</p><p>यदि आपने अनुरोध नहीं किया है, तो इस ईमेल को अनदेखा करें।</p>`,
+  });
+  if (!delivery.sent) {
+    await del(store, resetKey);
+    if ((await getJson(store, indexKey)) === tokenHash) await del(store, indexKey);
+    throw new HttpError("रीसेट ईमेल नहीं भेजा जा सका। ईमेल provider configuration जाँचकर फिर प्रयास करें।", 503);
+  }
+  return json({
+    ok: true,
+    message: "यदि जानकारी किसी सक्रिय खाते से मेल खाती है, तो रीसेट लिंक पंजीकृत ईमेल पर भेजा जाएगा।",
+  });
+}
+
+export async function handleStaffResetPassword({ req, ctx, store }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "staff-reset-password-ip", ip, 8, 15 * 60 * 1000);
+  const body = await readJson(req);
+  const token = String(body.token || "");
+  const newPassword = String(body.newPassword || "");
+  if (!validResetToken(token)) {
+    throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+
+  const tokenHash = hashResetToken(token);
+  const resetKey = K.staffPasswordReset(tokenHash);
+  const reset = await store.consumeResetToken(resetKey, Date.now(), tokenHash);
+  if (!reset?.staffId) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
+  const user = await getJson(store, K.staffUser(String(reset.staffId)));
+  if (!user || user.active === false || !user.passwordHash) {
+    throw new HttpError("यह खाता अब पासवर्ड रीसेट नहीं कर सकता", 400);
+  }
+  const indexKey = K.staffPasswordResetIndex(user.id);
+  if ((await getJson(store, indexKey)) === tokenHash) await del(store, indexKey);
+  const updated = {
+    ...user,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    authVersion: (Number(user.authVersion) || 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.staffUser(user.id), updated);
+  await clearRateLimit(store, "staff-login-email", user.emailHash);
+  await audit(store, "staff.password.reset", user.id, { ip });
+  return json({
+    ok: true,
+    profile: safeStaffProfile(updated),
+    message: "पासवर्ड रीसेट हो गया है। अब नए पासवर्ड से लॉगिन करें।",
+  });
+}
+
 export async function handleStaffSetupPassword({ req, ctx, store, env }) {
   const body = await readJson(req);
   const ip = getIp(req, ctx);
