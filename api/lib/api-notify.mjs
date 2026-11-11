@@ -58,10 +58,42 @@ export async function handleSiteNotices({ store }) {
   const notices = (await listJson(store, "notices/")).filter(
     (notice) => notice && notice.active !== false && (notice.audience || "all") === "all"
   );
+  const now = Date.now();
+  const exams = await listJson(store, "exams/");
+  for (const exam of exams) {
+    if (exam?.status !== "published" || exam.active === false) continue;
+    const endAt = Date.parse(exam.endAt || "");
+    if (!Number.isFinite(endAt)) continue;
+    const ended = now > endAt;
+    const resultsReady =
+      ended &&
+      exam.releaseResults === true &&
+      (!exam.releaseAt || Date.parse(exam.releaseAt) <= now);
+    notices.push({
+      id: ended ? `exam-results-${exam.id}` : `exam-published-${exam.id}`,
+      title: ended
+        ? resultsReady
+          ? `परिणाम उपलब्ध: ${exam.title}`
+          : `परीक्षा समाप्त: ${exam.title}`
+        : `नई परीक्षा प्रकाशित: ${exam.title}`,
+      body: ended
+        ? resultsReady
+          ? "इस परीक्षा के परिणाम उपलब्ध हैं। छात्र पोर्टल में लॉगिन करके परिणाम देखें।"
+          : "परीक्षा पूरी हो गई है। Admin द्वारा परिणाम जारी करने पर वे छात्र पोर्टल में दिखेंगे।"
+        : "यह परीक्षा प्रकाशित है। शुरू: " +
+          new Intl.DateTimeFormat("hi-IN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(exam.startAt)) +
+          " · समाप्त: " +
+          new Intl.DateTimeFormat("hi-IN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(endAt)),
+      level: resultsReady || !ended ? "important" : "info",
+      audience: "all",
+      createdAt: ended ? exam.endAt : exam.publishedAt || exam.updatedAt || exam.createdAt,
+      updatedAt: exam.updatedAt || exam.publishedAt || exam.createdAt,
+    });
+  }
   notices.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return json({
     notices: notices.slice(0, 5).map((notice) => publicNotice(notice, null)),
-    serverTime: Date.now(),
+    serverTime: now,
   });
 }
 

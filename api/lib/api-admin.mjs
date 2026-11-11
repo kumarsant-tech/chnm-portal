@@ -523,7 +523,15 @@ function safeStaffProfile(user) {
     type: user.type,
     permissions: Array.isArray(user.permissions) ? user.permissions : [],
     active: user.active !== false,
-    status: user.active === false ? "inactive" : user.passwordHash ? "active" : "pending",
+    archived: Boolean(user.deletedAt),
+    deletedAt: user.deletedAt || null,
+    status: user.deletedAt
+      ? "archived"
+      : user.active === false
+        ? "inactive"
+        : user.passwordHash
+          ? "active"
+          : "pending",
     inviteSentAt: user.inviteSentAt || null,
     mustChangePassword: Boolean(user.mustChangePassword),
   };
@@ -681,6 +689,11 @@ export async function handleAdminStaffSave({ req, store, ctx, env }) {
   }
   const now = new Date().toISOString();
   const userId = String(input.id || "");
+  const archiveRequested = input.archive === true;
+  const restoreRequested = input.restore === true;
+  if ((archiveRequested || restoreRequested) && !userId) {
+    throw new HttpError("मौजूदा खाते को ही archive या restore किया जा सकता है", 400);
+  }
   let user;
   let created = false;
   if (userId) {
@@ -705,7 +718,15 @@ export async function handleAdminStaffSave({ req, store, ctx, env }) {
         throw new HttpError("इस ईमेल से स्टाफ खाता पहले से मौजूद है", 409);
       }
     }
-    const active = input.active === undefined ? user.active !== false : bool(input.active, false);
+    const active = archiveRequested
+      ? false
+      : restoreRequested
+        ? true
+        : user.deletedAt
+          ? false
+          : input.active === undefined
+            ? user.active !== false
+            : bool(input.active, false);
     const changed =
       user.displayName !== displayName ||
       user.email !== email ||
@@ -713,7 +734,9 @@ export async function handleAdminStaffSave({ req, store, ctx, env }) {
       user.photo !== photo ||
       user.type !== type ||
       JSON.stringify([...user.permissions].sort()) !== JSON.stringify([...permissions].sort()) ||
-      user.active !== active;
+      user.active !== active ||
+      (archiveRequested && !user.deletedAt) ||
+      (restoreRequested && Boolean(user.deletedAt));
     user = {
       ...user,
       displayName,
@@ -724,6 +747,7 @@ export async function handleAdminStaffSave({ req, store, ctx, env }) {
       type,
       permissions,
       active,
+      deletedAt: archiveRequested ? (user.deletedAt || now) : restoreRequested ? null : user.deletedAt || null,
       authVersion: (Number(user.authVersion) || 0) + (changed ? 1 : 0),
       updatedAt: now,
     };
@@ -765,7 +789,7 @@ export async function handleAdminStaffSave({ req, store, ctx, env }) {
     created = true;
   }
   await putJson(store, K.staffUser(user.id), user);
-  await audit(store, created ? "staff.create" : "staff.update", user.id, {
+  await audit(store, created ? "staff.create" : archiveRequested ? "staff.archive" : restoreRequested ? "staff.restore" : "staff.update", user.id, {
     type: user.type,
     permissions: user.permissions,
     active: user.active,
@@ -2071,6 +2095,7 @@ export async function handleAdminStudents({ store, req }) {
     const count = (await listKeys(store, `idx/student-results/${student.id}/`)).length;
     items.push({
       ...studentSummary(student, catalog.tradeMap.get(student.tradeId)?.name || student.legacyTrade || ""),
+      archived: Boolean(student.deletedAt),
       resultCount: count,
       hasPin: Boolean(student.pinHash),
     });
@@ -2168,7 +2193,7 @@ export async function handleAdminStudentSave({ store, req }) {
     photo: Object.prototype.hasOwnProperty.call(input, "photo")
       ? photo(input.photo)
       : existing?.photo || "",
-    active: bool(input.active, existing?.active !== false),
+    active: existing?.deletedAt ? false : bool(input.active, existing?.active !== false),
     source: existing?.source || "admin",
     createdAt: existing?.createdAt || now,
     updatedAt: now,
@@ -2231,10 +2256,16 @@ export async function handleAdminStudentStatus({ store, req }) {
   const student = await getJson(store, K.students(String(body.studentId || "")));
   if (!student) throw new HttpError("छात्र नहीं मिला", 404);
   student.active = bool(body.active, student.active !== false);
+  const restored = Boolean(student.deletedAt && student.active);
+  if (restored) {
+    student.deletedAt = null;
+    student.restoredAt = new Date().toISOString();
+  }
+  student.authVersion = (Number(student.authVersion) || 0) + 1;
   student.updatedAt = new Date().toISOString();
   await putJson(store, K.students(student.id), student);
-  await audit(store, "student.status", "admin", { studentId: student.id, active: student.active });
-  return json({ ok: true, active: student.active, serverNow: Date.now() });
+  await audit(store, restored ? "student.restore" : "student.status", "admin", { studentId: student.id, active: student.active });
+  return json({ ok: true, active: student.active, archived: Boolean(student.deletedAt), serverNow: Date.now() });
 }
 
 export async function handleAdminStudentDelete({ store, req }) {
@@ -2244,39 +2275,14 @@ export async function handleAdminStudentDelete({ store, req }) {
   if (clean(body.confirm, 40) !== student.id) {
     throw new HttpError("पुष्टि के लिए Registration ID टाइप करें", 400);
   }
-  const resultKeys = await listKeys(store, `idx/student-results/${student.id}/`);
-  const attemptKeys = await listKeys(store, `idx/student-attempts/${student.id}/`);
-  if ((resultKeys.length || attemptKeys.length) && body.deleteResults !== true) {
-    throw new HttpError(
-      "इस छात्र के परिणाम/सक्रिय प्रयास मौजूद हैं। सुरक्षित रखने के लिए छात्र को निष्क्रिय करें, या Delete Results अलग से चुनें।",
-      409
-    );
-  }
-  if (body.deleteResults === true) {
-    for (const key of attemptKeys) {
-      await finalizeIfActive(store, key.split("/").pop(), student);
-    }
-    const freshResultKeys = await listKeys(store, `idx/student-results/${student.id}/`);
-    const entries = (await Promise.all(freshResultKeys.map((key) => getJson(store, key)))).filter(Boolean);
-    for (const entry of entries) {
-      await del(store, K.result(entry.resultId));
-      await del(store, K.examResultIndex(entry.examId, entry.resultId));
-    }
-    await deleteKeys(store, freshResultKeys);
-  }
-  for (const key of attemptKeys) {
-    const examId = key.split("/").pop();
-    await del(store, K.attempt(examId, student.id));
-    await del(store, K.attemptExamIndex(examId, student.id));
-  }
-  if (student.mobile) await del(store, K.mobileIndex(student.mobile));
-  if (student.citsNumber) await del(store, K.studentCitsIndex(student.citsNumber));
-  await del(store, K.students(student.id));
-  await audit(store, "student.delete", "admin", {
-    studentId: student.id,
-    deletedResults: body.deleteResults === true,
-  });
-  return json({ ok: true });
+  if (student.deletedAt) return json({ ok: true, archived: true, alreadyArchived: true });
+  student.active = false;
+  student.deletedAt = new Date().toISOString();
+  student.authVersion = (Number(student.authVersion) || 0) + 1;
+  student.updatedAt = student.deletedAt;
+  await putJson(store, K.students(student.id), student);
+  await audit(store, "student.archive", "admin", { studentId: student.id });
+  return json({ ok: true, archived: true, retainedResults: true, retainedAttempts: true });
 }
 
 async function finalizeIfActive(store, examId, student) {
@@ -2604,7 +2610,7 @@ export async function handleAdminLegacyImport({ store, env }) {
 
 export async function handleAdminExport({ store }) {
   const catalog = await loadCatalog(store, { includeInactive: true });
-  const [students, exams, results, settings, subjects, trades, notices, chat] = await Promise.all([
+  const [students, exams, results, settings, subjects, trades, notices, chat, staff, legacyController] = await Promise.all([
     listJson(store, "students/"),
     listJson(store, "exams/"),
     allResults(store),
@@ -2613,6 +2619,8 @@ export async function handleAdminExport({ store }) {
     listJson(store, "trades/"),
     listJson(store, "notices/"),
     listJson(store, "chat/"),
+    listJson(store, "auth/staff-users/"),
+    getJson(store, K.examController()),
   ]);
   const papers = [];
   for (const exam of exams) {
@@ -2638,6 +2646,13 @@ export async function handleAdminExport({ store }) {
       const { passwordHash, pinHash, ...safeStudent } = student;
       return safeStudent;
     }),
+    staff: staff.map((user) => {
+      const { passwordHash, emailHash, ...safeUser } = user;
+      return safeUser;
+    }),
+    legacyController: legacyController
+      ? (({ passwordHash, ...safeController }) => safeController)(legacyController)
+      : null,
     results,
     notices,
     chat,

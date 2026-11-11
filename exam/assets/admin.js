@@ -1798,6 +1798,26 @@
           statCard("पास दर", UI.trimNumber(stats.passRate || 0) + "%", "")
         : '<div class="notice info">परीक्षा की तैयारी और प्रश्न-पत्र प्रबंधन</div>') +
       "</div></div></div>" +
+      '<div class="editor-section"><h4>पेपर और परिणाम के अलग-अलग विकल्प</h4><div class="grid-2">' +
+      '<div class="notice info"><b>1. Draft / पेपर Lock</b><p>पहले प्रश्न और पेपर तैयार करें, फिर स्नैपशॉट लॉक करें।</p>' +
+      (!published
+        ? '<button class="btn btn-sm btn-navy" type="button" id="examLockBtn">' +
+          (exam.status === "locked" ? "पेपर फिर लॉक करें" : "पेपर लॉक करें") +
+          "</button>"
+        : '<span class="tiny muted">पहले Publish रोकें</span>') +
+      '</div><div class="notice info"><b>2. Publish</b><p>लॉक पेपर को छात्रों के लिए खोलें।</p>' +
+      (!staffView && exam.status === "locked"
+        ? '<button class="btn btn-sm btn-navy" type="button" id="examPublishBtn">छात्रों के लिए Publish करें</button>'
+        : '<span class="tiny muted">' + (published ? "अभी छात्रों के लिए खुला है" : "पहले पेपर Lock करें") + "</span>") +
+      '</div><div class="notice warn"><b>3. Unpublish / रोकें</b><p>नई शुरुआत रोकें; पुराने परिणाम और पेपर सुरक्षित रहेंगे।</p>' +
+      (!staffView && published
+        ? '<button class="btn btn-sm btn-warn" type="button" id="examUnpublishBtn">नई परीक्षा रोकें</button>'
+        : '<span class="tiny muted">केवल प्रकाशित परीक्षा पर लागू</span>') +
+      '</div><div class="notice good"><b>4. परिणाम अलग से जारी करें</b><p>परिणाम/उत्तर-कुंजी जारी करना Publish से अलग नियंत्रण है।</p>' +
+      (!staffView
+        ? '<button class="btn btn-sm" type="button" id="examReleaseBtn">परिणाम सेट करें</button>'
+        : '<span class="tiny muted">परिणाम जारी करना केवल Admin कर सकता है</span>') +
+      "</div></div></div>" +
       (exam.instructions || exam.instructionsEn
         ? '<div class="editor-section"><h4>निर्देश / Instructions</h4>' +
           (exam.instructions ? '<div class="instruction-box">' + esc(exam.instructions) + "</div>" : "") +
@@ -1854,7 +1874,7 @@
           "</tbody></table></div>"
         : emptyBox("अभी कोई परिणाम नहीं", true)) +
       "</div>" +
-      '<div class="editor-section"><div class="row-between"><div class="row"><button class="btn btn-sm btn-soft" type="button" id="examReleaseBtn">परिणाम जारी करें</button>' +
+      '<div class="editor-section"><div class="row-between"><div class="row">' +
       (exam.releaseResults
         ? '<button class="btn btn-sm btn-ghost" type="button" id="examNoticeBtn">पोर्टल सूचना भेजें</button>'
         : "") +
@@ -1865,56 +1885,6 @@
       "</div>" : "");
 
     const actions = [{ label: "बंद करें", ghost: true, onClick: (handle) => handle.close() }];
-    if (!published) {
-      actions.push({
-        label: exam.status === "locked" ? "पेपर फिर लॉक करें" : "पेपर लॉक करें",
-        tone: "btn-navy",
-        onClick: async (handle) => {
-          const ok = await UI.confirm({
-            title: "पेपर लॉक करें?",
-            message: "लॉक करने पर पेपर का स्थायी स्नैपशॉट बनेगा। इसके बाद पेपर Publish किया जा सकता है।",
-            confirmText: "लॉक करें",
-            tone: "btn-navy",
-          });
-          if (!ok) return;
-          await examAction(handle, "admin_exam_lock", { examId: exam.id }, "पेपर लॉक हो गया");
-        },
-      });
-    }
-    if (!staffView && exam.status === "locked") {
-      actions.push({
-        label: "प्रकाशित करें",
-        tone: "",
-        onClick: async (handle) => {
-          const ok = await UI.confirm({
-            title: "परीक्षा प्रकाशित करें?",
-            message: "प्रकाशित होते ही विद्यार्थी परीक्षा शुरू कर सकेंगे।",
-            detail: exam.startAt ? "निर्धारित शुरुआत: " + UI.fmtDateTime(exam.startAt) : "",
-            confirmText: "प्रकाशित करें",
-            tone: "btn-navy",
-          });
-          if (!ok) return;
-          await examAction(handle, "admin_exam_publish", { examId: exam.id }, "परीक्षा प्रकाशित हो गई");
-        },
-      });
-    }
-    if (!staffView && published) {
-      actions.push({
-        label: "Unpublish करें",
-        tone: "btn-warn",
-        onClick: async (handle) => {
-          const ok = await UI.confirm({
-            title: "परीक्षा Unpublish करें?",
-            message: "नए विद्यार्थी इसे शुरू नहीं कर पाएँगे। पहले से जमा परिणाम और पेपर सुरक्षित रहेंगे।",
-            confirmText: "Unpublish",
-            tone: "btn-warn",
-          });
-          if (!ok) return;
-          await examAction(handle, "admin_exam_unpublish", { examId: exam.id }, "परीक्षा Unpublish हो गई");
-        },
-      });
-    }
-
     detailModal = UI.modal({
       title: exam.title,
       subtitle: exam.code + " · " + (exam.subjectName || ""),
@@ -1924,6 +1894,55 @@
     });
 
     const root = detailModal.body;
+    async function transition(button, action, confirm, message) {
+      const ok = await UI.confirm(confirm);
+      if (!ok) return;
+      UI.setButtonBusy(button, true, "कृपया प्रतीक्षा करें…");
+      try {
+        await api(action, { examId: exam.id });
+        detailModal.close();
+        detailModal = null;
+        UI.toast(message, "good");
+        await afterExamChange(exam.id);
+      } catch (error) {
+        UI.toast(error.message || "कार्य पूरा नहीं हो सका", "bad");
+        UI.setButtonBusy(button, false);
+      }
+    }
+    const lockButton = $("#examLockBtn", root);
+    if (lockButton) {
+      lockButton.addEventListener("click", () =>
+        transition(lockButton, "admin_exam_lock", {
+          title: "पेपर लॉक करें?",
+          message: "लॉक करने पर पेपर का सुरक्षित स्नैपशॉट बनेगा। इसके बाद Admin Publish कर सकता है।",
+          confirmText: "लॉक करें",
+          tone: "btn-navy",
+        }, "पेपर लॉक हो गया")
+      );
+    }
+    const publishButton = $("#examPublishBtn", root);
+    if (publishButton) {
+      publishButton.addEventListener("click", () =>
+        transition(publishButton, "admin_exam_publish", {
+          title: "परीक्षा Publish करें?",
+          message: "Publish होते ही छात्र निर्धारित समय में परीक्षा शुरू कर सकेंगे।",
+          detail: exam.startAt ? "शुरुआत: " + UI.fmtDateTime(exam.startAt) : "",
+          confirmText: "Publish करें",
+          tone: "btn-navy",
+        }, "परीक्षा Publish हो गई")
+      );
+    }
+    const unpublishButton = $("#examUnpublishBtn", root);
+    if (unpublishButton) {
+      unpublishButton.addEventListener("click", () =>
+        transition(unpublishButton, "admin_exam_unpublish", {
+          title: "नई परीक्षा रोकें?",
+          message: "नए विद्यार्थी शुरू नहीं कर पाएँगे; पुराने परिणाम और पेपर सुरक्षित रहेंगे।",
+          confirmText: "Unpublish करें",
+          tone: "btn-warn",
+        }, "नई परीक्षा रोक दी गई")
+      );
+    }
     $("#examEditBtn", root).addEventListener("click", () => {
       if (detailModal) {
         detailModal.close();
@@ -2001,22 +2020,6 @@
 
   function detailRow(label, value) {
     return "<div><dt>" + esc(label) + "</dt><dd>" + esc(value) + "</dd></div>";
-  }
-
-  async function examAction(handle, action, payload, message) {
-    const buttons = $$("button", handle.foot);
-    const target = buttons[buttons.length - 1];
-    UI.setButtonBusy(target, true, "कृपया प्रतीक्षा करें…");
-    try {
-      await api(action, payload);
-      handle.close();
-      if (detailModal === handle) detailModal = null;
-      UI.toast(message, "good");
-      await afterExamChange(payload.examId);
-    } catch (error) {
-      UI.toast(error.message || "कार्य पूरा नहीं हो सका", "bad");
-      UI.setButtonBusy(target, false);
-    }
   }
 
   async function openExamPreview(examId, options = {}) {
@@ -3505,7 +3508,7 @@
               "</span>" +
               (student.hasPin ? ' <span class="pill">PIN</span>' : "") +
               "</td><td>" +
-              (student.active === false ? '<span class="pill">निष्क्रिय</span>' : '<span class="pill good">सक्रिय</span>') +
+              (student.archived ? '<span class="pill warn">Archive</span>' : student.active === false ? '<span class="pill">निष्क्रिय</span>' : '<span class="pill good">सक्रिय</span>') +
               "</td><td>" +
               esc(UI.fmtDate(student.createdAt)) +
               '</td><td class="actions"><div class="row-actions"><button class="btn btn-sm btn-ghost" type="button" data-student-view="' +
@@ -3776,7 +3779,7 @@
       esc(student.tradeName || "ट्रेड नहीं") +
       (student.batch ? " · " + esc(student.batch) : "") +
       "</p><div class=\"row\" style=\"margin-top:6px\">" +
-      (student.active === false ? '<span class="pill">निष्क्रिय</span>' : '<span class="pill good">सक्रिय</span>') +
+      (student.deletedAt ? '<span class="pill warn">Archive · डेटा सुरक्षित</span>' : student.active === false ? '<span class="pill">निष्क्रिय</span>' : '<span class="pill good">सक्रिय</span>') +
       (student.hasPin ? ' <span class="pill">PIN सेट</span>' : "") +
       "</div></div></div>" +
       '<div class="grid-2" style="margin-top:14px"><dl class="detail-list">' +
@@ -3839,7 +3842,9 @@
           "</div>"
         : emptyBox("कोई सक्रिय प्रयास नहीं", true)) +
       "</div>" +
-      '<div class="editor-section"><div class="danger-zone"><h4>विद्यार्थी हटाना</h4><p>यदि परिणाम या प्रयास मौजूद हैं तो हटाने से पहले अलग स्पष्ट पुष्टि ली जाएगी। सामान्यतः निष्क्रिय करना सुरक्षित है।</p><button class="btn btn-sm btn-bad" type="button" id="studentDeleteBtn">विद्यार्थी हटाएँ</button></div></div>';
+      '<div class="editor-section"><div class="danger-zone"><h4>विद्यार्थी Archive / हटाना</h4><p>खाता लॉगिन से हटेगा, लेकिन विद्यार्थी रिकॉर्ड, परिणाम और प्रयास बैकअप के लिए सुरक्षित रहेंगे। बाद में स्थिति बदलकर वापस चालू किया जा सकता है।</p><button class="btn btn-sm btn-bad" type="button" id="studentDeleteBtn"' +
+      (student.deletedAt ? " disabled" : "") +
+      '>रिकॉर्ड सुरक्षित रखकर हटाएँ</button></div></div>';
 
     const modal = UI.modal({
       title: "विद्यार्थी विवरण",
@@ -3849,7 +3854,7 @@
       actions: [
         { label: "बंद करें", ghost: true, onClick: (handle) => handle.close() },
         {
-          label: "स्थिति बदलें",
+          label: student.deletedAt ? "विद्यार्थी वापस चालू करें" : "स्थिति बदलें",
           tone: "btn-warn",
           id: "studentToggleBtn",
           onClick: async (handle) => {
@@ -3858,7 +3863,7 @@
             try {
               await api("admin_student_status", { studentId: student.id, active: student.active === false });
               handle.close();
-              UI.toast(student.active === false ? "विद्यार्थी सक्रिय कर दिया" : "विद्यार्थी निष्क्रिय कर दिया", "good");
+              UI.toast(student.deletedAt ? "विद्यार्थी रिकॉर्ड restore हो गया" : student.active === false ? "विद्यार्थी सक्रिय कर दिया" : "विद्यार्थी निष्क्रिय कर दिया", "good");
               state.overview = null;
               if (state.route === "students") await renderRoute("students", true);
             } catch (error) {
@@ -3916,46 +3921,17 @@
   }
 
   async function deleteStudent(student) {
-    const hasResults = Number(student.resultCount || 0) > 0;
-    if (hasResults) {
-      const typed = await UI.confirm({
-        title: "विद्यार्थी और परिणाम हटाएँ?",
-        message:
-          "इस विद्यार्थी के " +
-          student.resultCount +
-          " परिणाम और सभी प्रयास स्थायी रूप से हट जाएँगे। यह कार्रवाई वापस नहीं हो सकती। सुरक्षित विकल्प: विद्यार्थी को निष्क्रिय करें।",
-        detail: "पुष्टि के लिए Registration ID टाइप करें: " + student.id,
-        requireText: student.id,
-        confirmText: "आगे बढ़ें",
-        tone: "btn-bad",
-      });
-      if (!typed) return false;
-      const second = await UI.confirm({
-        title: "परिणाम सहित हटाना पक्का?",
-        message: "परिणाम, उत्तर और प्रयास भी मिट जाएँगे। केवल तभी आगे बढ़ें जब आपने बैकअप लिया हो।",
-        requireText: "DELETE",
-        confirmText: "परिणाम सहित हटाएँ",
-        tone: "btn-bad",
-      });
-      if (!second) return false;
-      await api("admin_student_delete", {
-        studentId: student.id,
-        confirm: student.id,
-        deleteResults: true,
-      });
-    } else {
-      const typed = await UI.confirm({
-        title: "विद्यार्थी हटाएँ?",
-        message: "यह विद्यार्थी स्थायी रूप से हट जाएगा। यदि उसका कोई परिणाम/प्रयास है तो सर्वर हटाने से रोक देगा।",
-        detail: "पुष्टि के लिए Registration ID टाइप करें: " + student.id,
-        requireText: student.id,
-        confirmText: "हटाएँ",
-        tone: "btn-bad",
-      });
-      if (!typed) return false;
-      await api("admin_student_delete", { studentId: student.id, confirm: student.id });
-    }
-    UI.toast("विद्यार्थी हटा दिया गया", "good");
+    const typed = await UI.confirm({
+      title: "विद्यार्थी रिकॉर्ड Archive करें?",
+      message: "लॉगिन बंद होगा। विद्यार्थी का रिकॉर्ड, परिणाम और प्रयास सुरक्षित रहेंगे और admin backup में बने रहेंगे।",
+      detail: "पुष्टि के लिए Registration ID टाइप करें: " + student.id,
+      requireText: student.id,
+      confirmText: "Archive करें",
+      tone: "btn-warn",
+    });
+    if (!typed) return false;
+    await api("admin_student_delete", { studentId: student.id, confirm: student.id });
+    UI.toast("लॉगिन बंद; विद्यार्थी रिकॉर्ड और परिणाम सुरक्षित हैं", "good");
     return true;
   }
 
@@ -4628,9 +4604,9 @@
         esc(user.email) +
         (user.mobile ? " · " + esc(user.mobile) : "") +
         '</div></div><span class="pill ' +
-        (user.status === "active" ? "good" : "info") +
+        (user.status === "active" ? "good" : user.status === "archived" ? "warn" : "info") +
         '">' +
-        (user.status === "active" ? "सक्रिय" : user.status === "inactive" ? "निष्क्रिय" : user.inviteSentAt ? "पासवर्ड सेटअप लंबित" : "ईमेल फिर भेजें") +
+        (user.status === "active" ? "सक्रिय" : user.status === "archived" ? "Archive · डेटा सुरक्षित" : user.status === "inactive" ? "निष्क्रिय" : user.inviteSentAt ? "पासवर्ड सेटअप लंबित" : "ईमेल फिर भेजें") +
         '</span></div><div class="settings-grid"><label class="field"><span>नाम</span><input class="input" name="displayName" maxlength="60" value="' +
         attr(user.displayName) +
         '" required></label><label class="field"><span>ईमेल</span><input class="input" type="email" name="email" maxlength="254" value="' +
@@ -4647,8 +4623,10 @@
         (user.photo ? '<label class="check"><input type="checkbox" name="removePhoto"> मौजूदा फोटो हटाएँ</label>' : "") +
         '</div><label class="check"><input type="checkbox" name="active"' +
         (user.active ? " checked" : "") +
+        (user.archived ? " disabled" : "") +
         '> खाता चालू रखें</label><div class="row"><button class="btn btn-navy btn-sm" type="submit">अनुमति सेव करें</button>' +
-        (user.active ? '<button class="btn btn-warn btn-sm" type="button" data-staff-remove>खाता हटाएँ</button>' : "") +
+        (user.active ? '<button class="btn btn-warn btn-sm" type="button" data-staff-remove>केवल लॉगिन रोकें</button>' : "") +
+        (!user.archived ? '<button class="btn btn-bad btn-sm" type="button" data-staff-archive>रिकॉर्ड सुरक्षित रखकर हटाएँ</button>' : '<button class="btn btn-ghost btn-sm" type="button" data-staff-restore>खाता restore करें</button>') +
         (user.status === "pending" && user.active
           ? '<button class="btn btn-ghost btn-sm" type="button" data-staff-invite="' + attr(user.id) + '">सेटअप ईमेल फिर भेजें</button>'
           : "") +
@@ -4812,7 +4790,7 @@
     $$("[data-staff-remove]", content).forEach((button) => {
       button.addEventListener("click", async () => {
         const form = button.closest("[data-staff-edit]");
-        if (!form || !window.confirm("इस खाते की लॉगिन पहुँच बंद करें? रिकॉर्ड और पुराना डेटा सुरक्षित रहेगा।")) return;
+        if (!form || !window.confirm("इस खाते की लॉगिन पहुँच रोकें? रिकॉर्ड सुरक्षित रहेगा।")) return;
         UI.setButtonBusy(button, true, "पहुँच हटाई जा रही है…");
         try {
           await api("admin_staff_save", {
@@ -4826,10 +4804,71 @@
               permissions: [...form.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
             },
           });
-          UI.toast("खाते की पहुँच हटा दी गई; रिकॉर्ड सुरक्षित है।", "good");
+          UI.toast("लॉगिन पहुँच रोक दी गई; रिकॉर्ड सुरक्षित है।", "good");
           await renderSettings(content);
         } catch (error) {
           UI.toast(error.message || "खाते की पहुँच नहीं हटाई जा सकी।", "bad");
+          UI.setButtonBusy(button, false);
+        }
+      });
+    });
+    $$("[data-staff-archive]", content).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const form = button.closest("[data-staff-edit]");
+        if (!form) return;
+        const typed = await UI.confirm({
+          title: "स्टाफ रिकॉर्ड Archive करें?",
+          message: "लॉगिन बंद होगा; प्रोफ़ाइल और पुराना डेटा admin backup में सुरक्षित रहेगा।",
+          detail: "पुष्टि के लिए खाता ID टाइप करें: " + form.dataset.user,
+          requireText: form.dataset.user,
+          confirmText: "Archive करें",
+          tone: "btn-warn",
+        });
+        if (!typed) return;
+        UI.setButtonBusy(button, true, "Archive हो रहा है…");
+        try {
+          await api("admin_staff_save", {
+            staff: {
+              id: form.dataset.user,
+              displayName: form.elements.displayName.value.trim(),
+              email: form.elements.email.value.trim(),
+              mobile: form.elements.mobile.value.trim(),
+              type: form.elements.type.value,
+              active: false,
+              archive: true,
+              permissions: [...form.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
+            },
+          });
+          UI.toast("स्टाफ लॉगिन बंद; रिकॉर्ड और बैकअप सुरक्षित हैं।", "good");
+          await renderSettings(content);
+        } catch (error) {
+          UI.toast(error.message || "स्टाफ रिकॉर्ड Archive नहीं हुआ।", "bad");
+          UI.setButtonBusy(button, false);
+        }
+      });
+    });
+    $$("[data-staff-restore]", content).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const form = button.closest("[data-staff-edit]");
+        if (!form || !window.confirm("इस स्टाफ खाते को restore करके लॉगिन चालू करें?")) return;
+        UI.setButtonBusy(button, true, "Restore हो रहा है…");
+        try {
+          await api("admin_staff_save", {
+            staff: {
+              id: form.dataset.user,
+              displayName: form.elements.displayName.value.trim(),
+              email: form.elements.email.value.trim(),
+              mobile: form.elements.mobile.value.trim(),
+              type: form.elements.type.value,
+              active: true,
+              restore: true,
+              permissions: [...form.querySelectorAll('input[name="permissions"]:checked')].map((input) => input.value),
+            },
+          });
+          UI.toast("स्टाफ खाता restore हो गया।", "good");
+          await renderSettings(content);
+        } catch (error) {
+          UI.toast(error.message || "खाता restore नहीं हुआ।", "bad");
           UI.setButtonBusy(button, false);
         }
       });
