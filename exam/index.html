@@ -24,6 +24,7 @@
       <a class="header-link desk-only" href="../index.html">होम / लैब</a>
       <a class="header-link" href="../study/index.html">अध्ययन सामग्री</a>
       <a class="header-link" href="index.html">छात्र पोर्टल</a>
+      <a class="header-link" href="staff-login.html">स्टाफ लॉगिन</a>
       <a class="header-link" href="admin.html">एडमिन लॉगिन</a>
       <a class="header-link" href="controller.html">परीक्षा कंट्रोलर</a>
       <a class="header-link desk-only" href="register.html">नया रजिस्ट्रेशन</a>
@@ -72,6 +73,7 @@
             <label class="field">
               <span>पासवर्ड</span>
               <input class="input" id="loginPassword" name="password" type="password" autocomplete="current-password" maxlength="128">
+              <small>तीन बार गलत पासवर्ड डालने पर लॉगिन और रिकवरी एक घंटे के लिए लॉक हो जाएगी।</small>
             </label>
             <label class="field">
               <span>पुराने खाते के लिए पंजीकृत मोबाइल</span>
@@ -85,8 +87,10 @@
 
           <form id="studentForgotPanel" class="stack" hidden novalidate>
             <h3>पासवर्ड रिकवरी</h3>
-            <p class="muted small">अपना CITS नंबर या पंजीकृत मोबाइल दर्ज करें। लिंक खाते में दर्ज ईमेल पर भेजा जाएगा।</p>
+            <p class="muted small">अपना लॉगिन ID और खाते में दर्ज ईमेल या मोबाइल से पुष्टि करें। लिंक खाते के ईमेल पर भेजा जाएगा।</p>
             <label class="field"><span>CITS नंबर या मोबाइल नंबर</span><input class="input" id="studentForgotId" autocomplete="username" autocapitalize="characters" maxlength="40" required></label>
+            <label class="field"><span>पंजीकृत ईमेल</span><input class="input" id="studentForgotEmail" type="email" autocomplete="email" maxlength="254"></label>
+            <label class="field"><span>या पंजीकृत मोबाइल नंबर</span><input class="input" id="studentForgotMobile" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16"></label>
             <p class="notice bad" id="studentForgotError" hidden></p>
             <p class="notice info" id="studentForgotMessage" hidden></p>
             <button class="btn btn-lg btn-block" id="studentForgotSubmit" type="submit">रीसेट लिंक भेजें</button>
@@ -216,6 +220,7 @@
       <span id="portalGroupFooter">Future Instructor Group · CHNM / CITS परीक्षा पोर्टल</span>
       <span class="row">
         <a href="../index.html">मुख्य पोर्टल</a>
+        <a href="staff-login.html">स्टाफ लॉगिन</a>
         <a href="admin.html">एडमिन</a>
         <a href="controller.html">परीक्षा कंट्रोलर</a>
       </span>

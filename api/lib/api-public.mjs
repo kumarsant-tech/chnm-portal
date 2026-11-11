@@ -10,6 +10,9 @@ import {
   checkPin,
   checkPassword,
   hashPassword,
+  assertLoginNotLocked,
+  recordLoginFailure,
+  clearLoginFailures,
 } from "./auth.mjs";
 import { publicSettings, studentSelf } from "./serializers.mjs";
 import { loadCatalog, nextRegistrationId, publicSubject, publicTrade } from "./domain.mjs";
@@ -246,20 +249,24 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
   await rateLimit(store, "student-login-id", identifier, 8, 15 * 60 * 1000);
   const student = await findStudentByIdentifier(store, identifier);
   if (!student) throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
+  await assertLoginNotLocked(store, "student", student.id);
   if (student.active === false) {
     throw new HttpError("यह छात्र खाता निष्क्रिय है — एडमिन से संपर्क करें", 403);
   }
   if (student.passwordHash) {
     if (!(await checkPassword(password, student.passwordHash))) {
+      await recordLoginFailure(store, "student", student.id);
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
   } else {
     const legacyIdMatches = identifier === String(student.id).toUpperCase() ||
       identifier === String(student.mobile || "");
     if (!legacyIdMatches || !mobile || mobile !== student.mobile) {
+      await recordLoginFailure(store, "student", student.id);
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
     if (student.pinHash && !(await checkPin(password, student.pinHash))) {
+      await recordLoginFailure(store, "student", student.id);
       throw new HttpError("लॉगिन ID या पासवर्ड सही नहीं है", 401);
     }
     if (!student.mustChangePassword) {
@@ -267,6 +274,7 @@ export async function handleStudentLogin({ req, ctx, store, env }) {
       await putJson(store, K.students(student.id), student);
     }
   }
+  await clearLoginFailures(store, "student", student.id);
   await clearRateLimit(store, "student-login-id", identifier);
   await audit(store, "student.login", student.id, { ip });
   return json({
@@ -282,14 +290,14 @@ export async function handleStudentForgotPassword({ req, ctx, store, env }) {
   await rateLimit(store, "student-forgot-password-ip", ip, 10, 60 * 60 * 1000);
   const body = await readJson(req);
   const identifier = clean(body.identifier ?? body.id, 40).toUpperCase();
+  const submittedEmail = clean(body.email, 254).toLowerCase();
+  const submittedMobile = phone(body.mobile);
   const message =
-    "यदि इस लॉगिन ID से जुड़ा खाता और ईमेल उपलब्ध है, तो रीसेट लिंक भेज दिया जाएगा। अपना इनबॉक्स और स्पैम फ़ोल्डर देखें।";
+    "यदि लॉगिन ID और पंजीकृत ईमेल या मोबाइल सही है, तो खाते के ईमेल पर रीसेट लिंक भेज दिया जाएगा। अपना इनबॉक्स और स्पैम फ़ोल्डर देखें।";
 
   if (!/^[A-Z0-9][A-Z0-9_/-]{1,39}$/.test(identifier)) {
     return json({ ok: true, message });
   }
-  await rateLimit(store, "student-forgot-password-id", identifier, 3, 60 * 60 * 1000);
-
   const baseUrl = studentResetBaseUrl(env);
   if (!baseUrl || !emailConfigured(env)) {
     throw new HttpError(
@@ -299,12 +307,22 @@ export async function handleStudentForgotPassword({ req, ctx, store, env }) {
   }
 
   const student = await findStudentByIdentifier(store, identifier);
+  if (student) await assertLoginNotLocked(store, "student", student.id);
   const recipient = String(student?.email || "").trim().toLowerCase();
+  const contactVerified = Boolean(
+    (submittedEmail && submittedEmail === recipient) ||
+    (submittedMobile && submittedMobile === phone(student?.mobile))
+  );
   if (
     !student ||
     student.active === false ||
-    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) ||
+    (!submittedEmail && !submittedMobile)
   ) {
+    return json({ ok: true, message });
+  }
+  if (!contactVerified) {
+    await recordLoginFailure(store, "student", student.id);
     return json({ ok: true, message });
   }
 
@@ -363,14 +381,15 @@ export async function handleStudentResetPassword({ req, ctx, store }) {
   ) {
     throw new HttpError(invalidMessage, 400);
   }
+  const student = await getJson(store, K.students(studentId));
+  if (!student || student.active === false) throw new HttpError(invalidMessage, 400);
+  await assertLoginNotLocked(store, "student", student.id);
   const reset = await store.consumeResetToken(
     K.studentPasswordReset(studentId),
     Date.now(),
     hashResetToken(token)
   );
   if (!reset) throw new HttpError(invalidMessage, 400);
-  const student = await getJson(store, K.students(studentId));
-  if (!student || student.active === false) throw new HttpError(invalidMessage, 400);
 
   student.passwordHash = await hashPassword(newPassword);
   student.mustChangePassword = false;
@@ -378,6 +397,7 @@ export async function handleStudentResetPassword({ req, ctx, store }) {
   delete student.pinHash;
   student.updatedAt = new Date().toISOString();
   await putJson(store, K.students(student.id), student);
+  await clearLoginFailures(store, "student", student.id);
   await audit(store, "student.password.reset", student.id, { ip });
   return json({ ok: true, message: "पासवर्ड रीसेट हो गया है। अब नए पासवर्ड से लॉगिन करें।" });
 }

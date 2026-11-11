@@ -19,6 +19,7 @@
     <div class="header-spacer"></div>
     <nav class="header-links" aria-label="मुख्य मेन्यू">
       <a class="header-link" href="index.html">छात्र पोर्टल</a>
+      <a class="header-link" href="staff-login.html">स्टाफ लॉगिन</a>
       <a class="header-link" href="admin.html">एडमिन लॉगिन</a>
     </nav>
   </header>
@@ -29,11 +30,32 @@
       <h1 style="margin-top:12px">परीक्षा कंट्रोलर लॉगिन</h1>
       <p class="muted">यह खाता केवल परीक्षा संचालन के लिए है। प्रश्न, विद्यार्थी और सभी सेटिंग्स admin के नियंत्रण में रहेंगे।</p>
       <form id="controllerLoginForm" class="stack" style="max-width:480px;margin-top:22px">
-        <label class="field"><span>यूज़रनेम</span><input class="input" id="controllerLoginUsername" autocomplete="username" maxlength="32" required></label>
+        <label class="field"><span>यूज़रनेम</span><input class="input" id="controllerLoginUsername" autocomplete="username" maxlength="254" required></label>
         <label class="field"><span>पासवर्ड</span><input class="input" id="controllerLoginPassword" type="password" autocomplete="current-password" maxlength="128" required></label>
         <p class="notice bad" id="controllerLoginError" hidden></p>
         <button class="btn btn-lg btn-block" id="controllerLoginButton" type="submit">लॉगिन करें</button>
       </form>
+      <form id="controllerPasswordChangeForm" class="stack" style="max-width:480px;margin-top:22px" hidden>
+        <p class="notice warn">पहले से मौजूद कंट्रोलर खाते की सुरक्षा के लिए यह पासवर्ड अपडेट अनिवार्य है। अपडेट होने तक अन्य विकल्प बंद रहेंगे।</p>
+        <label class="field"><span>वर्तमान पासवर्ड</span><input class="input" name="currentPassword" type="password" autocomplete="current-password" maxlength="128" required></label>
+        <label class="field"><span>नया पासवर्ड (कम-से-कम 12 अक्षर)</span><input class="input" name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <p class="notice bad" id="controllerPasswordChangeError" hidden></p>
+        <button class="btn btn-lg btn-block" id="controllerPasswordChangeButton" type="submit">पासवर्ड अपडेट करें</button>
+      </form>
+      <form id="controllerAccountUpgradeForm" class="stack" style="max-width:560px;margin-top:22px" hidden>
+        <p class="notice warn">यह पुराना कंट्रोलर खाता है। जारी रखने के लिए नई प्रोफ़ाइल जानकारी अपडेट करें; पुराने खाते और परीक्षाएँ सुरक्षित रहेंगी। आगे से ईमेल से लॉगिन होगा।</p>
+        <label class="field"><span>पुराना पासवर्ड सत्यापित करें</span><input class="input" name="currentPassword" type="password" autocomplete="current-password" maxlength="128" required></label>
+        <label class="field"><span>पूरा नाम *</span><input class="input" name="displayName" maxlength="60" required></label>
+        <label class="field"><span>लॉगिन ईमेल *</span><input class="input" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label class="field"><span>मोबाइल नंबर *</span><input class="input" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="14" required></label>
+        <label class="field"><span>प्रोफ़ाइल फोटो (वैकल्पिक)</span><input class="input" name="photo" type="file" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG या WebP; फोटो अपने-आप छोटी होगी।</small></label>
+        <label class="field"><span>नया पासवर्ड (कम-से-कम 12 अक्षर) *</span><input class="input" name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="field"><span>नया पासवर्ड दोबारा लिखें *</span><input class="input" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <p class="notice bad" id="controllerAccountUpgradeError" hidden></p>
+        <button class="btn btn-lg btn-block" id="controllerAccountUpgradeButton" type="submit">जानकारी अपडेट करें</button>
+      </form>
+      <p class="tiny muted">नया आमंत्रित स्टाफ खाता: <a href="staff-login.html">स्टाफ लॉगिन पेज</a></p>
     </section>
 
     <section id="controllerDashboard" hidden>
@@ -62,6 +84,8 @@
             <label class="field"><span>ट्रेड</span><select class="select" id="controllerExamTrade"><option value="">लोड हो रहा है…</option></select></label>
             <label class="field"><span>अवधि (मिनट)</span><input class="input" id="controllerExamDuration" type="number" min="1" max="300" value="60" required></label>
             <label class="field"><span>प्रकार</span><select class="select" id="controllerExamType"><option value="final">अंतिम परीक्षा</option><option value="practice">अभ्यास परीक्षा</option></select></label>
+            <label class="field"><span>शुरू होने की तारीख और समय *</span><input class="input" id="controllerExamStartAt" type="datetime-local" required></label>
+            <label class="field"><span>समाप्ति की तारीख और समय *</span><input class="input" id="controllerExamEndAt" type="datetime-local" required></label>
           </div>
           <p class="notice bad" id="controllerCreateError" hidden></p>
           <div><button class="btn btn-navy" id="controllerCreateButton" type="submit">ड्राफ्ट परीक्षा बनाएँ</button></div>

@@ -1228,7 +1228,7 @@
         hide(forgotPanel, false);
         forgotButton.setAttribute("aria-expanded", "true");
         $("#authTitle").textContent = "पासवर्ड रिकवरी";
-        $("#authSub").textContent = "रीसेट लिंक आपके खाते में दर्ज ईमेल पर भेजा जाएगा।";
+        $("#authSub").textContent = "लॉगिन ID और पंजीकृत ईमेल या मोबाइल से पुष्टि करें।";
         setError("#studentForgotError", "");
         setError("#studentForgotMessage", "");
         $("#studentForgotId").focus();
@@ -1242,13 +1242,19 @@
         setError("#studentForgotError", "");
         setError("#studentForgotMessage", "");
         const identifier = $("#studentForgotId").value.trim().toUpperCase();
+        const email = $("#studentForgotEmail").value.trim();
+        const mobile = $("#studentForgotMobile").value.trim();
         if (!/^[A-Za-z0-9][A-Za-z0-9_/-]{1,39}$/.test(identifier)) {
           setError("#studentForgotError", "सही CITS नंबर या पंजीकृत मोबाइल दर्ज करें।");
           return;
         }
+        if (!email && !mobile) {
+          setError("#studentForgotError", "पंजीकृत ईमेल या मोबाइल में से एक दर्ज करें।");
+          return;
+        }
         await UI.withBusy($("#studentForgotSubmit"), async () => {
           try {
-            const data = await UI.call("student_forgot_password", { identifier });
+            const data = await UI.call("student_forgot_password", { identifier, email, mobile });
             setError("#studentForgotMessage", data.message || "यदि ईमेल खाते में दर्ज है, तो रीसेट लिंक भेज दिया जाएगा।");
           } catch (error) {
             setError("#studentForgotError", error.message || "रीसेट लिंक नहीं भेजा जा सका।");

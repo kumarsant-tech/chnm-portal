@@ -27,6 +27,7 @@ import {
 import {
   issueAdminToken,
   issueExamControllerToken,
+  issueStaffToken,
   hasAdminCredential,
   checkAdminPassword,
   checkPassword,
@@ -38,8 +39,13 @@ import {
   audit,
   recentAudit,
   hashPin,
+  requireStaffSession,
+  assertLoginNotLocked,
+  recordLoginFailure,
+  clearLoginFailures,
 } from "./auth.mjs";
 import { emailConfigured, sendEmail } from "./email.mjs";
+import { STAFF_PERMISSIONS } from "./permissions.mjs";
 import { processResultReleaseEmails } from "./result-notifications.mjs";
 import {
   examSummary,
@@ -254,6 +260,7 @@ function paged(items, body, defaultSize = 25) {
 export async function handleAdminLogin({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "admin-login", ip, 8, ADMIN_LOGIN_WINDOW);
+  await assertLoginNotLocked(store, "admin", "admin");
   if (!(await hasAdminCredential(env, store))) {
     throw new HttpError(
       "ADMIN_PASSWORD secret या पहले से सेट किया गया एडमिन पासवर्ड आवश्यक है।",
@@ -262,8 +269,10 @@ export async function handleAdminLogin({ req, ctx, store, env }) {
   }
   const body = await readJson(req);
   if (!(await checkAdminPassword(body.password, env, store))) {
+    await recordLoginFailure(store, "admin", "admin");
     throw new HttpError("गलत पासवर्ड", 401);
   }
+  await clearLoginFailures(store, "admin", "admin");
   await clearRateLimit(store, "admin-login", ip);
   await audit(store, "admin.login", "admin", { ip });
   return json({
@@ -279,7 +288,7 @@ export async function handleExamControllerLogin({ req, ctx, store, env }) {
   const username = String(body.username || "").trim().toLowerCase();
   await rateLimit(store, "exam-controller-login-ip", ip, 8, ADMIN_LOGIN_WINDOW);
   await rateLimit(store, "exam-controller-login-user", username || "invalid", 8, ADMIN_LOGIN_WINDOW);
-  const controller = await getJson(store, K.examController());
+  let controller = await getJson(store, K.examController());
   if (
     !controller ||
     controller.active === false ||
@@ -287,6 +296,16 @@ export async function handleExamControllerLogin({ req, ctx, store, env }) {
     !(await checkPassword(String(body.password || ""), controller.passwordHash))
   ) {
     throw new HttpError("यूज़रनेम या पासवर्ड सही नहीं है", 401);
+  }
+  const mustUpgradeAccount = !controller.email || controller.profileVersion !== 2;
+  if (mustUpgradeAccount && controller.mustChangePassword !== true) {
+    controller = {
+      ...controller,
+      mustChangePassword: true,
+      authVersion: (Number(controller.authVersion) || 0) + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await putJson(store, K.examController(), controller);
   }
   await clearRateLimit(store, "exam-controller-login-ip", ip);
   await clearRateLimit(store, "exam-controller-login-user", username);
@@ -297,8 +316,125 @@ export async function handleExamControllerLogin({ req, ctx, store, env }) {
     controller: {
       username: controller.username,
       displayName: controller.displayName,
+      mustUpgradeAccount,
     },
+    mustUpgradeAccount,
+    mustChangePassword: controller.mustChangePassword === true,
     expiresIn: 12 * 3600,
+  });
+}
+
+export async function handleStaffLogin({ req, ctx, store, env }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  const email = String(body.email || "").trim().toLowerCase();
+  const emailHash = crypto.createHash("sha256").update(email).digest("hex");
+  await rateLimit(store, "staff-login-ip", ip, 8, ADMIN_LOGIN_WINDOW);
+  await rateLimit(store, "staff-login-email", emailHash || "invalid", 8, ADMIN_LOGIN_WINDOW);
+  const userId = await getJson(store, K.staffEmailIndex(emailHash));
+  const user = userId ? await getJson(store, K.staffUser(userId)) : null;
+  const expectedType = String(body.expectedType || "");
+  const validType = expectedType === "staff" || expectedType === "controller";
+  if (
+    !user ||
+    !validType ||
+    user.type !== expectedType ||
+    user.active === false ||
+    !user.passwordHash ||
+    !(await checkPassword(String(body.password || ""), user.passwordHash))
+  ) {
+    throw new HttpError("ईमेल या पासवर्ड सही नहीं है", 401);
+  }
+  await clearRateLimit(store, "staff-login-ip", ip);
+  await clearRateLimit(store, "staff-login-email", emailHash);
+  await audit(store, "staff.login", user.id, { type: user.type, ip });
+  return json({
+    ok: true,
+    token: issueStaffToken(env, user),
+    profile: safeStaffProfile(user),
+    expiresIn: 12 * 3600,
+  });
+}
+
+export async function handleStaffSetupPassword({ req, ctx, store, env }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "staff-password-setup", ip, 8, ADMIN_LOGIN_WINDOW);
+  const token = String(body.token || "");
+  const match = token.match(/^([0-9a-f-]{36})\.([A-Za-z0-9_-]{40,60})$/i);
+  const newPassword = String(body.newPassword || "");
+  if (!match) throw new HttpError("आमंत्रण लिंक अमान्य या समाप्त हो गया है", 400);
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  const userId = match[1];
+  const key = K.staffInvite(userId);
+  const invite = await getJson(store, key);
+  const tokenHash = hashResetToken(token);
+  const supplied = Buffer.from(tokenHash, "hex");
+  const expected = Buffer.from(String(invite?.tokenHash || ""), "hex");
+  if (!invite || expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    throw new HttpError("आमंत्रण लिंक अमान्य या समाप्त हो गया है", 400);
+  }
+  const consumed = await store.consumeResetToken(key, Date.now(), tokenHash);
+  if (!consumed) throw new HttpError("आमंत्रण लिंक अमान्य या समाप्त हो गया है", 400);
+  const user = await getJson(store, K.staffUser(userId));
+  if (!user || user.active === false) {
+    throw new HttpError("यह आमंत्रण अब उपलब्ध नहीं है", 400);
+  }
+  const updated = {
+    ...user,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    authVersion: (Number(user.authVersion) || 0) + 1,
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    inviteSentAt: null,
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.staffUser(userId), updated);
+  await audit(store, "staff.password.setup", userId, {});
+  return json({
+    ok: true,
+    token: issueStaffToken(env, updated),
+    profile: safeStaffProfile(updated),
+    expiresIn: 12 * 3600,
+  });
+}
+
+export async function handleStaffMe({ staff }) {
+  return json({ ok: true, profile: safeStaffProfile(staff), mustChangePassword: Boolean(staff.mustChangePassword) });
+}
+
+export async function handleStaffPasswordChange({ req, ctx, store, env, staff }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "staff-password-change", `${staff.id}:${ip}`, 6, ADMIN_LOGIN_WINDOW);
+  const currentPassword = String(body.currentPassword || "");
+  const newPassword = String(body.newPassword || "");
+  if (!(await checkPassword(currentPassword, staff.passwordHash))) {
+    throw new HttpError("वर्तमान पासवर्ड सही नहीं है", 401);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  if (newPassword === currentPassword) {
+    throw new HttpError("नया पासवर्ड वर्तमान पासवर्ड से अलग होना चाहिए", 400);
+  }
+  const updated = {
+    ...staff,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    authVersion: (Number(staff.authVersion) || 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.staffUser(staff.id), updated);
+  await audit(store, "staff.password.change", staff.id, { ip });
+  return json({
+    ok: true,
+    token: issueStaffToken(env, updated),
+    profile: safeStaffProfile(updated),
+    message: "पासवर्ड अपडेट हो गया।",
   });
 }
 
@@ -311,6 +447,7 @@ export async function handleAdminExamControllerGet({ store }) {
           username: controller.username,
           displayName: controller.displayName,
           active: controller.active !== false,
+          migrated: Boolean(controller.migratedTo),
         }
       : null,
   });
@@ -324,6 +461,9 @@ export async function handleAdminExamControllerSave({ req, store, ctx }) {
   const displayName = clean(input.displayName ?? input.name, 60);
   const password = String(input.password || "");
   const current = await getJson(store, K.examController());
+  if (current?.migratedTo) {
+    throw new HttpError("यह खाता नई स्टाफ प्रोफ़ाइल में बदला जा चुका है — उसे नीचे संपादित करें", 409);
+  }
   if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
     throw new HttpError("यूज़रनेम 3-32 अक्षर, अंक, dot, _ या - का होना चाहिए", 400);
   }
@@ -344,6 +484,7 @@ export async function handleAdminExamControllerSave({ req, store, ctx }) {
     displayName,
     passwordHash: password ? await hashPassword(password) : current.passwordHash,
     active,
+    mustChangePassword: password ? false : current ? current.mustChangePassword !== false : false,
     authVersion: (Number(current?.authVersion) || 0) + (changed ? 1 : 0),
     updatedAt: new Date().toISOString(),
   };
@@ -352,6 +493,389 @@ export async function handleAdminExamControllerSave({ req, store, ctx }) {
   return json({
     ok: true,
     controller: { username, displayName, active },
+  });
+}
+
+function safeStaffProfile(user) {
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    email: user.email || "",
+    mobile: user.mobile || "",
+    photo: user.photo || "",
+    type: user.type,
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+    active: user.active !== false,
+    status: user.active === false ? "inactive" : user.passwordHash ? "active" : "pending",
+    inviteSentAt: user.inviteSentAt || null,
+    mustChangePassword: Boolean(user.mustChangePassword),
+  };
+}
+
+function staffEmailHash(email) {
+  return crypto.createHash("sha256").update(String(email).trim().toLowerCase()).digest("hex");
+}
+
+function normalizeStaffMobile(value, required = true) {
+  let mobile = String(value || "").replace(/\D/g, "");
+  if (mobile.length === 12 && mobile.startsWith("91")) mobile = mobile.slice(2);
+  if (!mobile && !required) return "";
+  if (!/^[6-9]\d{9}$/.test(mobile)) {
+    throw new HttpError("10 अंकों का सही मोबाइल नंबर दर्ज करें", 400);
+  }
+  return mobile;
+}
+
+function validateProfilePhoto(value, existing = "") {
+  if (value === undefined) return existing;
+  if (value === null) return "";
+  if (typeof value !== "string" || value.length > 350_000) {
+    throw new HttpError("प्रोफ़ाइल फोटो 256 KB से छोटी होनी चाहिए", 400);
+  }
+  if (!value) return existing;
+  const match = value.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match || Buffer.from(match[2], "base64").length > 256 * 1024) {
+    throw new HttpError("केवल JPG, PNG या WebP की 256 KB तक की फोटो अपलोड करें", 400);
+  }
+  return value;
+}
+
+function staffPermissions(value) {
+  if (!Array.isArray(value)) throw new HttpError("कम-से-कम एक अनुमति चुनें", 400);
+  const permissions = [...new Set(value.map((item) => String(item)))];
+  if (!permissions.length || permissions.some((item) => !STAFF_PERMISSIONS.includes(item))) {
+    throw new HttpError("चुनी गई अनुमति मान्य नहीं है", 400);
+  }
+  return permissions;
+}
+
+function staffInviteReady(env) {
+  const baseUrl = resetBaseUrl(env);
+  if (!emailConfigured(env) || !baseUrl) {
+    throw new HttpError(
+      "स्टाफ आमंत्रण ईमेल के लिए PUBLIC_BASE_URL और Gmail या Resend ईमेल कॉन्फ़िगरेशन आवश्यक है।",
+      503
+    );
+  }
+  return baseUrl;
+}
+
+async function sendStaffInvite(env, store, user) {
+  const baseUrl = staffInviteReady(env);
+  if (!user.active || user.passwordHash) {
+    throw new HttpError("यह खाता नया पासवर्ड सेटअप आमंत्रण के योग्य नहीं है।", 400);
+  }
+  const token = `${user.id}.${crypto.randomBytes(32).toString("base64url")}`;
+  const tokenHash = hashResetToken(token);
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  await putJson(store, K.staffInvite(user.id), { tokenHash, expiresAt });
+  const pending = {
+    ...user,
+    inviteTokenHash: tokenHash,
+    inviteExpiresAt: expiresAt,
+    inviteSentAt: null,
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.staffUser(user.id), pending);
+  const inviteUrl = `${baseUrl}/exam/staff-login.html?setup=${encodeURIComponent(token)}`;
+  const delivery = await sendEmail(env, {
+    to: user.email,
+    subject: "CHNM परीक्षा पोर्टल — स्टाफ खाता सेटअप",
+    text: `${user.displayName}, आपका ${user.type === "controller" ? "परीक्षा कंट्रोलर" : "स्टाफ"} खाता बनाया गया है। पासवर्ड सेट करने के लिए इस 24 घंटे के लिंक को खोलें:\n${inviteUrl}\n\nयह लिंक एक बार ही उपयोग किया जा सकता है। यदि आपने यह खाता नहीं माँगा है, तो एडमिन से संपर्क करें।`,
+    html: `<p>${escapeEmailName(user.displayName)}, आपका ${user.type === "controller" ? "परीक्षा कंट्रोलर" : "स्टाफ"} खाता बनाया गया है।</p><p><a href="${inviteUrl}">पासवर्ड सेट करें</a> — यह लिंक 24 घंटे में समाप्त होगा और एक बार ही उपयोग किया जा सकता है।</p><p>यदि आपने यह खाता नहीं माँगा है, तो एडमिन से संपर्क करें।</p>`,
+  });
+  if (!delivery.sent) {
+    throw new HttpError(
+      "खाता सेव हो गया, लेकिन सेटअप ईमेल नहीं भेजा जा सका। ईमेल कॉन्फ़िगरेशन जाँचें और फिर से आमंत्रण भेजें।",
+      503
+    );
+  }
+  pending.inviteSentAt = new Date().toISOString();
+  await putJson(store, K.staffUser(user.id), pending);
+  await audit(store, "staff.invite.send", user.id, { type: user.type });
+  return pending;
+}
+
+function escapeEmailName(value) {
+  return String(value || "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
+export async function handleAdminStaffList({ store }) {
+  const users = await listJson(store, "auth/staff-users/");
+  const profiles = users.map(safeStaffProfile);
+  const legacy = await getJson(store, K.examController());
+  if (legacy) {
+    profiles.unshift({
+      id: "legacy-controller",
+      displayName: legacy.displayName,
+      email: "",
+      username: legacy.username,
+      type: "controller",
+      permissions: ["exams"],
+      active: legacy.active !== false,
+      status: legacy.migratedTo ? "migrated" : "legacy",
+      mustChangePassword: legacy.mustChangePassword !== false,
+      legacy: true,
+      migrated: Boolean(legacy.migratedTo),
+    });
+  }
+  return json({ ok: true, users: profiles });
+}
+
+export async function handleAdminProfileGet({ store }) {
+  const profile = await getJson(store, K.adminProfile());
+  return json({ ok: true, profile: profile || { displayName: "", mobile: "", photo: "" } });
+}
+
+export async function handleAdminProfileSave({ req, store }) {
+  const body = await readJson(req);
+  const input = body.profile || {};
+  const displayName = clean(input.displayName ?? input.name, 60);
+  if (displayName.length < 2) throw new HttpError("अपना नाम दर्ज करें", 400);
+  const existing = (await getJson(store, K.adminProfile())) || {};
+  const profile = {
+    displayName,
+    mobile: normalizeStaffMobile(input.mobile),
+    photo: validateProfilePhoto(input.photo, existing.photo || ""),
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.adminProfile(), profile);
+  await audit(store, "admin.profile.update", "admin", {});
+  return json({ ok: true, profile });
+}
+
+export async function handleAdminStaffSave({ req, store, ctx, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "admin-staff-save", ip, 20, ADMIN_LOGIN_WINDOW);
+  const body = await readJson(req);
+  const input = body.staff || {};
+  const displayName = clean(input.displayName ?? input.name, 60);
+  const type = String(input.type || "");
+  const permissions = staffPermissions(input.permissions);
+  if (displayName.length < 2) throw new HttpError("नाम कम-से-कम 2 अक्षरों का होना चाहिए", 400);
+  if (type !== "staff" && type !== "controller") {
+    throw new HttpError("खाते का प्रकार चुनें", 400);
+  }
+  const now = new Date().toISOString();
+  const userId = String(input.id || "");
+  let user;
+  let created = false;
+  if (userId) {
+    user = await getJson(store, K.staffUser(userId));
+    if (!user) throw new HttpError("स्टाफ खाता नहीं मिला", 404);
+    const previousEmailHash = user.emailHash;
+    const email = String(input.email ?? user.email ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+      throw new HttpError("मान्य ईमेल पता दर्ज करें", 400);
+    }
+    const mobile = normalizeStaffMobile(input.mobile);
+    const photo = validateProfilePhoto(input.photo, user.photo || "");
+    const emailHash = staffEmailHash(email);
+    const emailChanged = emailHash !== user.emailHash;
+    if (emailChanged) {
+      const owner = await getJson(store, K.staffEmailIndex(emailHash));
+      if (owner && owner !== user.id) throw new HttpError("इस ईमेल से स्टाफ खाता पहले से मौजूद है", 409);
+      const reserved = typeof store.setIfAbsent === "function"
+        ? await store.setIfAbsent(K.staffEmailIndex(emailHash), user.id)
+        : !owner && Boolean(await putJson(store, K.staffEmailIndex(emailHash), user.id));
+      if (!reserved && owner !== user.id) {
+        throw new HttpError("इस ईमेल से स्टाफ खाता पहले से मौजूद है", 409);
+      }
+    }
+    const active = input.active === undefined ? user.active !== false : bool(input.active, false);
+    const changed =
+      user.displayName !== displayName ||
+      user.email !== email ||
+      user.mobile !== mobile ||
+      user.photo !== photo ||
+      user.type !== type ||
+      JSON.stringify([...user.permissions].sort()) !== JSON.stringify([...permissions].sort()) ||
+      user.active !== active;
+    user = {
+      ...user,
+      displayName,
+      email,
+      emailHash,
+      mobile,
+      photo,
+      type,
+      permissions,
+      active,
+      authVersion: (Number(user.authVersion) || 0) + (changed ? 1 : 0),
+      updatedAt: now,
+    };
+    if (emailChanged && previousEmailHash) {
+      await del(store, K.staffEmailIndex(previousEmailHash));
+    }
+  } else {
+    const email = String(input.email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+      throw new HttpError("मान्य ईमेल पता दर्ज करें", 400);
+    }
+    staffInviteReady(env);
+    const emailHash = staffEmailHash(email);
+    const mobile = normalizeStaffMobile(input.mobile);
+    const photo = validateProfilePhoto(input.photo);
+    const existingId = await getJson(store, K.staffEmailIndex(emailHash));
+    if (existingId) throw new HttpError("इस ईमेल से स्टाफ खाता पहले से मौजूद है", 409);
+    user = {
+      id: crypto.randomUUID(),
+      displayName,
+      email,
+      emailHash,
+      mobile,
+      photo,
+      type,
+      permissions,
+      active: true,
+      passwordHash: null,
+      mustChangePassword: false,
+      authVersion: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const reserved = typeof store.setIfAbsent === "function"
+      ? await store.setIfAbsent(K.staffEmailIndex(emailHash), user.id)
+      : !(await getJson(store, K.staffEmailIndex(emailHash))) &&
+        Boolean(await putJson(store, K.staffEmailIndex(emailHash), user.id));
+    if (!reserved) throw new HttpError("इस ईमेल से स्टाफ खाता पहले से मौजूद है", 409);
+    created = true;
+  }
+  await putJson(store, K.staffUser(user.id), user);
+  await audit(store, created ? "staff.create" : "staff.update", user.id, {
+    type: user.type,
+    permissions: user.permissions,
+    active: user.active,
+  });
+  if (created) user = await sendStaffInvite(env, store, user);
+  return json({ ok: true, created, inviteSent: created, user: safeStaffProfile(user) });
+}
+
+export async function handleAdminStaffInvite({ req, store, ctx, env }) {
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "admin-staff-invite", ip, 10, ADMIN_LOGIN_WINDOW);
+  const body = await readJson(req);
+  const user = await getJson(store, K.staffUser(String(body.userId || "")));
+  if (!user) throw new HttpError("स्टाफ खाता नहीं मिला", 404);
+  const pending = await sendStaffInvite(env, store, user);
+  return json({ ok: true, inviteSent: true, user: safeStaffProfile(pending) });
+}
+
+export async function handleLegacyControllerPasswordChange({ req, ctx, store, env, controller }) {
+  const body = await readJson(req);
+  const ip = getIp(req, ctx);
+  await rateLimit(store, "controller-password-change", ip, 6, ADMIN_LOGIN_WINDOW);
+  const currentPassword = String(body.currentPassword || "");
+  const newPassword = String(body.newPassword || "");
+  if (!(await checkPassword(currentPassword, controller.passwordHash))) {
+    throw new HttpError("वर्तमान पासवर्ड सही नहीं है", 401);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  if (newPassword === currentPassword) {
+    throw new HttpError("नया पासवर्ड वर्तमान पासवर्ड से अलग होना चाहिए", 400);
+  }
+  const updated = {
+    ...controller,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    authVersion: (Number(controller.authVersion) || 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await putJson(store, K.examController(), updated);
+  await audit(store, "exam_controller.password.change", controller.username, { ip });
+  return json({
+    ok: true,
+    token: issueExamControllerToken(env, updated.username, updated.authVersion),
+    controller: { username: updated.username, displayName: updated.displayName },
+    message: "पासवर्ड अपडेट हो गया।",
+  });
+}
+
+export async function handleLegacyControllerAccountUpgrade({ req, ctx, store, env, controller }) {
+  const body = await readJson(req);
+  const input = body.profile || {};
+  const currentPassword = String(input.currentPassword || "");
+  const email = String(input.email || "").trim().toLowerCase();
+  const displayName = clean(input.displayName || controller.displayName, 60);
+  const mobile = normalizeStaffMobile(input.mobile);
+  const newPassword = String(input.newPassword || "");
+  if (controller.email && controller.profileVersion === 2) {
+    throw new HttpError("यह कंट्रोलर खाता पहले ही अपडेट हो चुका है", 409);
+  }
+  if (!(await checkPassword(currentPassword, controller.passwordHash))) {
+    throw new HttpError("वर्तमान पासवर्ड सही नहीं है", 401);
+  }
+  if (displayName.length < 2) throw new HttpError("अपना पूरा नाम दर्ज करें", 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+    throw new HttpError("मान्य ईमेल पता दर्ज करें", 400);
+  }
+  if (!validNewAdminPassword(newPassword)) {
+    throw new HttpError("नया पासवर्ड 12 से 128 अक्षरों का होना चाहिए", 400);
+  }
+  if (newPassword === currentPassword) {
+    throw new HttpError("नया पासवर्ड पुराने पासवर्ड से अलग होना चाहिए", 400);
+  }
+  const emailHash = staffEmailHash(email);
+  const existingId = await getJson(store, K.staffEmailIndex(emailHash));
+  if (existingId) throw new HttpError("इस ईमेल से एक खाता पहले से मौजूद है — एडमिन से संपर्क करें", 409);
+  const userId = crypto.randomUUID();
+  const reserved = typeof store.setIfAbsent === "function"
+    ? await store.setIfAbsent(K.staffEmailIndex(emailHash), userId)
+    : !(await getJson(store, K.staffEmailIndex(emailHash))) &&
+      Boolean(await putJson(store, K.staffEmailIndex(emailHash), userId));
+  if (!reserved) throw new HttpError("इस ईमेल से एक खाता पहले से मौजूद है — एडमिन से संपर्क करें", 409);
+
+  const now = new Date().toISOString();
+  const user = {
+    id: userId,
+    displayName,
+    email,
+    emailHash,
+    mobile,
+    photo: validateProfilePhoto(input.photo),
+    type: "controller",
+    permissions: ["exams"],
+    active: false,
+    passwordHash: await hashPassword(newPassword),
+    mustChangePassword: false,
+    authVersion: 1,
+    migratedFromUsername: controller.username,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await putJson(store, K.staffUser(user.id), user);
+  const migratedController = {
+    ...controller,
+    displayName,
+    email,
+    mobile,
+    profileVersion: 2,
+    active: false,
+    passwordHash: null,
+    mustChangePassword: false,
+    migratedTo: user.id,
+    migratedAt: now,
+    authVersion: (Number(controller.authVersion) || 0) + 1,
+    updatedAt: now,
+  };
+  await putJson(store, K.examController(), migratedController);
+  user.active = true;
+  user.updatedAt = new Date().toISOString();
+  await putJson(store, K.staffUser(user.id), user);
+  await audit(store, "exam_controller.migrate", controller.username, { userId: user.id });
+  return json({
+    ok: true,
+    token: issueStaffToken(env, user),
+    profile: safeStaffProfile(user),
+    message: "प्रोफ़ाइल अपडेट हो गई। आगे से ईमेल से लॉगिन करें।",
   });
 }
 
@@ -403,13 +927,28 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "admin-forgot-password", ip, 5, 60 * 60 * 1000);
   await rateLimit(store, "admin-forgot-password-global", "admin", 3, 60 * 60 * 1000);
+  await assertLoginNotLocked(store, "admin", "admin");
+  const body = await readJson(req);
   const recipient = String(env?.ADMIN_EMAIL || "").trim().toLowerCase();
+  const submittedEmail = clean(body.email, 254).toLowerCase();
+  const submittedMobile = normalizeStaffMobile(body.mobile, false);
+  const profile = await getJson(store, K.adminProfile());
+  const contactVerified = Boolean(
+    (submittedEmail && submittedEmail === recipient) ||
+    (submittedMobile && submittedMobile === normalizeStaffMobile(profile?.mobile, false))
+  );
   const baseUrl = resetBaseUrl(env);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) || !baseUrl || !emailConfigured(env)) {
     throw new HttpError(
       "पासवर्ड रिकवरी उपलब्ध नहीं है। ADMIN_EMAIL और PUBLIC_BASE_URL के साथ Gmail API (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN) या Resend (RESEND_API_KEY, EMAIL_FROM) configure करें।",
       503
     );
+  }
+  const message = "यदि ईमेल या मोबाइल एडमिन खाते से मेल खाता है, तो configured admin email पर रीसेट लिंक भेज दिया जाएगा।";
+  if (!submittedEmail && !submittedMobile) return json({ ok: true, message });
+  if (!contactVerified) {
+    await recordLoginFailure(store, "admin", "admin");
+    return json({ ok: true, message });
   }
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashResetToken(token);
@@ -432,13 +971,14 @@ export async function handleAdminForgotPassword({ req, ctx, store, env }) {
   }
   return json({
     ok: true,
-    message: "यदि एडमिन ईमेल कॉन्फ़िगर है, तो पासवर्ड रीसेट लिंक भेज दिया गया है।",
+    message,
   });
 }
 
 export async function handleAdminResetPassword({ req, ctx, store, env }) {
   const ip = getIp(req, ctx);
   await rateLimit(store, "admin-reset-password", ip, 8, 15 * 60 * 1000);
+  await assertLoginNotLocked(store, "admin", "admin");
   const body = await readJson(req);
   const token = String(body.token || "");
   const newPassword = String(body.newPassword || "");
@@ -453,6 +993,7 @@ export async function handleAdminResetPassword({ req, ctx, store, env }) {
   if (!reset) throw new HttpError("रीसेट लिंक अमान्य या समाप्त हो गया है", 400);
   await putJson(store, K.adminPasswordOverride(), await hashPassword(newPassword));
   await bumpAdminAuthVersion(store);
+  await clearLoginFailures(store, "admin", "admin");
   await audit(store, "admin.password.reset", "admin", { ip });
   return json({ ok: true, message: "एडमिन पासवर्ड रीसेट हो गया है।" });
 }
@@ -569,6 +1110,8 @@ export async function handleExamControllerCreate({ store, req, actor = "exam_con
     tradeId: input.tradeId,
     durationMin: input.durationMin,
     type: input.type,
+    startAt: input.startAt,
+    endAt: input.endAt,
     passPct: 40,
     marksPerQuestion: 1,
     negativeMarks: 0,
@@ -589,6 +1132,7 @@ export async function handleExamControllerCreate({ store, req, actor = "exam_con
     ...data,
     id: newExamId(),
     questionIds: [],
+    questionSetId: newQuestionSetId(),
     status: "draft",
     paperVersion: 0,
     paperHash: "",
@@ -701,12 +1245,17 @@ export async function handleAdminExamGet({ store, req }) {
   });
 }
 
-export async function handleAdminExamSave({ store, req }) {
+export async function handleAdminExamSave({ store, req, staff }) {
   const body = await readJson(req);
   const input = body.exam || {};
   const existing = input.id ? await getJson(store, K.exams(String(input.id))) : null;
   if (input.id && !existing) throw new HttpError("संपादित करने के लिए परीक्षा नहीं मिली", 404);
   const data = validateExam(input);
+  if (staff) {
+    data.releaseResults = Boolean(existing?.releaseResults);
+    data.showAnswers = Boolean(existing?.showAnswers);
+    data.releaseAt = existing?.releaseAt || null;
+  }
   const catalog = await loadCatalog(store, { includeInactive: true });
   if (data.subjectId !== "mixed" && !catalog.subjectMap.has(data.subjectId)) {
     throw new HttpError("चुना गया विषय मौजूद नहीं है", 400);
@@ -720,10 +1269,14 @@ export async function handleAdminExamSave({ store, req }) {
 
   let questionIds = existing?.questionIds || [];
   let totalMarks = Number(existing?.totalMarks) || 0;
+  let questionSetId = existing?.questionSetId || (!existing ? newQuestionSetId() : null);
   if (Array.isArray(body.questionIds)) {
     questionIds = [...new Set(body.questionIds.map((id) => clean(id, 40)).filter(Boolean))];
     if (questionIds.length > MAX_QUESTIONS_PER_EXAM) {
       throw new HttpError(`एक परीक्षा में अधिकतम ${MAX_QUESTIONS_PER_EXAM} प्रश्न हो सकते हैं`, 400);
+    }
+    if (staff && !existing && questionIds.length) {
+      throw new HttpError("नई स्टाफ परीक्षा में पुराने प्रश्न नहीं चुने जा सकते — पहले परीक्षा सेव कर उसका प्रश्न-पत्र अपलोड करें।", 403);
     }
     const { questions, missing } = await resolveQuestions(store, questionIds);
     if (missing.length) {
@@ -738,6 +1291,18 @@ export async function handleAdminExamSave({ store, req }) {
         );
       }
     }
+    if (existing?.questionSetId) {
+      const externalQuestions = questions.filter(
+        (question) => question.setId !== existing.questionSetId
+      );
+      if (externalQuestions.length && staff) {
+        throw new HttpError("इस परीक्षा में केवल इसी परीक्षा के अपलोड किए गए प्रश्न जोड़े जा सकते हैं", 400);
+      }
+      if (externalQuestions.length) {
+        questionSetId = null;
+      }
+    }
+    if (!existing && questionIds.length) questionSetId = null;
     totalMarks = Math.round(
       questions.reduce((sum, question) => sum + (question.marks ?? data.marksPerQuestion ?? 1), 0) * 100
     ) / 100;
@@ -782,6 +1347,7 @@ export async function handleAdminExamSave({ store, req }) {
     paperHash: existing?.paperHash || "",
     paperLockedAt: demoteLocked ? null : existing?.paperLockedAt || null,
     publishedAt: existing?.publishedAt || null,
+    questionSetId,
     totalQuestions: structuralChanged ? questionIds.length : existing?.totalQuestions || questionIds.length,
     totalMarks,
     createdAt: existing?.createdAt || now,
@@ -792,13 +1358,13 @@ export async function handleAdminExamSave({ store, req }) {
   return json({ ok: true, exam, serverNow: Date.now() });
 }
 
-export async function handleAdminExamPaper({ store, req }) {
+export async function handleAdminExamPaper({ store, req, staff }) {
   const body = await readJson(req);
   const exam = await getExam(store, String(body.examId || ""));
   if (exam.status === "published") {
     throw new HttpError("Published परीक्षा का पेपर बदलने से पहले Unpublish करें", 409);
   }
-  const questionIds = [
+  let questionIds = [
     ...new Set((Array.isArray(body.questionIds) ? body.questionIds : []).map((id) => clean(id, 40)).filter(Boolean)),
   ];
   if (questionIds.length > MAX_QUESTIONS_PER_EXAM) {
@@ -806,6 +1372,17 @@ export async function handleAdminExamPaper({ store, req }) {
   }
   const { questions, missing } = await resolveQuestions(store, questionIds);
   if (missing.length) throw new HttpError(`ये प्रश्न नहीं मिले: ${missing.join(", ")}`, 400);
+  if (exam.questionSetId) {
+    const externalQuestions = questions.filter(
+      (question) => question.setId !== exam.questionSetId
+    );
+    if (externalQuestions.length && staff) {
+      throw new HttpError("इस परीक्षा में केवल इसी परीक्षा के प्रश्न-पत्र के प्रश्न जोड़े जा सकते हैं", 400);
+    }
+    if (externalQuestions.length) {
+      exam.questionSetId = null;
+    }
+  }
   if (exam.subjectId !== "mixed") {
     const wrong = questions.filter((question) => question.subjectId !== exam.subjectId);
     if (wrong.length) {
@@ -865,7 +1442,10 @@ export async function handleAdminExamPublish({ store, req, actor = "admin" }) {
   }
   const paper = await getPaper(store, exam.id, exam.paperVersion);
   if (!paper || !paper.questions?.length) throw new HttpError("लॉक किया हुआ पेपर नहीं मिला", 409);
-  if (exam.startAt && exam.endAt && new Date(exam.startAt) >= new Date(exam.endAt)) {
+  if (!exam.startAt || !exam.endAt) {
+    throw new HttpError("प्रकाशित करने से पहले शुरू और समाप्ति की तारीख/समय भरें", 400);
+  }
+  if (new Date(exam.startAt) >= new Date(exam.endAt)) {
     throw new HttpError("Exam Start/End Time ठीक करें", 400);
   }
   exam.status = "published";
@@ -1125,8 +1705,14 @@ export async function handleAdminTradeDelete({ store, req }) {
   return json({ ok: true });
 }
 
-export async function handleAdminQuestions({ store, req }) {
+export async function handleAdminQuestions({ store, req, staff }) {
   const body = await readJson(req);
+  const exam = body.examId ? await getExam(store, String(body.examId)) : null;
+  if (body.examId && !exam) throw new HttpError("परीक्षा नहीं मिली", 404);
+  const examOnlyStaff = staff && !staff.permissions.includes("questions");
+  if (examOnlyStaff && !exam) {
+    throw new HttpError("परीक्षा के प्रश्न देखने के लिए परीक्षा चुनें", 403);
+  }
   const catalog = await loadCatalog(store, { includeInactive: true });
   const subjectId = clean(body.subjectId, 40);
   const q = clean(body.q, 100).toLowerCase();
@@ -1147,8 +1733,9 @@ export async function handleAdminQuestions({ store, req }) {
     .filter((question) => {
       if (body.active === true && question.active === false) return false;
       if (body.active === false && question.active !== false) return false;
-      const setId = clean(body.setId, 80);
+      const setId = exam?.questionSetId || clean(body.setId, 80);
       if (setId && questionSet(question).setId !== setId) return false;
+      if (exam && !exam.questionSetId && !exam.questionIds.includes(question.qid)) return false;
       if (!q) return true;
       return normalizeText(question.text).includes(normalizeText(q)) ||
         String(question.qid).toLowerCase().includes(q);
@@ -1169,8 +1756,8 @@ export async function handleAdminQuestions({ store, req }) {
       subjectName:
         catalog.subjectMap.get(question.subjectId)?.name || question.subjectId,
     })),
-    sets: setSummary(questions, catalog),
-    counts,
+    sets: setSummary(filtered, catalog),
+    counts: examOnlyStaff ? [] : counts,
     serverNow: Date.now(),
   });
 }
@@ -1285,8 +1872,11 @@ export async function handleAdminQuestionDelete({ store, req }) {
   return json({ ok: true });
 }
 
-export async function handleAdminQuestionsImport({ store, req }) {
+export async function handleAdminQuestionsImport({ store, req, staff }) {
   const body = await readJson(req);
+  if (staff && !staff.permissions.includes("questions") && !body.examId) {
+    throw new HttpError("परीक्षा चुनकर उसी के लिए प्रश्न अपलोड करें", 403);
+  }
   if (!Array.isArray(body.questions)) throw new HttpError("प्रश्न सूची नहीं मिली", 400);
   if (body.questions.length > MAX_IMPORT_ROWS) {
     throw new HttpError(`एक बार में अधिकतम ${MAX_IMPORT_ROWS} प्रश्न आयात कर सकते हैं`, 400);
@@ -1302,7 +1892,7 @@ export async function handleAdminQuestionsImport({ store, req }) {
   const defaults = exam
     ? { marks: exam.marksPerQuestion, negativeMarks: exam.negativeMarks }
     : { marks: 1, negativeMarks: 0 };
-  const importSetId = newQuestionSetId();
+  const importSetId = exam?.questionSetId || newQuestionSetId();
   const importSetName =
     clean(body.setName, 120) ||
     (exam ? exam.title : `आयात ${new Date().toISOString().slice(0, 10)}`);
@@ -1349,14 +1939,14 @@ export async function handleAdminQuestionsImport({ store, req }) {
       continue;
     }
     const bank = bankBySubject.get(subject.id);
-    if (question.qid) {
+    if (question.qid && !exam) {
       if (bank.has(`qid:${question.qid}`) || (await getJson(store, K.questionIndex(question.qid)))) {
         duplicates.push({ row: rowNumber, qid: question.qid, reason: "Question ID पहले से मौजूद" });
         continue;
       }
     }
     const textKey = normalizeText(question.text);
-    if (bank.has(textKey)) {
+    if (bank.has(textKey) && !exam) {
       duplicates.push({
         row: rowNumber,
         qid: question.qid || "",
@@ -1370,7 +1960,7 @@ export async function handleAdminQuestionsImport({ store, req }) {
     }
     uploadTexts.add(`${subject.id}:${textKey}`);
     let qid = question.qid;
-    if (!qid) {
+    if (!qid || (exam && await getJson(store, K.questionIndex(qid)))) {
       do {
         qid = newQuestionId(subject.code);
       } while (await getJson(store, K.questionIndex(qid)));
@@ -1408,6 +1998,7 @@ export async function handleAdminQuestionsImport({ store, req }) {
     ];
     exam.questionIds = merged;
     exam.totalQuestions = merged.length;
+    if (exam.questionSetId) exam.questionSetName = clean(exam.title, 120);
     if (exam.status === "locked") {
       exam.status = "draft";
       exam.paperLockedAt = null;

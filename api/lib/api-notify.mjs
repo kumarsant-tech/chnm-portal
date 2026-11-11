@@ -71,6 +71,30 @@ export async function handleNotices({ store, student }) {
   const notices = (await listJson(store, "notices/")).filter(
     (notice) => notice && notice.active !== false && noticeVisibleTo(notice, student)
   );
+  const now = Date.now();
+  const publishedExams = (await listJson(store, "exams/"))
+    .filter(
+      (exam) =>
+        exam?.status === "published" &&
+        exam.active !== false &&
+        Number.isFinite(Date.parse(exam.endAt)) &&
+        Date.parse(exam.endAt) >= now &&
+        noticeVisibleTo({ audience: `trade:${exam.tradeId || DEFAULT_TRADE_ID}` }, student)
+    )
+    .map((exam) => ({
+      id: `exam-published-${exam.id}`,
+      title: `नई परीक्षा प्रकाशित: ${exam.title}`,
+      body:
+        `यह परीक्षा आपके लिए प्रकाशित हुई है।\n` +
+        `शुरू: ${new Intl.DateTimeFormat("hi-IN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(exam.startAt))}\n` +
+        `समाप्त: ${new Intl.DateTimeFormat("hi-IN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(exam.endAt))}`,
+      level: "important",
+      audience: `trade:${exam.tradeId || DEFAULT_TRADE_ID}`,
+      createdAt: exam.publishedAt || exam.updatedAt,
+      updatedAt: exam.publishedAt || exam.updatedAt,
+      examId: exam.id,
+    }));
+  notices.push(...publishedExams);
   notices.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const items = [];
   for (const notice of notices.slice(0, 50)) {
@@ -83,7 +107,22 @@ export async function handleNotices({ store, student }) {
 export async function handleNoticeRead({ store, student, body }) {
   const id = clean(body.noticeId, 40);
   if (!id) throw new HttpError("सूचना पहचान आवश्यक है", 400);
-  const notice = await getJson(store, K.notice(id));
+  let notice = await getJson(store, K.notice(id));
+  if (!notice && id.startsWith("exam-published-")) {
+    const examId = id.slice("exam-published-".length);
+    const exam = await getJson(store, K.exams(examId));
+    if (
+      exam?.status === "published" &&
+      exam.active !== false &&
+      Date.parse(exam.endAt) >= Date.now() &&
+      noticeVisibleTo({ audience: `trade:${exam.tradeId || DEFAULT_TRADE_ID}` }, student)
+    ) {
+      notice = {
+        id,
+        audience: `trade:${exam.tradeId || DEFAULT_TRADE_ID}`,
+      };
+    }
+  }
   if (!notice) throw new HttpError("सूचना नहीं मिली", 404);
   await putJson(store, K.noticeRead(student.id, notice.id), { at: new Date().toISOString() });
   return json({ ok: true, noticeId: notice.id });
@@ -242,9 +281,13 @@ function topicName(question) {
   return topic || "— विषय नहीं —";
 }
 
-async function subjectQuestions(store, subjectId) {
+async function subjectQuestions(store, subjectId, setId = "", allowedIds = null) {
   const all = (await listJson(store, `questions/${subjectId}/`)).filter(
-    (question) => question && question.active !== false
+    (question) =>
+      question &&
+      question.active !== false &&
+      (!setId || String(question.setId || "") === setId) &&
+      (!allowedIds || allowedIds.includes(question.qid))
   );
   const groups = new Map();
   for (const question of all) {
@@ -255,10 +298,25 @@ async function subjectQuestions(store, subjectId) {
   return groups;
 }
 
-export async function handleAdminTopics({ store, body }) {
+export async function handleAdminTopics({ store, body, staff }) {
+  if (staff && !staff.permissions.includes("questions") && !body.examId) {
+    throw new HttpError("प्रश्न देखने के लिए परीक्षा चुनें", 403);
+  }
   const subjectId = clean(body.subjectId, 40);
   if (!subjectId) throw new HttpError("विषय चुनें", 400);
-  const groups = await subjectQuestions(store, subjectId);
+  const exam = body.examId ? await getJson(store, K.exams(clean(body.examId, 80))) : null;
+  if (body.examId && !exam) throw new HttpError("परीक्षा नहीं मिली", 404);
+  if (exam && exam.subjectId !== "mixed" && exam.subjectId !== subjectId) {
+    throw new HttpError("यह विषय चुनी गई परीक्षा का नहीं है", 400);
+  }
+  const groups = await subjectQuestions(
+    store,
+    subjectId,
+    exam?.questionSetId || "",
+    staff && !staff.permissions.includes("questions") && exam && !exam.questionSetId
+      ? exam.questionIds
+      : null
+  );
   const topics = [...groups.entries()]
     .map(([topic, list]) => ({
       topic,
@@ -279,15 +337,30 @@ function sample(list, count, randomize) {
   return pool.slice(0, count);
 }
 
-export async function handleAdminPaperBuild({ store, body }) {
+export async function handleAdminPaperBuild({ store, body, staff }) {
+  if (staff && !staff.permissions.includes("questions") && !body.examId) {
+    throw new HttpError("प्रश्न चुनने के लिए परीक्षा चुनें", 403);
+  }
   const subjectId = clean(body.subjectId, 40);
   if (!subjectId) throw new HttpError("विषय चुनें", 400);
+  const exam = body.examId ? await getJson(store, K.exams(clean(body.examId, 80))) : null;
+  if (body.examId && !exam) throw new HttpError("परीक्षा नहीं मिली", 404);
+  if (exam && exam.subjectId !== "mixed" && exam.subjectId !== subjectId) {
+    throw new HttpError("यह विषय चुनी गई परीक्षा का नहीं है", 400);
+  }
   const plan = Array.isArray(body.plan) ? body.plan : [];
   const wanted = plan
     .map((row) => ({ topic: clean(row.topic, 120), count: Math.max(0, Math.floor(Number(row.count) || 0)) }))
     .filter((row) => row.topic && row.count > 0);
   if (!wanted.length) throw new HttpError("कम-से-कम एक विषय के लिए प्रश्न संख्या दें", 400);
-  const groups = await subjectQuestions(store, subjectId);
+  const groups = await subjectQuestions(
+    store,
+    subjectId,
+    exam?.questionSetId || "",
+    staff && !staff.permissions.includes("questions") && exam && !exam.questionSetId
+      ? exam.questionIds
+      : null
+  );
   const randomize = body.randomize !== false;
   const picked = [];
   const short = [];

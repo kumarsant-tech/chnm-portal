@@ -42,6 +42,17 @@
     refreshTimer = 0;
     $("#controllerLogin").hidden = false;
     $("#controllerDashboard").hidden = true;
+    $("#controllerLoginForm").hidden = false;
+    $("#controllerPasswordChangeForm").hidden = true;
+  }
+
+  function showPasswordUpdate() {
+    clearInterval(refreshTimer);
+    refreshTimer = 0;
+    $("#controllerLogin").hidden = false;
+    $("#controllerDashboard").hidden = true;
+    $("#controllerLoginForm").hidden = true;
+    $("#controllerPasswordChangeForm").hidden = false;
   }
 
   function showDashboard() {
@@ -150,6 +161,10 @@
       renderLive();
       $("#controllerUpdated").textContent = "अपडेट: " + UI.fmtTime(new Date().toISOString());
     } catch (error) {
+      if (error.status === 428) {
+        showPasswordUpdate();
+        return;
+      }
       if (error.status === 401) {
         saveSession("", null);
         showLogin();
@@ -205,6 +220,10 @@
       });
       $("#controllerLoginPassword").value = "";
       saveSession(result.token, result.controller);
+      if (result.mustChangePassword) {
+        showPasswordUpdate();
+        return;
+      }
       showDashboard();
       await refresh();
       clearInterval(refreshTimer);
@@ -214,6 +233,39 @@
     } catch (error) {
       $("#controllerLoginError").textContent = error.message || "लॉगिन नहीं हो सका।";
       $("#controllerLoginError").hidden = false;
+    } finally {
+      UI.setButtonBusy(button, false);
+    }
+  });
+
+  $("#controllerPasswordChangeForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorNode = $("#controllerPasswordChangeError");
+    const button = $("#controllerPasswordChangeButton");
+    errorNode.hidden = true;
+    if (form.elements.newPassword.value !== form.elements.confirmPassword.value) {
+      errorNode.textContent = "दोनों नए पासवर्ड एक जैसे नहीं हैं।";
+      errorNode.hidden = false;
+      return;
+    }
+    UI.setButtonBusy(button, true, "अपडेट हो रहा है…");
+    try {
+      const result = await UI.call("controller_password_change", {
+        currentPassword: form.elements.currentPassword.value,
+        newPassword: form.elements.newPassword.value,
+      }, token);
+      saveSession(result.token, result.controller);
+      form.reset();
+      showDashboard();
+      await refresh();
+      refreshTimer = setInterval(() => {
+        if (!document.hidden) refresh();
+      }, 15000);
+      UI.toast(result.message, "good");
+    } catch (error) {
+      errorNode.textContent = error.message || "पासवर्ड अपडेट नहीं हुआ।";
+      errorNode.hidden = false;
     } finally {
       UI.setButtonBusy(button, false);
     }
@@ -234,6 +286,8 @@
           tradeId: $("#controllerExamTrade").value,
           durationMin: Number($("#controllerExamDuration").value),
           type: $("#controllerExamType").value,
+          startAt: UI.fromLocalInput($("#controllerExamStartAt").value),
+          endAt: UI.fromLocalInput($("#controllerExamEndAt").value),
         },
       }, token);
       $("#controllerCreateForm").reset();
@@ -262,10 +316,13 @@
   }
   if (token) {
     showDashboard();
-    refresh();
-    refreshTimer = setInterval(() => {
-      if (!document.hidden) refresh();
-    }, 15000);
+    refresh().then(() => {
+      if (!$("#controllerDashboard").hidden) {
+        refreshTimer = setInterval(() => {
+          if (!document.hidden) refresh();
+        }, 15000);
+      }
+    });
   } else {
     showLogin();
   }

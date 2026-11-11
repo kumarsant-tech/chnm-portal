@@ -24,6 +24,34 @@ export function safeEqual(a, b) {
   return crypto.timingSafeEqual(digest(a), digest(b));
 }
 
+function loginFailureKey(scope, identity) {
+  const identityHash = digest(`${scope}:${identity}`).toString("hex").slice(0, 32);
+  return K.rateLimit(`login-fail-${scope}`, identityHash);
+}
+
+export async function assertLoginNotLocked(store, scope, identity) {
+  const key = loginFailureKey(scope, identity);
+  const record = await getJson(store, key);
+  if (Number(record?.n) >= 3 && Number(record?.reset) > Date.now()) {
+    throw new HttpError("तीन गलत प्रयासों के बाद खाता एक घंटे के लिए लॉक है। बाद में फिर प्रयास करें।", 429, {
+      retryAfter: Math.ceil((Number(record.reset) - Date.now()) / 1000),
+    });
+  }
+}
+
+export async function recordLoginFailure(store, scope, identity) {
+  const record = await store.consumeRateLimit(loginFailureKey(scope, identity), Date.now(), 2, HOUR);
+  if (record.n >= 3) {
+    throw new HttpError("तीन गलत प्रयासों के बाद खाता एक घंटे के लिए लॉक है। बाद में फिर प्रयास करें।", 429, {
+      retryAfter: Math.ceil((Number(record.reset) - Date.now()) / 1000),
+    });
+  }
+}
+
+export async function clearLoginFailures(store, scope, identity) {
+  await store.delete(loginFailureKey(scope, identity));
+}
+
 function signPayload(payload, env) {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto
@@ -65,6 +93,17 @@ export function issueExamControllerToken(env, username, authVersion = 0) {
     r: "exam_controller",
     sub: String(username).toLowerCase(),
     cv: Number(authVersion) || 0,
+    exp: Date.now() + 12 * HOUR,
+  }, env);
+}
+
+export function issueStaffToken(env, user) {
+  return signPayload({
+    r: "staff",
+    sub: String(user.id),
+    av: Number(user.authVersion) || 0,
+    t: String(user.type || "staff"),
+    p: Array.isArray(user.permissions) ? user.permissions : [],
     exp: Date.now() + 12 * HOUR,
   }, env);
 }
@@ -192,8 +231,16 @@ export async function requireAdmin(req, store, env) {
   return payload;
 }
 
-export async function requireExamController(req, store, env) {
+export async function requireExamController(req, store, env, options = {}) {
   const payload = verifyPayload(bearer(req), env);
+  if (payload?.r === "staff") {
+    const user = await requireStaffSession(req, store, env, "exams", { type: "controller" });
+    return {
+      ...user,
+      username: user.email,
+      displayName: user.displayName,
+    };
+  }
   if (!payload || payload.r !== "exam_controller" || !payload.sub) {
     throw new HttpError("परीक्षा कंट्रोलर लॉगिन आवश्यक है", 401);
   }
@@ -206,7 +253,59 @@ export async function requireExamController(req, store, env) {
   ) {
     throw new HttpError("परीक्षा कंट्रोलर सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
   }
+  const accountUpgradeRequired = !controller.email || controller.profileVersion !== 2;
+  if (accountUpgradeRequired && !options.allowAccountUpgrade) {
+    throw new HttpError(
+      "पहले अपना नाम, ईमेल और नया पासवर्ड अपडेट करें",
+      428,
+      { accountUpgradeRequired: true }
+    );
+  }
+  if (controller.mustChangePassword && !options.allowPasswordChange && !options.allowAccountUpgrade) {
+    throw new HttpError("पहले अपना पासवर्ड अपडेट करें", 428, { passwordChangeRequired: true });
+  }
   return controller;
+}
+
+export async function requireStaffSession(req, store, env, permission, options = {}) {
+  const payload = verifyPayload(bearer(req), env);
+  if (!payload || payload.r !== "staff" || !payload.sub) {
+    throw new HttpError("स्टाफ लॉगिन आवश्यक है", 401);
+  }
+  const user = await getJson(store, K.staffUser(payload.sub));
+  if (
+    !user ||
+    user.active === false ||
+    String(user.id) !== String(payload.sub) ||
+    Number(payload.av ?? 0) !== (Number(user.authVersion) || 0)
+  ) {
+    throw new HttpError("स्टाफ सत्र समाप्त हो गया है — दोबारा लॉगिन करें", 401);
+  }
+  if (options.type && user.type !== options.type) {
+    throw new HttpError("इस खाते के लिए यह लॉगिन विकल्प उपलब्ध नहीं है", 403);
+  }
+  if (user.mustChangePassword && !options.allowPasswordChange) {
+    throw new HttpError("पहले अपना पासवर्ड अपडेट करें", 428, { passwordChangeRequired: true });
+  }
+  const requiredPermissions = Array.isArray(permission) ? permission : [permission];
+  if (
+    permission &&
+    !requiredPermissions.some(
+      (required) => Array.isArray(user.permissions) && user.permissions.includes(required)
+    )
+  ) {
+    throw new HttpError("इस कार्य की अनुमति आपके खाते में नहीं है", 403);
+  }
+  return user;
+}
+
+export async function requireAdminOrStaff(req, store, env, permission) {
+  const payload = verifyPayload(bearer(req), env);
+  if (payload?.r === "admin") {
+    return { admin: await requireAdmin(req, store, env), staff: null };
+  }
+  const staff = await requireStaffSession(req, store, env, permission);
+  return { admin: null, staff };
 }
 
 export async function requireStudent(req, store, env, allowPasswordChange = false) {

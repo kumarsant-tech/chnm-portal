@@ -24,7 +24,9 @@ Student password recovery के लिए CITS/mobile login ID और उस �
 
 Self-registration में छात्र की जन्मतिथि केवल अस्थायी पासवर्ड (`DDMMYYYY`) बनाने के लिए इस्तेमाल होती है और रिकॉर्ड/API/log में सहेजी या लौटाई नहीं जाती। पहले login के बाद परीक्षा सुविधाएँ तब तक बंद रहती हैं जब तक छात्र कम-से-कम 10 अक्षरों का नया पासवर्ड न बना ले। Email provider configure न होने पर registration पूरा होता है, पर UI बताता है कि ईमेल नहीं भेजा गया।
 
-Admin Settings में अलग Exam Controller account बनाया, बदला या disable किया जा सकता है। Controller draft exam बना सकता है, exam list देख सकता है, पेपर lock/stop, सीमित live monitoring और active attempt finalize कर सकता है। Publish केवल admin कर सकता है, ताकि वह प्रश्न/पेपर की समीक्षा कर सके। Controller को प्रश्न/छात्र प्रबंधन, result release, backup या settings का access नहीं है। Admin account full access रखता है। Controller login `exam/controller.html` पर है; credentials का salted hash D1 में रहता है और password/account update पुराने controller sessions को invalidate करता है।
+Admin Settings में अलग स्टाफ खाते बनाए जा सकते हैं; हर खाते के लिए `exams`, `questions`, `students`, `notices`, `reports` और `tools` permissions चुनें। सेटअप लिंक configured email provider से भेजा जाता है और पहली बार उपयोग पर स्टाफ अपना पासवर्ड सेट करता है। `staff-login.html` पर छात्र लॉगिन से अलग Admin, परीक्षा कंट्रोलर और अन्य स्टाफ विकल्प हैं। पुराने कंट्रोलर खाते को हटाया नहीं जाता; उसे पुराने यूज़रनेम से लॉगिन कर अपना पासवर्ड अपडेट करना होगा। खाते/अनुमतियाँ बदलने पर पुराने सत्र अमान्य हो जाते हैं।
+
+स्टाफ को केवल चुने हुए modules का access मिलता है। परिणाम देखना/जारी करना, परीक्षा publish करना, backup और settings केवल Admin के लिए हैं। नए exam draft खाली question paper से शुरू होते हैं; exam editor से अपलोड किए गए प्रश्न उसी exam के सेट में जोड़े जाते हैं और पुराने exam के प्रश्न अपने-आप नहीं जुड़ते। Controller का पुराना login page `exam/controller.html` legacy खाते के लिए उपलब्ध रहता है।
 
 ## स्थानीय विकास
 

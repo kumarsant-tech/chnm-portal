@@ -10,7 +10,14 @@ process.env.ADMIN_SECRET = "test-admin-secret-with-at-least-32-bytes";
 const { default: api } = await import("../api/handler.mjs");
 const { handleRegister } = await import("../api/lib/api-public.mjs");
 const { getDb, putJson, getJson, listKeys, __resetMemoryStore } = await import("../api/lib/db.mjs");
-const { rateLimit, hashPassword, checkPassword, hashPin, checkPin } = await import("../api/lib/auth.mjs");
+const {
+  rateLimit,
+  hashPassword,
+  checkPassword,
+  hashPin,
+  checkPin,
+  clearLoginFailures,
+} = await import("../api/lib/auth.mjs");
 const { emailConfigured, sendEmail } = await import("../api/lib/email.mjs");
 const { seedLegacyQuestions } = await import("../api/lib/seed.mjs");
 let apiEnv;
@@ -225,6 +232,8 @@ const examPayload = {
   instructions: "सभी प्रश्न अनिवार्य हैं।",
   type: "final",
   attemptsAllowed: 1,
+  startAt: new Date(Date.now() - 60_000).toISOString(),
+  endAt: new Date(Date.now() + 60 * 60_000).toISOString(),
   releaseResults: false,
   showAnswers: false,
   active: true,
@@ -1521,10 +1530,19 @@ console.log("\n11. Registration email and admin password recovery");
       });
       return new Response(JSON.stringify({ id: `test-${sentEmails.length}` }), { status: 200 });
     };
-    const forgot = await call("admin_forgot_password", { email: "attacker@example.com" }, "", "10.0.10.2");
-    check("forgot password returns a non-enumerating success", forgot.status === 200 && !forgot.data.message.includes("attacker@example.com"));
-    check("reset email recipient is fixed to ADMIN_EMAIL", sentEmails[1]?.body.to?.[0] === "admin@example.com");
-    const resetMatch = sentEmails[1]?.body.text.match(/reset=([A-Za-z0-9_-]+)/);
+    const sentBeforeAdminReset = sentEmails.length;
+    const wrongAdminContact = await call("admin_forgot_password", { email: "attacker@example.com" }, "", "10.0.10.2");
+    check(
+      "admin recovery does not send a reset link for an unverified contact",
+      wrongAdminContact.status === 200 &&
+        !wrongAdminContact.data.message.includes("attacker@example.com") &&
+        sentEmails.length === sentBeforeAdminReset
+    );
+    const forgot = await call("admin_forgot_password", { email: "admin@example.com" }, "", "10.0.10.9");
+    check("verified admin recovery returns a non-enumerating success", forgot.status === 200);
+    const adminResetEmail = sentEmails[sentEmails.length - 1];
+    check("reset email recipient is fixed to ADMIN_EMAIL", adminResetEmail?.body.to?.[0] === "admin@example.com");
+    const resetMatch = adminResetEmail?.body.text.match(/reset=([A-Za-z0-9_-]+)/);
     const resetToken = resetMatch?.[1] || "";
     check("reset email contains a one-time link", Boolean(resetToken));
     const expiredToken = crypto.randomBytes(32).toString("base64url");
@@ -1572,27 +1590,248 @@ console.log("\n11. Registration email and admin password recovery");
     );
     check("changed admin password is active", finalAdminLogin.status === 200);
 
-    const controllerSave = await call(
-      "admin_exam_controller_save",
+    const sentBeforeStaffInvite = sentEmails.length;
+    const staffCreated = await call(
+      "admin_staff_save",
       {
-        controller: {
-          username: "test-controller",
-          displayName: "परीक्षा कंट्रोलर",
-          password: "exam-controller-password-2026",
+        staff: {
+          displayName: "परीक्षा टीम",
+          email: "exam-staff@example.com",
+          mobile: "9876500082",
+          type: "staff",
+          permissions: ["exams"],
+        },
+      },
+      finalAdminLogin.data.token
+    );
+    const staffInviteEmail = sentEmails[sentBeforeStaffInvite];
+    const staffInviteUrl = staffInviteEmail?.body.text.match(/https:\/\/\S+/)?.[0] || "";
+    const staffInviteToken = staffInviteUrl
+      ? new URL(staffInviteUrl).searchParams.get("setup")
+      : "";
+    check(
+      "admin staff account sends a password setup invitation",
+      staffCreated.status === 200 &&
+        staffCreated.data.created &&
+        staffCreated.data.inviteSent &&
+        staffInviteEmail?.body.to?.[0] === "exam-staff@example.com" &&
+        Boolean(staffInviteToken) &&
+        staffCreated.data.user.permissions.includes("exams") &&
+        !JSON.stringify(staffCreated.data).includes("passwordHash")
+    );
+    const staffSetup = await call("staff_setup_password", {
+      token: staffInviteToken,
+      newPassword: "staff-exam-password-2026",
+    });
+    const reusedStaffInvite = await call("staff_setup_password", {
+      token: staffInviteToken,
+      newPassword: "staff-other-password-2026",
+    });
+    const wrongStaffRole = await call("staff_login", {
+      email: "exam-staff@example.com",
+      password: "staff-exam-password-2026",
+      expectedType: "controller",
+    });
+    const staffLogin = await call("staff_login", {
+      email: "exam-staff@example.com",
+      password: "staff-exam-password-2026",
+      expectedType: "staff",
+    });
+    const staffToken = staffLogin.data.token;
+    check(
+      "staff setup link is single-use and login role is separate",
+      staffSetup.status === 200 &&
+        reusedStaffInvite.status === 400 &&
+        wrongStaffRole.status === 401 &&
+        staffLogin.status === 200 &&
+        staffLogin.data.profile.type === "staff"
+    );
+
+    const staffAdminExams = await call("admin_exams", {}, staffToken);
+    const staffAdminStudents = await call("admin_students", {}, staffToken);
+    const staffGlobalQuestions = await call("admin_questions", {}, staffToken);
+    const staffPublishDenied = await call(
+      "admin_exam_publish",
+      { examId },
+      staffToken
+    );
+    check(
+      "exam-only staff cannot access students, global questions, or publish",
+      staffAdminExams.status === 200 &&
+        staffAdminStudents.status === 403 &&
+        staffGlobalQuestions.status === 403 &&
+        staffPublishDenied.status === 401 &&
+        (await call("admin_results", {}, staffToken)).status === 401
+    );
+
+    const staffDraftA = await call(
+      "admin_exam_save",
+      {
+        exam: { ...examPayload, title: "Staff Draft A", code: "STAFF-DRAFT-A" },
+        questionIds: [],
+      },
+      staffToken
+    );
+    const staffDraftB = await call(
+      "admin_exam_save",
+      {
+        exam: { ...examPayload, title: "Staff Draft B", code: "STAFF-DRAFT-B" },
+        questionIds: [],
+      },
+      staffToken
+    );
+    const staffDraftWithOldQuestions = await call(
+      "admin_exam_save",
+      {
+        exam: { ...examPayload, title: "Staff Must Upload", code: "STAFF-OLD-QUESTIONS" },
+        questionIds,
+      },
+      staffToken
+    );
+    const staffPaperImport = await call(
+      "admin_questions_import",
+      {
+        examId: staffDraftA.data.exam?.id,
+        subjectId: "trade-theory",
+        questions: [{
+          question: "Staff isolation question?",
+          options: ["A", "B", "C", "D"],
+          correctAnswer: "A",
+          topic: "Staff isolated set",
+        }],
+      },
+      staffToken
+    );
+    const staffPaperA = await call(
+      "admin_questions",
+      { examId: staffDraftA.data.exam?.id, subjectId: "trade-theory" },
+      staffToken
+    );
+    const staffPaperB = await call(
+      "admin_questions",
+      { examId: staffDraftB.data.exam?.id, subjectId: "trade-theory" },
+      staffToken
+    );
+    const externalPaperSelection = await call(
+      "admin_exam_save",
+      {
+        exam: {
+          id: staffDraftB.data.exam?.id,
+          ...examPayload,
+          title: "Staff Draft B",
+          code: "STAFF-DRAFT-B",
+        },
+        questionIds: staffPaperA.data.items?.map((question) => question.qid) || [],
+      },
+      staffToken
+    );
+    check(
+      "staff exams start empty and question uploads remain isolated per exam",
+      staffDraftA.status === 200 &&
+        Boolean(staffDraftA.data.exam.questionSetId) &&
+        staffDraftB.status === 200 &&
+        Boolean(staffDraftB.data.exam.questionSetId) &&
+        staffDraftWithOldQuestions.status === 403 &&
+        staffPaperImport.status === 200 &&
+        staffPaperA.data.items?.length === 1 &&
+        staffPaperB.data.items?.length === 0 &&
+        externalPaperSelection.status === 400
+    );
+    const staffRevoked = await call(
+      "admin_staff_save",
+      {
+        staff: {
+          id: staffCreated.data.user.id,
+          displayName: "परीक्षा टीम",
+          email: "exam-staff@example.com",
+          mobile: "9876500082",
+          type: "staff",
+          permissions: ["questions"],
           active: true,
         },
       },
       finalAdminLogin.data.token
     );
-    const controllerGet = await call(
-      "admin_exam_controller_get",
+    check(
+      "changing staff permissions invalidates the old staff session",
+      staffRevoked.status === 200 &&
+        (await call("admin_exams", {}, staffToken)).status === 401
+    );
+
+    await putJson(store, "auth/exam-controller", {
+      username: "legacy-controller",
+      displayName: "पुराना कंट्रोलर",
+      passwordHash: await hashPassword("legacy-controller-password"),
+      active: true,
+      authVersion: 1,
+    });
+    const legacyControllerLogin = await call("exam_controller_login", {
+      username: "legacy-controller",
+      password: "legacy-controller-password",
+    });
+    const legacyControllerBlocked = await call(
+      "controller_exams",
       {},
+      legacyControllerLogin.data.token
+    );
+    const legacyControllerUpdate = await call(
+      "controller_account_upgrade",
+      {
+        profile: {
+          currentPassword: "legacy-controller-password",
+          displayName: "पुराना कंट्रोलर",
+          email: "legacy-controller@example.com",
+          mobile: "9876500083",
+          newPassword: "legacy-controller-new-password-2026",
+        },
+      },
+      legacyControllerLogin.data.token
+    );
+    const legacyControllerRecord = await getJson(store, "auth/exam-controller");
+    const legacyControllerStaff = legacyControllerUpdate.data.profile?.id
+      ? await getJson(store, `auth/staff-users/${legacyControllerUpdate.data.profile.id}`)
+      : null;
+    check(
+      "legacy controller is preserved and must update its password",
+      legacyControllerLogin.status === 200 &&
+        legacyControllerLogin.data.mustChangePassword === true &&
+        legacyControllerBlocked.status === 428 &&
+        legacyControllerUpdate.status === 200 &&
+        (await call("controller_exams", {}, legacyControllerUpdate.data.token)).status === 200 &&
+        legacyControllerRecord?.username === "legacy-controller" &&
+        legacyControllerRecord.active === false &&
+        Boolean(legacyControllerRecord.migratedTo) &&
+        legacyControllerStaff?.active === true
+    );
+
+    const sentBeforeControllerInvite = sentEmails.length;
+    const controllerSave = await call(
+      "admin_staff_save",
+      {
+        staff: {
+          displayName: "परीक्षा कंट्रोलर",
+          email: "test-controller@example.com",
+          mobile: "9876500084",
+          type: "controller",
+          permissions: ["exams"],
+        },
+      },
       finalAdminLogin.data.token
     );
-    const controllerLogin = await call(
-      "exam_controller_login",
-      { username: "test-controller", password: "exam-controller-password-2026" }
-    );
+    const controllerInviteEmail = sentEmails[sentBeforeControllerInvite];
+    const controllerInviteUrl = controllerInviteEmail?.body.text.match(/https:\/\/\S+/)?.[0] || "";
+    const controllerSetupToken = controllerInviteUrl
+      ? new URL(controllerInviteUrl).searchParams.get("setup")
+      : "";
+    const controllerSetup = await call("staff_setup_password", {
+      token: controllerSetupToken,
+      newPassword: "exam-controller-password-2026",
+    });
+    const controllerLogin = await call("staff_login", {
+      email: "test-controller@example.com",
+      password: "exam-controller-password-2026",
+      expectedType: "controller",
+    });
     const controllerToken = controllerLogin.data.token;
     const controllerExams = await call("controller_exams", {}, controllerToken);
     const controllerCatalog = await call("controller_catalog", {}, controllerToken);
@@ -1610,6 +1849,8 @@ console.log("\n11. Registration email and admin password recovery");
           negativeMarks: 0,
           attemptsAllowed: 1,
           type: "final",
+          startAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          endAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
           status: "published",
           questionIds: ["must-not-be-accepted"],
         },
@@ -1630,12 +1871,20 @@ console.log("\n11. Registration email and admin password recovery");
     const controllerDenied = await call("admin_overview", {}, controllerToken);
     const controllerStudentRecordsDenied = await call("admin_students", {}, controllerToken);
     check(
-      "admin can create a separate controller account without returning its hash",
+      "admin can create a separate controller account and email its setup link without returning its hash",
       controllerSave.status === 200 &&
-        controllerGet.data.controller?.username === "test-controller" &&
-        !JSON.stringify(controllerGet.data).includes("passwordHash")
+        controllerSave.data.created &&
+        controllerSave.data.inviteSent &&
+        controllerSetup.status === 200 &&
+        controllerInviteEmail?.body.to?.[0] === "test-controller@example.com" &&
+        !JSON.stringify(controllerSave.data).includes("passwordHash")
     );
-    check("exam controller has a separate successful login", controllerLogin.status === 200 && controllerToken);
+    check(
+      "controller account uses the distinct controller login role",
+      controllerLogin.status === 200 &&
+        controllerLogin.data.profile.type === "controller" &&
+        controllerToken
+    );
     check(
       "controller catalog exposes only active subject and trade labels",
       controllerCatalog.status === 200 &&
@@ -1668,8 +1917,15 @@ console.log("\n11. Registration email and admin password recovery");
         !JSON.stringify(controllerLive.data).includes('"ip"')
     );
     check(
-      "controller cannot access admin dashboard or student records",
-      controllerDenied.status === 401 && controllerStudentRecordsDenied.status === 401
+      "controller dashboard is sanitized and student records remain denied",
+      controllerDenied.status === 200 &&
+        Array.isArray(controllerDenied.data.recentAudit) &&
+        controllerDenied.data.recentAudit.length === 0 &&
+        Array.isArray(controllerDenied.data.recentResults) &&
+        controllerDenied.data.recentResults.length === 0 &&
+        controllerDenied.data.legacy === null &&
+        controllerStudentRecordsDenied.status === 403,
+      JSON.stringify({ overview: controllerDenied, students: controllerStudentRecordsDenied })
     );
     const reviewedDraft = controllerDraft.data.exam
       ? await call(
@@ -1682,6 +1938,8 @@ console.log("\n11. Registration email and admin password recovery");
               subjectId: "trade-theory",
               tradeId: "chnm",
               durationMin: 45,
+              startAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+              endAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
               passPct: 40,
               marksPerQuestion: 1,
               negativeMarks: 0,
@@ -1720,11 +1978,15 @@ console.log("\n11. Registration email and admin password recovery");
       })
     );
     const controllerDisabled = await call(
-      "admin_exam_controller_save",
+      "admin_staff_save",
       {
-        controller: {
-          username: "test-controller",
+        staff: {
+          id: controllerSave.data.user.id,
           displayName: "परीक्षा कंट्रोलर",
+          email: "test-controller@example.com",
+          mobile: "9876500084",
+          type: "controller",
+          permissions: ["exams"],
           active: false,
         },
       },
@@ -1744,11 +2006,23 @@ console.log("\n11. Registration email and admin password recovery");
       "10.0.10.31"
     );
     const sentBeforeStudentReset = sentEmails.length;
-    const studentForgot = await call(
+    const wrongStudentForgot = await call(
       "student_forgot_password",
       { identifier: registration.data.loginId, email: "attacker@example.com" },
       "",
       "10.0.10.32"
+    );
+    check(
+      "student recovery requires a matching saved contact",
+      wrongStudentForgot.status === 200 &&
+        wrongStudentForgot.data.message === "यदि लॉगिन ID और पंजीकृत ईमेल या मोबाइल सही है, तो खाते के ईमेल पर रीसेट लिंक भेज दिया जाएगा। अपना इनबॉक्स और स्पैम फ़ोल्डर देखें।" &&
+        sentEmails.length === sentBeforeStudentReset
+    );
+    const studentForgot = await call(
+      "student_forgot_password",
+      { identifier: registration.data.loginId, mobile: "9876500088" },
+      "",
+      "10.0.10.42"
     );
     const studentResetEmail = sentEmails[sentEmails.length - 1];
     const studentResetMatch = studentResetEmail?.body.text.match(/reset=([^&\s]+)/);
@@ -1761,12 +2035,19 @@ console.log("\n11. Registration email and admin password recovery");
         studentForgot.status === 200 &&
         sentEmails.length === sentBeforeStudentReset + 1 &&
         studentResetEmail?.body.to?.[0] === "student@example.com" &&
-        !studentResetEmail?.body.text.includes("attacker@example.com")
+        !studentResetEmail?.body.text.includes("attacker@example.com"),
+      JSON.stringify({
+        login: studentLoginBeforeReset,
+        forgot: studentForgot,
+        emailCount: sentEmails.length - sentBeforeStudentReset,
+        recipient: studentResetEmail?.body.to?.[0],
+      })
     );
     check(
       "student reset link uses the configured HTTPS portal origin",
       studentResetEmail?.body.text.includes("https://portal.example/exam/index.html?reset=") &&
-        Boolean(studentResetToken)
+        Boolean(studentResetToken),
+      JSON.stringify({ text: studentResetEmail?.body.text, token: Boolean(studentResetToken) })
     );
     const unknownStudentForgot = await call(
       "student_forgot_password",
@@ -1778,7 +2059,8 @@ console.log("\n11. Registration email and admin password recovery");
       "student password recovery does not reveal whether an account exists",
       unknownStudentForgot.status === studentForgot.status &&
         unknownStudentForgot.data.message === studentForgot.data.message &&
-        sentEmails.length === sentBeforeStudentReset + 1
+        sentEmails.length === sentBeforeStudentReset + 1,
+      JSON.stringify({ known: studentForgot, unknown: unknownStudentForgot, emailCount: sentEmails.length - sentBeforeStudentReset })
     );
     const emailLessForgot = await call(
       "student_forgot_password",
@@ -1790,7 +2072,8 @@ console.log("\n11. Registration email and admin password recovery");
       "accounts without a saved email receive the same non-enumerating response",
       emailLessForgot.status === studentForgot.status &&
         emailLessForgot.data.message === studentForgot.data.message &&
-        sentEmails.length === sentBeforeStudentReset + 1
+        sentEmails.length === sentBeforeStudentReset + 1,
+      JSON.stringify({ known: studentForgot, emailLess: emailLessForgot, emailCount: sentEmails.length - sentBeforeStudentReset })
     );
     const studentRecordBeforeReset = await getJson(store, `students/${registration.data.student.id}`);
     const expiredStudentToken =
@@ -1811,7 +2094,7 @@ console.log("\n11. Registration email and admin password recovery");
     check("expired student reset links are rejected", expiredStudentReset.status === 400);
     const validStudentForgot = await call(
       "student_forgot_password",
-      { identifier: registration.data.loginId },
+      { identifier: registration.data.loginId, email: "student@example.com" },
       "",
       "10.0.10.36"
     );
@@ -1899,6 +2182,111 @@ console.log("\n11. Registration email and admin password recovery");
     check(
       "repeating result publish does not send a duplicate email",
       sentEmails.length === emailCountAfterPublish
+    );
+
+    const lockoutRegistration = await call("register", {
+      name: "Lockout Test Student",
+      fatherName: "Test Father",
+      citsNumber: "CITS-LOCKOUT-1",
+      mobile: "9876500081",
+      email: "lockout@example.com",
+      dateOfBirth: "2001-02-03",
+      tradeId: "chnm",
+      batch: "2026",
+      consent: true,
+      skipSetup: true,
+    });
+    const lockoutId = lockoutRegistration.data.student?.id;
+    const wrongStudentPasswords = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      wrongStudentPasswords.push(await call(
+        "student_login",
+        { identifier: lockoutRegistration.data.loginId, password: "wrong-password" },
+        "",
+        `10.0.11.${attempt + 1}`
+      ));
+    }
+    const blockedStudentLogin = await call(
+      "student_login",
+      { identifier: lockoutRegistration.data.loginId, password: "03022001" },
+      "",
+      "10.0.11.4"
+    );
+    const blockedStudentRecovery = await call(
+      "student_forgot_password",
+      { identifier: lockoutRegistration.data.loginId, email: "lockout@example.com" },
+      "",
+      "10.0.11.5"
+    );
+    await clearLoginFailures(store, "student", lockoutId);
+    const unlockedStudentLogin = await call(
+      "student_login",
+      { identifier: lockoutRegistration.data.loginId, password: "03022001" },
+      "",
+      "10.0.11.6"
+    );
+    check(
+      "three wrong student passwords lock login and recovery for one hour",
+      lockoutRegistration.status === 200 &&
+        wrongStudentPasswords[0].status === 401 &&
+        wrongStudentPasswords[1].status === 401 &&
+        wrongStudentPasswords[2].status === 429 &&
+        Number(wrongStudentPasswords[2].data.details?.retryAfter) > 3500 &&
+        blockedStudentLogin.status === 429 &&
+        blockedStudentRecovery.status === 429 &&
+        unlockedStudentLogin.status === 200,
+      JSON.stringify({
+        registration: lockoutRegistration,
+        wrong: wrongStudentPasswords,
+        blockedLogin: blockedStudentLogin,
+        blockedRecovery: blockedStudentRecovery,
+        unlockedLogin: unlockedStudentLogin,
+      })
+    );
+
+    const wrongAdminPasswords = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      wrongAdminPasswords.push(await call(
+        "admin_login",
+        { password: "wrong-admin-password" },
+        "",
+        `10.0.12.${attempt + 1}`
+      ));
+    }
+    const blockedAdminLogin = await call(
+      "admin_login",
+      { password: "admin-changed-password-2026" },
+      "",
+      "10.0.12.4"
+    );
+    const blockedAdminRecovery = await call(
+      "admin_forgot_password",
+      { email: "admin@example.com" },
+      "",
+      "10.0.12.5"
+    );
+    await clearLoginFailures(store, "admin", "admin");
+    const unlockedAdminLogin = await call(
+      "admin_login",
+      { password: "admin-changed-password-2026" },
+      "",
+      "10.0.12.6"
+    );
+    check(
+      "three wrong admin passwords lock login and recovery for one hour",
+      wrongAdminPasswords[0].status === 401 &&
+        wrongAdminPasswords[1].status === 401 &&
+        wrongAdminPasswords[2].status === 429 &&
+        Number(wrongAdminPasswords[2].data.details?.retryAfter) > 3500 &&
+        blockedAdminLogin.status === 429 &&
+        blockedAdminRecovery.status === 429 &&
+        unlockedAdminLogin.status === 200,
+      JSON.stringify({
+        wrong: wrongAdminPasswords,
+        blockedLogin: blockedAdminLogin,
+        blockedRecovery: blockedAdminRecovery,
+        unlockedLogin: unlockedAdminLogin,
+      })
     );
   } finally {
     globalThis.fetch = savedFetch;
