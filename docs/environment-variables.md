@@ -27,9 +27,7 @@ Self-registration में छात्र की जन्मतिथि क�
 `scripts/dev-server.mjs` development के लिए process-local in-memory store चलाता है। ये values केवल स्थानीय demo के लिए हैं:
 
 ```powershell
-$env:USE_MEMORY_STORE="1"
-$env:ADMIN_PASSWORD="local-demo-password"
-$env:ADMIN_SECRET="local-demo-only-random-secret-change-before-use"
+$env:USE_MEMORY_STORE="1"$env:ADMIN_PASSWORD = Read-Host "Local admin password"$env:ADMIN_SECRET = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
 node scripts/dev-server.mjs
 ```
 

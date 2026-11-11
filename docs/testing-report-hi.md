@@ -481,7 +481,7 @@ dist तैयार: 95 फाइलें, 47.73 MB
 node scripts/build.mjs
 
 # 2) Dev server (PowerShell)
-$env:USE_MEMORY_STORE="1"; $env:ADMIN_PASSWORD="admin12345"; node scripts/dev-server.mjs
+<!-- Local credential example removed; configure a unique secret outside version control. -->
 
 # 3) दूसरे terminal में API tests
 node scripts/test-api.mjs
@@ -1239,7 +1239,7 @@ hub के अंदर हर पेज iframe में चलाया — �
 
 ## 25. पूरी वेबसाइट (32 पेज) लोकल सर्वर + ब्राउज़र पर चलाकर जाँच — 6 नवम्बर 2026
 
-**सर्वर:** `ADMIN_PASSWORD=admin12345 node scripts/dev-server.mjs` → http://127.0.0.1:8888 (`/exam/*` पर CSP `script-src 'self'` + `Cache-Control: no-store`)।
+<!-- Local credential example removed; configure a unique secret outside version control. -->
 
 | जाँच | नतीजा |
 |---|---|

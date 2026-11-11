@@ -25,50 +25,7 @@ const headers = [
   "Image",
 ];
 
-const rows = [
-  [
-    "Q-TT-0001",
-    "Trade Theory",
-    "HTTP का डिफ़ॉल्ट पोर्ट कौन-सा है?",
-    "21",
-    "80",
-    "443",
-    "25",
-    "B",
-    "1",
-    "0.25",
-    "HTTP = 80, HTTPS = 443।",
-    "",
-  ],
-  [
-    "Q-TM-0001",
-    "Training Methodology (TM)",
-    "ADDIE मॉडल में पहला 'A' क्या है?",
-    "Analysis",
-    "Assessment",
-    "Application",
-    "Approval",
-    "A",
-    "1",
-    "0",
-    "Analysis, Design, Development, Implementation, Evaluation।",
-    "",
-  ],
-  [
-    "",
-    "Networking",
-    "DNS का डिफ़ॉल्ट पोर्ट कौन-सा है?",
-    "53",
-    "67",
-    "80",
-    "110",
-    "A",
-    "",
-    "",
-    "खाली Marks परीक्षा के डिफ़ॉल्ट अंक लेंगे।",
-    "",
-  ],
-];
+const rows = [];
 
 const instructions = [
   ["Column", "नियम"],

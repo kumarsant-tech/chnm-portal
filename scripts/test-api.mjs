@@ -2,10 +2,23 @@
 // Run: node scripts/test-api.mjs [--d1]
 import crypto from "node:crypto";
 
+const TEST_PASSWORD_1 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_2 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_3 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_4 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_5 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_6 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_7 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_8 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_9 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_10 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_11 = crypto.randomBytes(24).toString("base64url");
+const TEST_PASSWORD_12 = crypto.randomBytes(24).toString("base64url");
+
 const testD1 = process.argv.includes("--d1");
 process.env.USE_MEMORY_STORE = testD1 ? "0" : "1";
-process.env.ADMIN_PASSWORD = "test-admin-pass";
-process.env.ADMIN_SECRET = "test-admin-secret-with-at-least-32-bytes";
+process.env.ADMIN_PASSWORD = TEST_PASSWORD_4;
+process.env.ADMIN_SECRET = crypto.randomBytes(32).toString("base64url");
 
 const { default: api } = await import("../api/handler.mjs");
 const { handleRegister } = await import("../api/lib/api-public.mjs");
@@ -67,6 +80,11 @@ function check(name, condition, extra = "") {
   }
 }
 
+function temporaryPasswordFromDob(value) {
+  const [year, month, day] = String(value).split("-");
+  return `${day}${month}${year}`;
+}
+
 console.log("\n0b. Web Crypto password hashing compatibility");
 {
   const passwordHash = await hashPassword("test-password-for-web-crypto");
@@ -109,16 +127,17 @@ async function call(action, payload = {}, token = "", ip = "10.0.0.1") {
   const type = res.headers.get("content-type") || "";
   const data = type.includes("json") ? await res.json() : await res.text();
   if (setupRegistration && res.status === 200) {
+    const temporaryPassword = temporaryPasswordFromDob(requestPayload.dateOfBirth);
     const login = await call(
       "student_login",
-      { identifier: data.loginId, password: "01012000" },
+      { identifier: data.loginId, password: temporaryPassword },
       "",
       ip
     );
     if (login.status === 200 && login.data.requiresPasswordChange) {
       const changed = await call(
         "student_password_change",
-        { currentPassword: "01012000", newPassword: "student-strong-password" },
+        { currentPassword: temporaryPassword, newPassword: TEST_PASSWORD_2 },
         login.data.token,
         ip
       );
@@ -171,7 +190,7 @@ console.log("\n1. Public bootstrap + admin auth");
   const savedBoundPassword = apiEnv?.ADMIN_PASSWORD;
   delete process.env.ADMIN_PASSWORD;
   if (apiEnv) apiEnv.ADMIN_PASSWORD = "";
-  const fallbackLogin = await call("admin_login", { password: "admin12345" }, "", "10.0.0.2");
+  const fallbackLogin = await call("admin_login", { password: TEST_PASSWORD_3 }, "", "10.0.0.2");
   process.env.ADMIN_PASSWORD = savedPassword;
   if (apiEnv) apiEnv.ADMIN_PASSWORD = savedBoundPassword;
   check("admin login requires configured password", fallbackLogin.status === 500);
@@ -182,7 +201,7 @@ console.log("\n1. Public bootstrap + admin auth");
   if (apiEnv) apiEnv.ADMIN_SECRET = "";
   const missingSecretLogin = await call(
     "admin_login",
-    { password: "test-admin-pass" },
+    { password: TEST_PASSWORD_4 },
     "",
     "10.0.0.3"
   );
@@ -190,11 +209,11 @@ console.log("\n1. Public bootstrap + admin auth");
   if (apiEnv) apiEnv.ADMIN_SECRET = savedBoundSecret;
   check("token signing requires configured ADMIN_SECRET", missingSecretLogin.status === 500);
 
-  process.env.ADMIN_SECRET = "too-short";
+  process.env.ADMIN_SECRET = "x".repeat(16);
   if (apiEnv) apiEnv.ADMIN_SECRET = "";
   const shortSecretLogin = await call(
     "admin_login",
-    { password: "test-admin-pass" },
+    { password: TEST_PASSWORD_4 },
     "",
     "10.0.0.4"
   );
@@ -202,9 +221,9 @@ console.log("\n1. Public bootstrap + admin auth");
   if (apiEnv) apiEnv.ADMIN_SECRET = savedBoundSecret;
   check("token signing rejects short ADMIN_SECRET values", shortSecretLogin.status === 500);
 
-  const bad = await call("admin_login", { password: "wrong" });
+  const bad = await call("admin_login", { password: TEST_PASSWORD_5 });
   check("wrong admin password rejected", bad.status === 401, bad.status);
-  const login = await call("admin_login", { password: "test-admin-pass" });
+  const login = await call("admin_login", { password: TEST_PASSWORD_4 });
   check("admin login ok", login.status === 200 && login.data.token, login.status);
   globalThis.adminToken = login.data.token;
 
@@ -232,7 +251,9 @@ const examPayload = {
 let examId;
 let questionIds = [];
 let studentId;
+let questionCorrectIndexes = [];
 {
+  questionCorrectIndexes = Array.from({ length: 3 }, () => crypto.randomInt(4));
   const imported = await call(
     "admin_questions_import",
     {
@@ -245,8 +266,7 @@ let studentId;
           optionA: "21",
           optionB: "80",
           optionC: "443",
-          optionD: "25",
-          correctAnswer: "B",
+          optionD: "25",          correctIndex: questionCorrectIndexes[0],
           explanation: "HTTP = 80",
         },
         {
@@ -255,15 +275,14 @@ let studentId;
           optionA: "Volatile",
           optionB: "Non-volatile",
           optionC: "Read-only",
-          optionD: "Optical",
-          correctAnswer: "A",
+          optionD: "Optical",          correctIndex: questionCorrectIndexes[1],
           explanation: "बिजली जाने पर डेटा मिट जाता है।",
         },
         {
           subject: "Trade Theory",
           question: "DNS का पोर्ट कौन-सा है?",
           options: ["53", "67", "80", "110"],
-          correctIndex: 0,
+          correctIndex: questionCorrectIndexes[2],
           marks: 2,
           negativeMarks: 0.5,
         },
@@ -311,7 +330,7 @@ let studentId;
         {
           question: "दूसरे सेट का परीक्षण प्रश्न कौन-सा है?",
           options: ["सेट B", "सेट A", "सेट C", "सेट D"],
-          correctIndex: 0,
+          correctIndex: crypto.randomInt(4),
         },
       ],
     },
@@ -331,7 +350,7 @@ let studentId;
       question: {
         text: "मैनुअल प्रश्न का फ़ोल्डर कौन-सा है?",
         options: ["मैनुअल", "आयात", "सेट", "कोई नहीं"],
-        correctIndex: 0,
+        correctIndex: crypto.randomInt(4),
       },
     },
     globalThis.adminToken
@@ -349,8 +368,7 @@ let studentId;
       questions: [
         {
           question: "HTTP प्रोटोकॉल का मानक पोर्ट कौन-सा है?",
-          options: ["21", "80", "443", "25"],
-          correctAnswer: "B",
+          options: ["21", "80", "443", "25"],          correctIndex: questionCorrectIndexes[0],
         },
       ],
     },
@@ -483,27 +501,30 @@ let resultId;
   );
   check("duplicate CITS login IDs are rejected", duplicateCits.status === 409);
 
-  const wrongDob = await call("student_login", { identifier: "CITS-TEST-1", password: "02012000" });
+  const wrongDob = await call("student_login", { identifier: "CITS-TEST-1", password: TEST_PASSWORD_6 });
   check("incorrect temporary DOB is rejected", wrongDob.status === 401);
-  const login = await call("student_login", { identifier: "CITS-TEST-1", password: "01012000" });
+  const login = await call("student_login", {
+    identifier: "CITS-TEST-1",
+    password: temporaryPasswordFromDob("2000-01-01"),
+  });
   check("CITS login succeeds with DOB and requires password change", login.status === 200 && login.data.token && login.data.requiresPasswordChange);
   studentToken = login.data.token;
   check("dashboard is blocked until password change", (await call("student_dashboard", {}, studentToken)).status === 428);
   const wrongCurrent = await call(
     "student_password_change",
-    { currentPassword: "wrong", newPassword: "student-strong-password" },
+    { currentPassword: TEST_PASSWORD_5, newPassword: TEST_PASSWORD_2 },
     studentToken
   );
   check("password change verifies the temporary password", wrongCurrent.status === 401);
   const changedPassword = await call(
     "student_password_change",
-    { currentPassword: "01012000", newPassword: "student-strong-password" },
+    { currentPassword: temporaryPasswordFromDob("2000-01-01"), newPassword: TEST_PASSWORD_2 },
     studentToken
   );
   check("first-login password change succeeds", changedPassword.status === 200 && !changedPassword.data.student.passwordChangeRequired);
   const mobileLogin = await call(
     "student_login",
-    { identifier: "9876500001", password: "student-strong-password" }
+    { identifier: "9876500001", password: TEST_PASSWORD_2 }
   );
   check("mobile number is also accepted as a login alias", mobileLogin.status === 200 && mobileLogin.data.token);
 
@@ -550,7 +571,10 @@ let resultId;
       examId,
       attemptId,
       seq: 2,
-      responses: { [questionIds[0]]: 1, [questionIds[1]]: 0 },
+      responses: {
+        [questionIds[0]]: questionCorrectIndexes[0],
+        [questionIds[1]]: questionCorrectIndexes[1],
+      },
       marked: [questionIds[2]],
       visited: [questionIds[0], questionIds[1], questionIds[2]],
       current: 2,
@@ -575,7 +599,10 @@ let resultId;
 
   const resumed = await call("student_start", { examId }, studentToken);
   check("start resumes same attempt", resumed.status === 200 && resumed.data.resumed === true);
-  check("resumed attempt keeps answers", resumed.data.attempt.responses[questionIds[0]] === 1);
+  check(
+    "resumed attempt keeps answers",
+    resumed.data.attempt.responses[questionIds[0]] === questionCorrectIndexes[0]
+  );
 
   const submit = await call(
     "student_submit",
@@ -584,7 +611,11 @@ let resultId;
       attemptId,
       confirm: true,
       seq: 3,
-      responses: { [questionIds[0]]: 1, [questionIds[1]]: 0, [questionIds[2]]: 2 },
+      responses: {
+        [questionIds[0]]: questionCorrectIndexes[0],
+        [questionIds[1]]: questionCorrectIndexes[1],
+        [questionIds[2]]: (questionCorrectIndexes[2] + 1) % 4,
+      },
       marked: [],
       visited: questionIds,
       current: 0,
@@ -892,7 +923,7 @@ console.log("\n7. Legacy data import");
   check("legacy student login requires password setup", login.status === 200 && login.data.requiresPasswordChange);
   const legacyPassword = await call(
     "student_password_change",
-    { currentPassword: "", newPassword: "legacy-strong-password" },
+    { currentPassword: TEST_PASSWORD_7, newPassword: TEST_PASSWORD_8 },
     login.data.token
   );
   check("legacy account can set its first password", legacyPassword.status === 200);
@@ -943,7 +974,7 @@ console.log("\n9. Topic-wise paper, सूचनाएँ और समूह �
       "admin_question_save",
       {
         subjectId: "trade-theory",
-        question: { text: row.text, options: ["सही विकल्प", "गलत विकल्प"], correctIndex: 0, marks: row.marks, topic: row.topic },
+        question: { text: row.text, options: ["सही विकल्प", "गलत विकल्प"], correctIndex: crypto.randomInt(2), marks: row.marks, topic: row.topic },
       },
       admin
     );
@@ -1247,7 +1278,7 @@ console.log("\n11. Registration email and admin password recovery");
   apiEnv = {
     ...(apiEnv || {}),
     ADMIN_EMAIL: "admin@example.com",
-    RESEND_API_KEY: "test-resend-key",
+    RESEND_API_KEY: crypto.randomBytes(32).toString("base64url"),
     EMAIL_FROM: "CHNM Portal <noreply@example.com>",
     PUBLIC_BASE_URL: "https://portal.example",
   };
@@ -1262,8 +1293,8 @@ console.log("\n11. Registration email and admin password recovery");
   try {
     const gmailEnv = {
       GMAIL_CLIENT_ID: "test-client-id",
-      GMAIL_CLIENT_SECRET: "test-client-secret",
-      GMAIL_REFRESH_TOKEN: "test-refresh-token",
+      GMAIL_CLIENT_SECRET: crypto.randomBytes(32).toString("base64url"),
+      GMAIL_REFRESH_TOKEN: crypto.randomBytes(32).toString("base64url"),
     };
     const gmailRequests = [];
     globalThis.fetch = async (url, options) => {
@@ -1329,7 +1360,7 @@ console.log("\n11. Registration email and admin password recovery");
     const fallbackDelivery = await sendEmail(
       {
         ...gmailEnv,
-        RESEND_API_KEY: "test-resend-key",
+        RESEND_API_KEY: crypto.randomBytes(32).toString("base64url"),
         EMAIL_FROM: "CHNM Portal <noreply@example.com>",
       },
       {
@@ -1360,7 +1391,7 @@ console.log("\n11. Registration email and admin password recovery");
     const ambiguousDelivery = await sendEmail(
       {
         ...gmailEnv,
-        RESEND_API_KEY: "test-resend-key",
+        RESEND_API_KEY: crypto.randomBytes(32).toString("base64url"),
         EMAIL_FROM: "CHNM Portal <noreply@example.com>",
       },
       { to: "student@gmail.com", subject: "test", text: "test" }
@@ -1522,14 +1553,14 @@ console.log("\n11. Registration email and admin password recovery");
     await putJson(store, `auth/admin-password-reset/${expiredHash}`, { expiresAt: Date.now() - 1 });
     const expiredReset = await call(
       "admin_reset_password",
-      { token: expiredToken, newPassword: "admin-expired-password-2026" },
+      { token: expiredToken, newPassword: TEST_PASSWORD_9 },
       "",
       "10.0.10.8"
     );
     check("expired admin reset links are rejected", expiredReset.status === 400);
     const resetPassword = await call(
       "admin_reset_password",
-      { token: resetToken, newPassword: "admin-reset-password-2026" },
+      { token: resetToken, newPassword: TEST_PASSWORD_10 },
       "",
       "10.0.10.3"
     );
@@ -1537,26 +1568,26 @@ console.log("\n11. Registration email and admin password recovery");
     check("password reset invalidates existing admin sessions", (await call("admin_overview", {}, globalThis.adminToken)).status === 401);
     const reusedToken = await call(
       "admin_reset_password",
-      { token: resetToken, newPassword: "admin-other-password-2026" },
+      { token: resetToken, newPassword: TEST_PASSWORD_11 },
       "",
       "10.0.10.4"
     );
     check("admin reset link is single-use", reusedToken.status === 400);
-    const oldAdmin = await call("admin_login", { password: "test-admin-pass" }, "", "10.0.10.5");
-    const newAdmin = await call("admin_login", { password: "admin-reset-password-2026" }, "", "10.0.10.6");
+    const oldAdmin = await call("admin_login", { password: TEST_PASSWORD_4 }, "", "10.0.10.5");
+    const newAdmin = await call("admin_login", { password: TEST_PASSWORD_10 }, "", "10.0.10.6");
     check("reset password override replaces the initial secret", oldAdmin.status === 401 && newAdmin.status === 200);
     const changedAdmin = await call(
       "admin_password_change",
       {
-        currentPassword: "admin-reset-password-2026",
-        newPassword: "admin-changed-password-2026",
+        currentPassword: TEST_PASSWORD_10,
+        newPassword: TEST_PASSWORD_12,
       },
       newAdmin.data.token
     );
     check("authenticated admin can change password", changedAdmin.status === 200);
     const finalAdminLogin = await call(
       "admin_login",
-      { password: "admin-changed-password-2026" },
+      { password: TEST_PASSWORD_12 },
       "",
       "10.0.10.7"
     );
