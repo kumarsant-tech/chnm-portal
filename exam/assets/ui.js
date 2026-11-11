@@ -141,6 +141,22 @@
     writeStorage("localStorage", ADMIN_TOKEN_KEY, token || null);
     writeStorage("sessionStorage", ADMIN_TOKEN_KEY, token || null);
   }
+  function staffToken() {
+    return readStorage("sessionStorage", "fig.staff.token");
+  }
+  function setStaffSession(token, profile) {
+    writeStorage("sessionStorage", "fig.staff.token", token || null);
+    writeStorage("sessionStorage", "fig.staff.profile", profile ? JSON.stringify(profile) : null);
+  }
+  function staffProfile() {
+    const raw = readStorage("sessionStorage", "fig.staff.profile");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
 
   /* ---------- API ---------- */
   class ApiError extends Error {
@@ -755,6 +771,9 @@
     studentData: studentData,
     adminToken: adminToken,
     setAdminSession: setAdminSession,
+    staffToken: staffToken,
+    setStaffSession: setStaffSession,
+    staffProfile: staffProfile,
     toast: toast,
     modal: modal,
     confirm: confirmDialog,
@@ -787,4 +806,40 @@
     formValues: formValues,
     ApiError: ApiError,
   };
+
+  if (!/\/test\.html$/i.test(window.location.pathname)) {
+    let lastActivity = Date.now();
+    let timeoutNoticeShown = false;
+    const idleLimit = 15 * 60 * 1000;
+    const hasSession = () =>
+      Boolean(
+        studentToken() ||
+          adminToken() ||
+          staffToken() ||
+          readStorage("sessionStorage", "fig.exam-controller.token")
+      );
+    const clearSessions = () => {
+      clearStudentSession();
+      setAdminSession("");
+      setStaffSession("", null);
+      writeStorage("sessionStorage", "fig.exam-controller.token", null);
+      writeStorage("sessionStorage", "fig.exam-controller.profile", null);
+    };
+    const recordActivity = () => {
+      lastActivity = Date.now();
+      timeoutNoticeShown = false;
+    };
+    ["pointerdown", "keydown", "touchstart", "scroll", "mousemove"].forEach((eventName) =>
+      document.addEventListener(eventName, recordActivity, { passive: true })
+    );
+    window.setInterval(() => {
+      if (!hasSession() || Date.now() - lastActivity < idleLimit) return;
+      clearSessions();
+      if (!timeoutNoticeShown) {
+        timeoutNoticeShown = true;
+        toast("15 मिनट तक कोई गतिविधि नहीं हुई — सुरक्षा के लिए लॉगआउट कर दिया गया।", "warn");
+        window.setTimeout(() => window.location.reload(), 800);
+      }
+    }, 5000);
+  }
 })();

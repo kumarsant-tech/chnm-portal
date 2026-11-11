@@ -46,14 +46,16 @@
               <input class="input" id="adminPassword" name="password" type="password" autocomplete="current-password" required autofocus />
               <button type="button" class="password-toggle" id="adminPasswordToggle" aria-label="पासवर्ड दिखाएँ"></button>
             </div>
-            <small>भूलने पर configured admin email पर reset link मँगाएँ।</small>
+            <small>तीन गलत प्रयासों पर लॉगिन और रिकवरी एक घंटे के लिए लॉक होगी। भूलने पर पंजीकृत संपर्क से पुष्टि करें।</small>
           </label>
           <p id="adminLoginError" class="notice bad" hidden></p>
           <button id="adminLoginBtn" class="btn btn-block btn-lg" type="submit">सुरक्षित लॉगिन</button>
           <button type="button" class="btn btn-ghost btn-sm" id="adminForgotOpen">पासवर्ड भूल गए?</button>
         </form>
         <form id="adminForgotForm" class="stack" hidden>
-          <p class="muted small">रीसेट लिंक केवल Cloudflare में सेट किए गए एडमिन ईमेल पर भेजा जाएगा।</p>
+          <p class="muted small">एडमिन खाते में दर्ज ईमेल या मोबाइल से पुष्टि करें। रीसेट लिंक configured admin email पर भेजा जाएगा।</p>
+          <label class="field"><span>एडमिन ईमेल</span><input class="input" id="adminForgotEmail" type="email" autocomplete="email" maxlength="254"></label>
+          <label class="field"><span>पंजीकृत मोबाइल नंबर</span><input class="input" id="adminForgotMobile" type="tel" autocomplete="tel" inputmode="numeric" maxlength="16"></label>
           <p id="adminForgotMessage" class="notice" hidden></p>
           <button id="adminForgotBtn" class="btn btn-block" type="submit">रीसेट लिंक भेजें</button>
           <button type="button" class="btn btn-ghost btn-sm" id="adminForgotBack">लॉगिन पर वापस जाएँ</button>
@@ -67,7 +69,7 @@
         </form>
         <div class="login-meta">
           <span>Future Instructor · CHNM</span>
-          <span><a href="index.html">छात्र पोर्टल</a> · <a href="../index.html">वेबसाइट</a></span>
+          <span><a href="index.html">छात्र पोर्टल</a> · <a href="staff-login.html">स्टाफ लॉगिन</a> · <a href="controller.html">परीक्षा कंट्रोलर</a> · <a href="../index.html">वेबसाइट</a></span>
         </div>
       </section>
     </div>
@@ -97,6 +99,7 @@
         <button type="button" data-nav="settings">सेटिंग्स</button>
         <button type="button" data-nav="tools">टूल्स</button>
         <div class="nav-sep" aria-hidden="true"></div>
+        <a href="controller.html">परीक्षा कंट्रोलर</a>
         <a href="index.html">छात्र पोर्टल</a>
         <a href="../index.html">मुख्य वेबसाइट</a>
       </nav>

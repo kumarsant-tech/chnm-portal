@@ -49,12 +49,13 @@ function memoryStore() {
     async delete(key) {
       MEMORY.delete(key);
     },
-    async consumeResetToken(key, now) {
+    async consumeResetToken(key, now, tokenHash = "") {
       const value = MEMORY.get(key);
       if (!value || Number(value.expiresAt) <= now) {
         MEMORY.delete(key);
         return null;
       }
+      if (tokenHash && value.tokenHash !== tokenHash) return null;
       MEMORY.delete(key);
       return clone(value);
     },
@@ -148,12 +149,13 @@ function d1Store(database) {
     async delete(key) {
       await database.prepare("DELETE FROM app_kv WHERE key = ?").bind(String(key)).run();
     },
-    async consumeResetToken(key, now) {
+    async consumeResetToken(key, now, tokenHash = "") {
       const row = await database
         .prepare(
-          "DELETE FROM app_kv WHERE key = ? AND CAST(json_extract(value, '$.expiresAt') AS INTEGER) > ? RETURNING value"
+          "DELETE FROM app_kv WHERE key = ? AND CAST(json_extract(value, '$.expiresAt') AS INTEGER) > ? " +
+            "AND (? = '' OR json_extract(value, '$.tokenHash') = ?) RETURNING value"
         )
-        .bind(String(key), now)
+        .bind(String(key), now, tokenHash, tokenHash)
         .first();
       if (!row) {
         await database
@@ -219,9 +221,14 @@ export const K = {
   authLockout: (scope, id) => `auth/lockout/${scope}/${id}`,
   adminPasswordOverride: () => "auth/admin-password-override",
   adminAuthVersion: () => "auth/admin-auth-version",
+  adminProfile: () => "auth/admin-profile",
   adminPasswordReset: (tokenHash) => `auth/admin-password-reset/${tokenHash}`,
   studentPasswordReset: (tokenHash) => `auth/student-password-reset/${tokenHash}`,
   studentPasswordResetIndex: (studentId) => `auth/student-password-reset-index/${studentId}`,
+  examController: () => "auth/exam-controller",
+  staffUser: (id) => `auth/staff-users/${id}`,
+  staffEmailIndex: (emailHash) => `auth/staff-email/${emailHash}`,
+  staffInvite: (id) => `auth/staff-invites/${id}`,
   studentCitsIndex: (cits) => `idx/cits/${cits}`,
   audit: (id) => `audit/${id}`,
   registrationSeq: () => "meta/registration-seq",

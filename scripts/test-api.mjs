@@ -243,6 +243,8 @@ const examPayload = {
   marksPerQuestion: 1,
   negativeMarks: 0.25,
   instructions: "सभी प्रश्न अनिवार्य हैं।",
+  startAt: new Date(Date.now() - 60 * 1000).toISOString(),
+  endAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   type: "final",
   attemptsAllowed: 1,
   releaseResults: false,
@@ -384,6 +386,32 @@ let questionCorrectIndexes = [];
   );
   check("exam created", save.status === 200, JSON.stringify(save.data));
   examId = save.data.exam.id;
+  const examFolderOptions = await call(
+    "admin_questions",
+    { subjectId: "trade-theory", examId, pageSize: 100 },
+    globalThis.adminToken
+  );
+  check(
+    "exam question picker lists imported folders for the selected subject",
+    examFolderOptions.status === 200 &&
+      examFolderOptions.data.sets?.some(
+        (set) => set.setId === imported.data.set.setId && set.count === 3
+      ) &&
+      examFolderOptions.data.total > 3,
+    JSON.stringify({ status: examFolderOptions.status, sets: examFolderOptions.data.sets, total: examFolderOptions.data.total })
+  );
+  const examFolderQuestions = await call(
+    "admin_questions",
+    { subjectId: "trade-theory", examId, setId: imported.data.set.setId, pageSize: 100 },
+    globalThis.adminToken
+  );
+  check(
+    "exam question picker filters by the chosen imported folder",
+    examFolderQuestions.status === 200 &&
+      examFolderQuestions.data.items?.length === 3 &&
+      examFolderQuestions.data.items.every((question) => question.setId === imported.data.set.setId),
+    JSON.stringify({ status: examFolderQuestions.status, total: examFolderQuestions.data.total })
+  );
 
   const duplicateCode = await call(
     "admin_exam_save",
@@ -400,6 +428,40 @@ let questionCorrectIndexes = [];
   check("exam locked", lock.status === 200 && lock.data.exam.status === "locked", JSON.stringify(lock.data));
   const publish = await call("admin_exam_publish", { examId }, globalThis.adminToken);
   check("exam published", publish.status === 200 && publish.data.exam.status === "published");
+  const homepageExamNotice = await call("site_notices");
+  check(
+    "publishing an exam adds a public homepage notice",
+    homepageExamNotice.status === 200 &&
+      homepageExamNotice.data.notices.some((notice) => notice.id === `exam-published-${examId}`)
+  );
+  const publishedExamRecord = await getJson(store, K.exams(examId));
+  await putJson(store, K.exams(examId), {
+    ...publishedExamRecord,
+    endAt: new Date(Date.now() - 60 * 1000).toISOString(),
+    releaseResults: false,
+  });
+  const endedHomepageNotice = await call("site_notices");
+  check(
+    "after exam end the homepage replaces the live notice with a results notice",
+    endedHomepageNotice.status === 200 &&
+      !endedHomepageNotice.data.notices.some((notice) => notice.id === `exam-published-${examId}`) &&
+      endedHomepageNotice.data.notices.some((notice) => notice.id === `exam-results-${examId}`)
+  );
+  await putJson(store, K.exams(examId), {
+    ...publishedExamRecord,
+    endAt: new Date(Date.now() - 60 * 1000).toISOString(),
+    releaseResults: true,
+    releaseAt: null,
+  });
+  const availableResultNotice = await call("site_notices");
+  check(
+    "homepage result notice states when results are available",
+    availableResultNotice.status === 200 &&
+      availableResultNotice.data.notices.some(
+        (notice) => notice.id === `exam-results-${examId}` && notice.title.includes("परिणाम उपलब्ध")
+      )
+  );
+  await putJson(store, K.exams(examId), publishedExamRecord);
 
   const structural = await call(
     "admin_exam_save",
@@ -1060,8 +1122,31 @@ console.log("\n8. Admin stats, export, safety guards");
       !JSON.stringify(exportRes.data.students).includes("pinHash")
   );
 
+  const archivedStudentLogin = await call("student_login", {
+    identifier: "FIG-99999",
+    password: TEST_PASSWORD_8,
+  });
+  check("student can sign in before archive", archivedStudentLogin.status === 200 && archivedStudentLogin.data.token);
   const delStudent = await call("admin_student_delete", { studentId: "FIG-99999", confirm: "FIG-99999" }, globalThis.adminToken);
-  check("student delete with results blocked", delStudent.status === 409, delStudent.status);
+  const archivedStudent = await getJson(store, K.students("FIG-99999"));
+  const preservedStudentResults = await listKeys(store, "idx/student-results/FIG-99999/");
+  check(
+    "student delete archives the account while preserving results and attempts",
+    delStudent.status === 200 &&
+      delStudent.data.archived &&
+      archivedStudent?.active === false &&
+      Boolean(archivedStudent?.deletedAt) &&
+      preservedStudentResults.length > 0
+  );
+  const archivedSession = await call("student_dashboard", {}, archivedStudentLogin.data.token);
+  check("archiving a student immediately invalidates its active login", archivedSession.status === 401);
+  const archivedBackup = await call("admin_export", {}, globalThis.adminToken);
+  check(
+    "admin JSON backup retains archived student and original results",
+    archivedBackup.status === 200 &&
+      archivedBackup.data.students?.some((student) => student.id === "FIG-99999" && student.deletedAt) &&
+      archivedBackup.data.results?.some((result) => result.studentId === "FIG-99999")
+  );
 
   const delExam = await call("admin_exam_delete", { examId, confirm: true }, globalThis.adminToken);
   check("published exam delete blocked", delExam.status === 409, delExam.status);
@@ -1699,6 +1784,7 @@ console.log("\n11. Registration email and admin password recovery");
       "10.0.10.7"
     );
     check("changed admin password is active", finalAdminLogin.status === 200);
+    globalThis.adminToken = finalAdminLogin.data.token;
 
     const wrongAdminAttempts = [];
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -1979,6 +2065,237 @@ if (testD1) {
   await worker.scheduled({}, runtimeEnv);
   check("Cloudflare scheduled expiry handler runs", true);
 }
+
+console.log("\n19. Exam controller migration and exam settings");
+{
+  const legacyPassword = TEST_PASSWORD_1;
+  await putJson(store, K.examController(), {
+    username: "legacy-controller",
+    displayName: "Legacy Controller",
+    passwordHash: await hashPassword(legacyPassword),
+    active: true,
+    mustChangePassword: false,
+    authVersion: 1,
+  });
+  const legacyLogin = await call(
+    "exam_controller_login",
+    { username: "legacy-controller", password: legacyPassword },
+    "",
+    "203.0.113.21"
+  );
+  check("legacy controller login requires profile upgrade", legacyLogin.status === 200 && legacyLogin.data.mustUpgradeAccount);
+  const upgraded = await call(
+    "controller_account_upgrade",
+    {
+      profile: {
+        currentPassword: legacyPassword,
+        displayName: "Upgraded Controller",
+        email: "controller-upgrade@example.test",
+        mobile: "9876500088",
+        newPassword: TEST_PASSWORD_2,
+      },
+    },
+    legacyLogin.data.token,
+    "203.0.113.21"
+  );
+  const migratedController = await getJson(store, K.examController());
+  const migratedUser = upgraded.status === 200
+    ? await getJson(store, K.staffUser(upgraded.data.profile.id))
+    : null;
+  check(
+    "account upgrade preserves the legacy controller record and its migration link",
+    upgraded.status === 200 &&
+      migratedController?.active === false &&
+      migratedController?.migratedTo === upgraded.data.profile.id &&
+      migratedController?.passwordHash === null &&
+      migratedUser?.email === "controller-upgrade@example.test"
+  );
+  const upgradedLogin = await call(
+    "staff_login",
+    { email: "controller-upgrade@example.test", password: TEST_PASSWORD_2, expectedType: "controller" },
+    "",
+    "203.0.113.22"
+  );
+  check("upgraded controller can sign in through staff login", upgradedLogin.status === 200);
+  const staffArchive = await call(
+    "admin_staff_save",
+    {
+      staff: {
+        id: upgraded.data.profile.id,
+        displayName: "Upgraded Controller",
+        email: "controller-upgrade@example.test",
+        mobile: "9876500088",
+        type: "controller",
+        permissions: ["exams"],
+        active: false,
+        archive: true,
+      },
+    },
+    globalThis.adminToken
+  );
+  const archivedStaff = await getJson(store, K.staffUser(upgraded.data.profile.id));
+  const archivedStaffLogin = await call("staff_me", {}, upgradedLogin.data.token);
+  check(
+    "staff delete archives the profile and invalidates the login",
+    staffArchive.status === 200 &&
+      archivedStaff?.active === false &&
+      Boolean(archivedStaff?.deletedAt) &&
+      archivedStaffLogin.status === 401,
+    JSON.stringify({ status: staffArchive.status, response: staffArchive.data, archivedStaff, loginStatus: archivedStaffLogin.status })
+  );
+  const archiveBackup = await call("admin_export", {}, globalThis.adminToken);
+  const backupStaff = archiveBackup.data.staff?.find((user) => user.id === upgraded.data.profile.id);
+  check(
+    "admin backup keeps archived staff without credential hashes",
+    Boolean(backupStaff?.deletedAt) &&
+      !Object.prototype.hasOwnProperty.call(backupStaff || {}, "passwordHash"),
+    JSON.stringify({ status: archiveBackup.status, backupStaff })
+  );
+  const staffRestore = await call(
+    "admin_staff_save",
+    {
+      staff: {
+        id: upgraded.data.profile.id,
+        displayName: "Upgraded Controller",
+        email: "controller-upgrade@example.test",
+        mobile: "9876500088",
+        type: "controller",
+        permissions: ["exams"],
+        active: true,
+        restore: true,
+      },
+    },
+    globalThis.adminToken
+  );
+  check(
+    "archived staff can be restored by admin",
+    staffRestore.status === 200 &&
+      (await getJson(store, K.staffUser(upgraded.data.profile.id)))?.active === true,
+    JSON.stringify({ status: staffRestore.status, response: staffRestore.data, restored: await getJson(store, K.staffUser(upgraded.data.profile.id)) })
+  );
+
+  const previousSettings = (await getJson(store, K.settings())) || {};
+  const defaults = {
+    ...previousSettings,
+    defaultDurationMin: 75,
+    defaultPassPct: 62,
+    defaultInstructions: "परीक्षा के निर्देश",
+    defaultInstructionsEn: "Exam instructions",
+    resultsReleaseDefault: true,
+  };
+  await putJson(store, K.settings(), defaults);
+  const currentPassword = TEST_PASSWORD_3;
+  await putJson(store, K.examController(), {
+    username: "current-controller",
+    displayName: "Current Controller",
+    email: "current-controller@example.test",
+    profileVersion: 2,
+    passwordHash: await hashPassword(currentPassword),
+    active: true,
+    mustChangePassword: false,
+    authVersion: 1,
+  });
+  const controllerLogin = await call(
+    "exam_controller_login",
+    { username: "current-controller", password: currentPassword },
+    "",
+    "203.0.113.23"
+  );
+  const controllerCatalog = await call("controller_catalog", {}, controllerLogin.data.token, "203.0.113.23");
+  check(
+    "controller catalog exposes configured defaults",
+    controllerCatalog.status === 200 &&
+      controllerCatalog.data.defaults?.durationMin === 75 &&
+      controllerCatalog.data.defaults?.passPct === 62 &&
+      controllerCatalog.data.defaults?.releaseResults === true
+  );
+  const startAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const endAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const defaultExam = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Controller Defaults",
+        code: "CTRL-DEFAULTS",
+        subjectId: "trade-theory",
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  const defaultStored = defaultExam.status === 200
+    ? await getJson(store, K.exams(defaultExam.data.exam.id))
+    : null;
+  check(
+    "controller exam creation uses configured defaults",
+    defaultExam.status === 200 &&
+      defaultStored?.durationMin === 75 &&
+      defaultStored?.passPct === 62 &&
+      defaultStored?.instructions === "परीक्षा के निर्देश" &&
+      defaultStored?.instructionsEn === "Exam instructions" &&
+      defaultStored?.releaseResults === true,
+    JSON.stringify({ status: defaultExam.status, response: defaultExam.data, stored: defaultStored })
+  );
+  const customExam = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Controller Options",
+        code: "CTRL-OPTIONS",
+        subjectId: "trade-theory",
+        durationMin: 90,
+        type: "practice",
+        attemptsAllowed: 4,
+        passPct: 68,
+        marksPerQuestion: 2.5,
+        negativeMarks: 0.5,
+        instructions: "हिंदी निर्देश",
+        instructionsEn: "English instructions",
+        releaseResults: false,
+        releaseAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  const customStored = customExam.status === 200
+    ? await getJson(store, K.exams(customExam.data.exam.id))
+    : null;
+  check(
+    "controller exam creation persists advanced settings",
+    customExam.status === 200 &&
+      customStored?.durationMin === 90 &&
+      customStored?.attemptsAllowed === 4 &&
+      customStored?.passPct === 68 &&
+      customStored?.marksPerQuestion === 2.5 &&
+      customStored?.negativeMarks === 0.5 &&
+      customStored?.instructions === "हिंदी निर्देश" &&
+      customStored?.instructionsEn === "English instructions" &&
+      customStored?.releaseResults === false &&
+      Boolean(customStored?.releaseAt)
+  );
+  const invalidRelease = await call(
+    "controller_exam_create",
+    {
+      exam: {
+        title: "Invalid Release",
+        code: "CTRL-INVALID-RELEASE",
+        subjectId: "trade-theory",
+        releaseAt: "not-a-date",
+        startAt,
+        endAt,
+      },
+    },
+    controllerLogin.data.token,
+    "203.0.113.23"
+  );
+  check("invalid result release timestamp is rejected", invalidRelease.status === 400);
+}
+
 console.log(`\n===== ${passed} passed, ${failed} failed =====`);
 if (failed) {
   console.log("Failures:", failures.join(", "));
