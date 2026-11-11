@@ -4310,7 +4310,7 @@
       '<label class="field"><span>नया पासवर्ड दोबारा लिखें</span><input class="input" id="adminConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>' +
       '<div class="editor-actions"><button class="btn btn-navy" type="submit" id="adminPasswordChangeBtn">पासवर्ड बदलें</button></div></form>' +
       '<p class="tiny muted">भूला हुआ पासवर्ड रीसेट लिंक केवल Cloudflare secret ADMIN_EMAIL पर भेजा जाता है।</p></section>' +
-      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>परीक्षा कंट्रोलर खाता</h3><p class="admin-card-sub">कंट्रोलर केवल पेपर लॉक/प्रकाशित/रोक, लाइव निगरानी और प्रयास जमा कर सकता है। छात्र, प्रश्न, परिणाम और सेटिंग्स का access admin के पास ही रहेगा।</p></div><a class="btn btn-ghost btn-sm" href="controller.html">कंट्रोलर लॉगिन पेज</a></div>' +
+      '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>परीक्षा कंट्रोलर खाता</h3><p class="admin-card-sub">कंट्रोलर ड्राफ्ट परीक्षा बना, पेपर लॉक/रोक और लाइव निगरानी कर सकता है। समीक्षा के बाद परीक्षा publish केवल admin करेगा; छात्र, प्रश्न, परिणाम और सेटिंग्स का access भी admin के पास रहेगा।</p></div><a class="btn btn-ghost btn-sm" href="controller.html">कंट्रोलर लॉगिन पेज</a></div>' +
       '<form id="examControllerForm" class="settings-grid">' +
       '<label class="field"><span>कंट्रोलर नाम</span><input class="input" id="controllerDisplayName" maxlength="60" value="' +
       attr(controller?.displayName || "") +
@@ -4423,26 +4423,36 @@
 
   /* ---------- tools ---------- */
   async function renderTools(content) {
-    const [legacyData, auditData] = await Promise.all([
+    const [legacyResult, auditResult] = await Promise.allSettled([
       api("admin_legacy_preview"),
       api("admin_audit", { limit: 100 }),
     ]);
-    const legacy = legacyData.legacy || {};
+    const legacyData = legacyResult.status === "fulfilled" ? legacyResult.value : null;
+    const auditData = auditResult.status === "fulfilled" ? auditResult.value : null;
+    const legacy = (legacyData && legacyData.legacy) || {};
     const legacyCount = (legacy.students || 0) + (legacy.results || 0) + (legacy.activeAttempts || 0);
 
     content.innerHTML =
       '<div class="admin-section-head"><div><h1>टूल्स</h1><p>पुराने डेटा का सुरक्षित आयात, पूरा बैकअप और ऑडिट लॉग।</p></div></div>' +
       '<div class="grid-2">' +
       '<section class="admin-card"><div class="admin-section-head"><div><h3>पुराने पोर्टल का डेटा</h3><p class="admin-card-sub">दोबारा चलाने पर डुप्लिकेट नहीं बनते (idempotent)</p></div></div>' +
-      (legacyCount
-        ? '<dl class="detail-list">' +
+      (!legacyData
+        ? '<div class="notice warn">' +
+          esc(
+            legacyResult.reason && legacyResult.reason.message
+              ? legacyResult.reason.message
+              : "पुराने पोर्टल का डेटा उपलब्ध नहीं है।"
+          ) +
+          '</div><p class="small muted">पुराने डेटा का आयात उपलब्ध न होने पर भी बैकअप और ऑडिट लॉग अलग से काम करते हैं।</p>'
+        : legacyCount
+          ? '<dl class="detail-list">' +
           detailRow("विद्यार्थी", legacy.students || 0) +
           detailRow("परिणाम", legacy.results || 0) +
           detailRow("सक्रिय प्रयास", legacy.activeAttempts || 0) +
           detailRow("पुराना विषय", (legacy.config && legacy.config.subject) || "—") +
           detailRow("स्टोर", legacy.store || "—") +
           '</dl><div class="editor-actions"><button class="btn btn-navy btn-sm" type="button" data-legacy-import>पुराना डेटा आयात करें</button></div><div class="notice warn small" style="margin-top:10px">आयात से पहले पूरा JSON बैकअप निकालने की सलाह है। मौजूदा परिणाम नहीं बदले जाएँगे।</div>'
-        : '<div class="notice info">इस स्टोर में पुराने पोर्टल का कोई डेटा नहीं मिला।</div>') +
+          : '<div class="notice info">इस स्टोर में पुराने पोर्टल का कोई डेटा नहीं मिला।</div>') +
       "</section>" +
       '<section class="admin-card"><div class="admin-section-head"><div><h3>पूरा डेटा बैकअप</h3><p class="admin-card-sub">Students, Exams, Papers, Questions, Results, Settings</p></div></div><p class="small muted">पूरा डेटा JSON में डाउनलोड करें। इसे सुरक्षित जगह रखें — इसमें छात्रों की जानकारी और परीक्षा पेपर शामिल हैं।</p><div class="backup-actions" style="margin-top:12px"><button class="btn btn-sm" type="button" id="exportAllBtn">JSON बैकअप डाउनलोड</button><a class="btn btn-ghost btn-sm" href="templates/questions-template.xlsx" download>Excel टेम्पलेट</a><a class="btn btn-ghost btn-sm" href="templates/questions-sample.json" download>Sample JSON</a></div></section></div>' +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>ऑडिट लॉग</h3><p class="admin-card-sub">एडमिन की सभी संवेदनशील गतिविधियाँ</p></div><div class="row"><select class="select compact" id="auditLimit">' +
@@ -4455,10 +4465,18 @@
         "100"
       ) +
       '<button class="btn btn-sm btn-ghost" type="button" id="auditRefreshBtn">रिफ़्रेश</button></div></div><div id="auditBox">' +
-      (auditData.entries.length ? auditList(auditData.entries) : emptyBox("कोई गतिविधि दर्ज नहीं", true)) +
+      (auditData
+        ? auditData.entries.length
+          ? auditList(auditData.entries)
+          : emptyBox("कोई गतिविधि दर्ज नहीं", true)
+        : emptyBox(
+            auditResult.reason && auditResult.reason.message
+              ? auditResult.reason.message
+              : "ऑडिट लॉग लोड नहीं हो सका"
+          )) +
       "</div></section>" +
       '<section class="admin-card" style="margin-top:18px"><div class="admin-section-head"><div><h3>सुरक्षा जाँच सूची</h3></div></div><div class="stack small">' +
-      '<div class="check"><span>✔ एडमिन पासवर्ड केवल Netlify Environment Variable में है</span></div>' +
+      '<div class="check"><span>✔ पासवर्ड salted hash या Cloudflare secret में सुरक्षित है</span></div>' +
       '<div class="check"><span>✔ हर एडमिन API सर्वर पर Bearer टोकन जाँचता है</span></div>' +
       '<div class="check"><span>✔ टाइमर, स्कोरिंग और प्रकाशन-स्थिति सर्वर पर लागू होती है</span></div>' +
       '<div class="check"><span>✔ विद्यार्थी केवल अपना परिणाम और अपने उत्तर देख सकता है</span></div>' +

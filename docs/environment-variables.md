@@ -24,7 +24,7 @@ Student password recovery के लिए CITS/mobile login ID और उस �
 
 Self-registration में छात्र की जन्मतिथि केवल अस्थायी पासवर्ड (`DDMMYYYY`) बनाने के लिए इस्तेमाल होती है और रिकॉर्ड/API/log में सहेजी या लौटाई नहीं जाती। पहले login के बाद परीक्षा सुविधाएँ तब तक बंद रहती हैं जब तक छात्र कम-से-कम 10 अक्षरों का नया पासवर्ड न बना ले। Email provider configure न होने पर registration पूरा होता है, पर UI बताता है कि ईमेल नहीं भेजा गया।
 
-Admin Settings में अलग Exam Controller account बनाया, बदला या disable किया जा सकता है। Controller केवल exams list, पेपर lock, publish/unpublish, सीमित live monitoring और active attempt finalize कर सकता है। उसे प्रश्न/छात्र प्रबंधन, result release, backup या settings का access नहीं है। Admin account full access रखता है। Controller login `exam/controller.html` पर है; credentials का salted hash D1 में रहता है और password/account update पुराने controller sessions को invalidate करता है।
+Admin Settings में अलग Exam Controller account बनाया, बदला या disable किया जा सकता है। Controller draft exam बना सकता है, exam list देख सकता है, पेपर lock/stop, सीमित live monitoring और active attempt finalize कर सकता है। Publish केवल admin कर सकता है, ताकि वह प्रश्न/पेपर की समीक्षा कर सके। Controller को प्रश्न/छात्र प्रबंधन, result release, backup या settings का access नहीं है। Admin account full access रखता है। Controller login `exam/controller.html` पर है; credentials का salted hash D1 में रहता है और password/account update पुराने controller sessions को invalidate करता है।
 
 ## स्थानीय विकास
 

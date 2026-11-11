@@ -38,8 +38,9 @@ import {
   handleAdminExamControllerSave,
   handleExamControllerLogin,
   handleExamControllerExams,
+  handleExamControllerCatalog,
+  handleExamControllerCreate,
   handleExamControllerLock,
-  handleExamControllerPublish,
   handleExamControllerUnpublish,
   handleExamControllerLive,
   handleExamControllerAttemptFinalize,
@@ -172,8 +173,9 @@ const ADMIN_ACTIONS = {
 
 const EXAM_CONTROLLER_ACTIONS = {
   controller_exams: handleExamControllerExams,
+  controller_catalog: handleExamControllerCatalog,
+  controller_exam_create: handleExamControllerCreate,
   controller_exam_lock: handleExamControllerLock,
-  controller_exam_publish: handleExamControllerPublish,
   controller_exam_unpublish: handleExamControllerUnpublish,
   controller_live: handleExamControllerLive,
   controller_attempt_finalize: handleExamControllerAttemptFinalize,

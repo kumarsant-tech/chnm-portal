@@ -908,6 +908,16 @@ console.log("\n8. Admin stats, export, safety guards");
   check("stats 200", stats.status === 200 && stats.data.overall.count >= 2, JSON.stringify(stats.data.overall));
   const overview = await call("admin_overview", {}, globalThis.adminToken);
   check("overview 200", overview.status === 200 && overview.data.summary.students >= 3);
+  if (apiEnv?.DB) {
+    const savedEnv = apiEnv;
+    apiEnv = { ...apiEnv, LEGACY_DB: undefined };
+    const legacyUnavailable = await call("admin_legacy_preview", {}, globalThis.adminToken);
+    apiEnv = savedEnv;
+    check(
+      "Cloudflare legacy preview reports the missing legacy binding explicitly",
+      legacyUnavailable.status === 501
+    );
+  }
   check(
     "admin overview hides credential hashes",
     !JSON.stringify(overview.data).includes("pinHash") &&
@@ -1585,7 +1595,38 @@ console.log("\n11. Registration email and admin password recovery");
     );
     const controllerToken = controllerLogin.data.token;
     const controllerExams = await call("controller_exams", {}, controllerToken);
+    const controllerCatalog = await call("controller_catalog", {}, controllerToken);
+    const controllerDraft = await call(
+      "controller_exam_create",
+      {
+        exam: {
+          title: "Controller Draft Test",
+          code: "CONTROLLER-DRAFT",
+          subjectId: "trade-theory",
+          tradeId: "chnm",
+          durationMin: 45,
+          passPct: 40,
+          marksPerQuestion: 1,
+          negativeMarks: 0,
+          attemptsAllowed: 1,
+          type: "final",
+          status: "published",
+          questionIds: ["must-not-be-accepted"],
+        },
+      },
+      controllerToken
+    );
     const controllerLive = await call("controller_live", {}, controllerToken);
+    const controllerPublishDenied = await call(
+      "controller_exam_publish",
+      { examId: controllerDraft.data.exam?.id || "" },
+      controllerToken
+    );
+    const controllerAdminPublishDenied = await call(
+      "admin_exam_publish",
+      { examId: controllerDraft.data.exam?.id || "" },
+      controllerToken
+    );
     const controllerDenied = await call("admin_overview", {}, controllerToken);
     const controllerStudentRecordsDenied = await call("admin_students", {}, controllerToken);
     check(
@@ -1595,6 +1636,26 @@ console.log("\n11. Registration email and admin password recovery");
         !JSON.stringify(controllerGet.data).includes("passwordHash")
     );
     check("exam controller has a separate successful login", controllerLogin.status === 200 && controllerToken);
+    check(
+      "controller catalog exposes only active subject and trade labels",
+      controllerCatalog.status === 200 &&
+        controllerCatalog.data.subjects.some((subject) => subject.id === "trade-theory") &&
+        controllerCatalog.data.trades.some((trade) => trade.id === "chnm") &&
+        !JSON.stringify(controllerCatalog.data).includes("students")
+    );
+    check(
+      "controller can create a draft but cannot inject questions or publish it",
+      controllerDraft.status === 200 &&
+        controllerDraft.data.exam.status === "draft" &&
+        controllerDraft.data.exam.questionCount === 0 &&
+        controllerPublishDenied.status === 400 &&
+      controllerAdminPublishDenied.status === 401,
+      JSON.stringify({
+      draft: controllerDraft,
+      publish: controllerPublishDenied,
+      adminPublish: controllerAdminPublishDenied,
+      })
+    );
     check(
       "controller exam list exposes no question content",
       controllerExams.status === 200 &&
@@ -1609,6 +1670,54 @@ console.log("\n11. Registration email and admin password recovery");
     check(
       "controller cannot access admin dashboard or student records",
       controllerDenied.status === 401 && controllerStudentRecordsDenied.status === 401
+    );
+    const reviewedDraft = controllerDraft.data.exam
+      ? await call(
+          "admin_exam_save",
+          {
+            exam: {
+              id: controllerDraft.data.exam.id,
+              title: "Controller Draft Test",
+              code: "CONTROLLER-DRAFT",
+              subjectId: "trade-theory",
+              tradeId: "chnm",
+              durationMin: 45,
+              passPct: 40,
+              marksPerQuestion: 1,
+              negativeMarks: 0,
+              attemptsAllowed: 1,
+              type: "final",
+            },
+            questionIds,
+          },
+          finalAdminLogin.data.token
+        )
+      : { status: 0 };
+    const reviewedLock = controllerDraft.data.exam
+      ? await call(
+          "admin_exam_lock",
+          { examId: controllerDraft.data.exam.id },
+          finalAdminLogin.data.token
+        )
+      : { status: 0 };
+    const reviewedPublish = controllerDraft.data.exam
+      ? await call(
+          "admin_exam_publish",
+          { examId: controllerDraft.data.exam.id },
+          finalAdminLogin.data.token
+        )
+      : { status: 0 };
+    check(
+      "admin can review controller draft, lock its paper, and publish it",
+      reviewedDraft.status === 200 &&
+        reviewedLock.status === 200 &&
+        reviewedPublish.status === 200 &&
+        reviewedPublish.data.exam.status === "published",
+      JSON.stringify({
+        draft: reviewedDraft,
+        lock: reviewedLock,
+        publish: reviewedPublish,
+      })
     );
     const controllerDisabled = await call(
       "admin_exam_controller_save",

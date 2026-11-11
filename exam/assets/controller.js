@@ -11,6 +11,7 @@
   let refreshTimer = 0;
   let exams = [];
   let liveItems = [];
+  let catalog = null;
 
   function readSession(key) {
     try {
@@ -65,7 +66,7 @@
         : '<span class="tiny muted">पेपर तैयार होने पर admin इसे उपलब्ध कराएँगे।</span>';
     }
     if (exam.status === "locked") {
-      return '<button class="btn btn-sm" type="button" data-conduct="publish" data-exam="' + UI.attr(exam.id) + '">परीक्षा प्रकाशित करें</button>';
+      return '<span class="tiny muted">पेपर lock है। समीक्षा के बाद admin परीक्षा publish करेगा।</span>';
     }
     if (exam.status === "published") {
       return '<button class="btn btn-sm btn-warn" type="button" data-conduct="unpublish" data-exam="' + UI.attr(exam.id) + '">नई शुरुआत रोकें</button><small class="muted">चल रहे प्रयास जारी रहेंगे।</small>';
@@ -95,6 +96,20 @@
     });
   }
 
+  function renderCreateOptions() {
+    if (!catalog) return;
+    const subjects = $("#controllerExamSubject");
+    const trades = $("#controllerExamTrade");
+    subjects.innerHTML = '<option value="">विषय चुनें</option>' +
+      catalog.subjects.map((subject) =>
+        '<option value="' + UI.attr(subject.id) + '">' + esc(subject.name) + '</option>'
+      ).join("");
+    trades.innerHTML = '<option value="">डिफ़ॉल्ट ट्रेड</option>' +
+      catalog.trades.map((trade) =>
+        '<option value="' + UI.attr(trade.id) + '">' + esc(trade.name) + '</option>'
+      ).join("");
+  }
+
   function renderLive() {
     const node = $("#controllerLiveList");
     $("#controllerLiveCount").textContent = String(liveItems.length);
@@ -122,12 +137,15 @@
   async function refresh() {
     if (!token) return;
     try {
-      const [examData, liveData] = await Promise.all([
+      const [examData, liveData, catalogData] = await Promise.all([
         UI.call("controller_exams", {}, token),
         UI.call("controller_live", {}, token),
+        catalog ? Promise.resolve(catalog) : UI.call("controller_catalog", {}, token),
       ]);
       exams = examData.exams || [];
       liveItems = liveData.items || [];
+      catalog = catalogData;
+      renderCreateOptions();
       renderExams();
       renderLive();
       $("#controllerUpdated").textContent = "अपडेट: " + UI.fmtTime(new Date().toISOString());
@@ -145,7 +163,6 @@
     const examId = button.dataset.exam;
     const labels = {
       lock: "पेपर लॉक करें?",
-      publish: "परीक्षा प्रकाशित करें?",
       unpublish: "नई परीक्षा शुरुआत रोकें? चल रहे प्रयास अपनी समय-सीमा तक जारी रहेंगे।",
     };
     if (!window.confirm(labels[operation] || "जारी रखें?")) return;
@@ -197,6 +214,35 @@
     } catch (error) {
       $("#controllerLoginError").textContent = error.message || "लॉगिन नहीं हो सका।";
       $("#controllerLoginError").hidden = false;
+    } finally {
+      UI.setButtonBusy(button, false);
+    }
+  });
+
+  $("#controllerCreateForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const errorNode = $("#controllerCreateError");
+    errorNode.hidden = true;
+    const button = $("#controllerCreateButton");
+    UI.setButtonBusy(button, true, "ड्राफ्ट बना रहे हैं…");
+    try {
+      await UI.call("controller_exam_create", {
+        exam: {
+          title: $("#controllerExamTitle").value.trim(),
+          code: $("#controllerExamCode").value.trim(),
+          subjectId: $("#controllerExamSubject").value,
+          tradeId: $("#controllerExamTrade").value,
+          durationMin: Number($("#controllerExamDuration").value),
+          type: $("#controllerExamType").value,
+        },
+      }, token);
+      $("#controllerCreateForm").reset();
+      $("#controllerExamDuration").value = "60";
+      UI.toast("ड्राफ्ट परीक्षा बन गई। प्रश्नों की समीक्षा और publish admin करेगा।", "good");
+      await refresh();
+    } catch (error) {
+      errorNode.textContent = error.message || "ड्राफ्ट परीक्षा नहीं बन सकी।";
+      errorNode.hidden = false;
     } finally {
       UI.setButtonBusy(button, false);
     }

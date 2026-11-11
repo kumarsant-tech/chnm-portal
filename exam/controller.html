@@ -42,7 +42,7 @@
           <div class="grow">
             <p class="hero-eyebrow">EXAM CONTROLLER</p>
             <h1 id="controllerWelcome">परीक्षा संचालन</h1>
-            <p class="muted">पेपर लॉक करें, परीक्षा प्रकाशित/रोकें और live attempts देखें।</p>
+            <p class="muted">ड्राफ्ट परीक्षा बनाएँ, पेपर लॉक करें और live attempts देखें। publish केवल admin कर सकता है।</p>
           </div>
           <div class="row">
             <button class="btn btn-ghost btn-sm" type="button" id="controllerRefresh">रीफ़्रेश</button>
@@ -52,7 +52,24 @@
       </div>
       <section class="panel" style="margin-top:20px">
         <div class="row-between">
-          <div><h2>परीक्षाएँ</h2><p class="muted small">कंट्रोलर यहाँ प्रश्न या छात्र प्रोफ़ाइल नहीं देख सकता।</p></div>
+          <div><h2>नई परीक्षा का ड्राफ्ट</h2><p class="muted small">यह परीक्षा केवल तैयारी में बनेगी। प्रश्न/पेपर की समीक्षा और publish केवल admin करेगा।</p></div>
+        </div>
+        <form id="controllerCreateForm" class="stack" style="margin-top:16px">
+          <div class="grid-2">
+            <label class="field"><span>परीक्षा का नाम *</span><input class="input" id="controllerExamTitle" maxlength="120" required></label>
+            <label class="field"><span>Exam Code *</span><input class="input" id="controllerExamCode" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9-]{1,29}" required></label>
+            <label class="field"><span>विषय *</span><select class="select" id="controllerExamSubject" required><option value="">लोड हो रहा है…</option></select></label>
+            <label class="field"><span>ट्रेड</span><select class="select" id="controllerExamTrade"><option value="">लोड हो रहा है…</option></select></label>
+            <label class="field"><span>अवधि (मिनट)</span><input class="input" id="controllerExamDuration" type="number" min="1" max="300" value="60" required></label>
+            <label class="field"><span>प्रकार</span><select class="select" id="controllerExamType"><option value="final">अंतिम परीक्षा</option><option value="practice">अभ्यास परीक्षा</option></select></label>
+          </div>
+          <p class="notice bad" id="controllerCreateError" hidden></p>
+          <div><button class="btn btn-navy" id="controllerCreateButton" type="submit">ड्राफ्ट परीक्षा बनाएँ</button></div>
+        </form>
+      </section>
+      <section class="panel" style="margin-top:20px">
+        <div class="row-between">
+          <div><h2>परीक्षाएँ</h2><p class="muted small">कंट्रोलर प्रश्न या छात्र प्रोफ़ाइल नहीं देख सकता और परीक्षा publish नहीं कर सकता।</p></div>
           <span class="pill info" id="controllerUpdated">लोड हो रहा है…</span>
         </div>
         <div id="controllerExamList" class="stack" style="margin-top:16px"></div>

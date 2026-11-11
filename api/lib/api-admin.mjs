@@ -550,14 +550,62 @@ export async function handleExamControllerExams(args) {
   });
 }
 
-export async function handleExamControllerLock(args) {
-  const response = await handleAdminExamLock(args);
-  const data = await response.json();
-  return json({ ok: true, exam: controllerExamSummary(data.exam) });
+export async function handleExamControllerCatalog({ store }) {
+  const catalog = await loadCatalog(store);
+  return json({
+    ok: true,
+    subjects: catalog.subjects.map(({ id, name, code }) => ({ id, name, code })),
+    trades: catalog.trades.map(({ id, name, code }) => ({ id, name, code })),
+  });
 }
 
-export async function handleExamControllerPublish(args) {
-  const response = await handleAdminExamPublish(args);
+export async function handleExamControllerCreate({ store, req, actor = "exam_controller" }) {
+  const body = await readJson(req);
+  const input = body.exam || {};
+  const data = validateExam({
+    title: input.title,
+    code: input.code,
+    subjectId: input.subjectId,
+    tradeId: input.tradeId,
+    durationMin: input.durationMin,
+    type: input.type,
+    passPct: 40,
+    marksPerQuestion: 1,
+    negativeMarks: 0,
+    attemptsAllowed: input.type === "practice" ? 3 : 1,
+  });
+  const catalog = await loadCatalog(store);
+  if (data.subjectId !== "mixed" && !catalog.subjectMap.has(data.subjectId)) {
+    throw new HttpError("चुना गया विषय मौजूद नहीं है", 400);
+  }
+  if (data.tradeId && !catalog.tradeMap.has(data.tradeId)) {
+    throw new HttpError("चुना गया ट्रेड मौजूद नहीं है", 400);
+  }
+  if (!(await uniqueExamCode(store, data.code))) {
+    throw new HttpError("यह Exam Code पहले से किसी परीक्षा में प्रयोग हो रहा है", 409);
+  }
+  const now = new Date().toISOString();
+  const exam = {
+    ...data,
+    id: newExamId(),
+    questionIds: [],
+    status: "draft",
+    paperVersion: 0,
+    paperHash: "",
+    paperLockedAt: null,
+    publishedAt: null,
+    totalQuestions: 0,
+    totalMarks: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await saveExam(store, exam);
+  await audit(store, "exam.create", actor, { examId: exam.id });
+  return json({ ok: true, exam: controllerExamSummary(exam), serverNow: Date.now() });
+}
+
+export async function handleExamControllerLock(args) {
+  const response = await handleAdminExamLock(args);
   const data = await response.json();
   return json({ ok: true, exam: controllerExamSummary(data.exam) });
 }
