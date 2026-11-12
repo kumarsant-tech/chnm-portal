@@ -74,6 +74,7 @@ function memoryStore() {
 function d1Store(database) {
   const upperBound = (prefix) => `${prefix}\uffff`;
   return {
+    persistent: true,
     async get(key, options = {}) {
       const row = await database
         .prepare("SELECT value FROM app_kv WHERE key = ?")
@@ -166,6 +167,16 @@ function d1Store(database) {
           .run();
       }
       return row ? JSON.parse(row.value) : null;
+    },
+    // One query that returns every JSON value under a prefix. This replaces the
+    // old "list keys, then one SELECT per key" pattern that caused 503/1102 errors
+    // under load. Read-only: it never writes or deletes anything.
+    async listValues({ prefix = "" } = {}) {
+      const { results } = await database
+        .prepare("SELECT value FROM app_kv WHERE key >= ? AND key < ? ORDER BY key")
+        .bind(String(prefix), upperBound(String(prefix)))
+        .all();
+      return results.map(({ value }) => JSON.parse(value)).filter(Boolean);
     },
     async list({ prefix = "" } = {}) {
       const { results } = await database
@@ -260,6 +271,7 @@ export async function listKeys(store, prefix = "") {
 }
 
 export async function listJson(store, prefix = "") {
+  if (typeof store.listValues === "function") return store.listValues({ prefix });
   const keys = await listKeys(store, prefix);
   return (await mapLimit(keys, 12, (key) => getJson(store, key))).filter(Boolean);
 }

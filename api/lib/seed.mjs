@@ -89,7 +89,13 @@ async function ensureScope(store) {
   await putJson(store, SCOPE_MARKER, { done: true, at: now });
 }
 
+// In production (D1) the seed/scope markers never go back once written, so after
+// they have been confirmed once in this Worker isolate we skip those 3 reads on
+// every later request.
+let SEED_CONFIRMED = false;
+
 export async function ensureSeed(store) {
+  if (store.persistent && SEED_CONFIRMED) return null;
   let settings = await getJson(store, K.settings());
   if (!settings) {
     settings = { ...DEFAULT_SETTINGS, createdAt: new Date().toISOString() };
@@ -98,6 +104,7 @@ export async function ensureSeed(store) {
   const marker = await getJson(store, SEED_MARKER);
   if (marker?.done) {
     await ensureScope(store);
+    if (store.persistent) SEED_CONFIRMED = true;
     return settings;
   }
 
