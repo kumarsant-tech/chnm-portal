@@ -21,6 +21,7 @@ export const SITE_ITEMS = [
   "404.html",
   "robots.txt",
   ".nojekyll",
+  "_headers",
 ];
 
 async function walk(dir) {

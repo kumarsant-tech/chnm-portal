@@ -1,0 +1,12 @@
+# Content-hashed files: the name changes whenever the content changes, so they can be cached for a year.
+/SMPS-Lab/shared/*
+  Cache-Control: public, max-age=31536000, immutable
+/SMPS-Lab/img/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/shared/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/img/*
+  Cache-Control: public, max-age=31536000, immutable
+# Big read-only data files: reuse for a day instead of re-checking on every visit.
+/assets/data/*
+  Cache-Control: public, max-age=86400
