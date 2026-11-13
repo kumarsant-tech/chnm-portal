@@ -1,0 +1,281 @@
+/* =====================================================================
+   FI MODERN UI · साझा सुधार परत (सभी पेजों पर ऊपर से चलती है)
+   पुरानी स्टाइल नहीं बदली गई — सिर्फ़ radius/shadow/spacing/flow सुधरा।
+   ===================================================================== */
+:root {
+  --fi-r-sm: 10px;
+  --fi-r: 16px;
+  --fi-r-lg: 22px;
+  --fi-shadow: 0 1px 2px rgba(11, 32, 26, .05), 0 10px 26px rgba(11, 32, 26, .07);
+  --fi-shadow-hi: 0 2px 6px rgba(11, 32, 26, .08), 0 18px 44px rgba(11, 32, 26, .13);
+  --fi-ease: cubic-bezier(.22, .61, .36, 1);
+}
+
+/* =====================================================================
+   परीक्षा पोर्टल · रीफ़्रेश्ड पैलेट (केवल रंग/शेड थोड़े आधुनिक)
+   पुराने वेरिएबल नाम (--brand, --accent, --navy...) वही रखे गए हैं, ताकि
+   बाकी कहीं भी styles.css/exam-ui.css की मौजूदा रूल्स टूटें नहीं — सिर्फ़
+   उनके रंग-मान थोड़े ताज़ा और एक-दूसरे से ज़्यादा मेल खाते हुए किए गए हैं। */
+body[data-page] {
+  --navy: #0e2a42;
+  --navy-2: #0a1f33;
+  --brand: #0c6e63;
+  --brand-dark: #07554c;
+  --brand-soft: #e4f4ef;
+  --accent: #b9791f;
+  --accent-soft: #fbf0db;
+  --bg: #f3f6f8;
+  --surface: #ffffff;
+  --surface-2: #f7f9fb;
+  --line: #dde5ea;
+  --line-strong: #c3d0d8;
+  --muted: #58697a;
+  --muted-2: #7c8b98;
+  --good: #16824c;
+  --good-soft: #e5f6ec;
+  --bad: #b3261e;
+  --bad-soft: #fcebea;
+  --warn: #9a5b0a;
+  --warn-soft: #fdf0dc;
+  --mark: #6a46c4;
+  --mark-soft: #efe8fb;
+  --info: #175ad0;
+  --info-soft: #e8f1fe;
+  --radius: 14px;
+  --radius-lg: 20px;
+}
+
+/* ---------- आधार ---------- */
+html { scroll-behavior: smooth; }
+body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent, var(--brand, #0d6b5f)); color: var(--accent-ink, #fff); }
+img { content-visibility: auto; }
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent, var(--brand, #0d6b5f)) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- ऊपर की पट्टी: चिपकी, हल्की, साफ़ ---------- */
+.fi-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: saturate(150%) blur(10px);
+  -webkit-backdrop-filter: saturate(150%) blur(10px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .06), 0 8px 24px rgba(10, 40, 30, .06);
+}
+.fi-header .brand { display: flex; align-items: center; gap: 10px; }
+.fi-header .brand-mark {
+  border-radius: 12px;
+  letter-spacing: .02em;
+  background: linear-gradient(145deg, var(--brand, #0c6e63), var(--brand-dark, #07554c));
+}
+.fi-header .header-link {
+  border-radius: 999px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .18s var(--fi-ease), color .18s var(--fi-ease), transform .18s var(--fi-ease);
+}
+.fi-header .header-link:hover { transform: translateY(-1px); }
+.fi-header .header-link[aria-current="page"],
+.fi-header .header-link.is-active {
+  background: color-mix(in srgb, var(--accent, var(--brand, #0c6e63)) 16%, transparent);
+  font-weight: 700;
+}
+
+/* ---------- परीक्षा सेक्शन: हेडर के हर लिंक की भूमिका एक नज़र में साफ़ ----------
+   छात्र लॉगिन मुख्य/भरा हुआ बटन जैसा; रजिस्ट्रेशन/परिणाम हल्के; स्टाफ़/एडमिन
+   अलग रंग-पट्टी के साथ ताकि गलती से कोई छात्र एडमिन लिंक न दबाए बिना सोचे। */
+body[data-page] .fi-header .header-links {
+  row-gap: 6px;
+}
+body[data-page] .fi-header .header-link[data-role="student"] {
+  background: color-mix(in srgb, var(--brand, #0c6e63) 88%, transparent);
+  color: #fff;
+  font-weight: 700;
+}
+body[data-page] .fi-header .header-link[data-role="student"]:hover {
+  background: var(--brand, #0c6e63);
+}
+body[data-page] .fi-header .header-link[data-role="register"],
+body[data-page] .fi-header .header-link[data-role="result"] {
+  border: 1px solid rgba(255, 255, 255, .22);
+}
+body[data-page] .fi-header .header-link[data-role="staff"],
+body[data-page] .fi-header .header-link[data-role="admin"] {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+}
+body[data-page] .fi-header .header-link[data-role="admin"] {
+  color: #f6d9a8;
+}
+body[data-page] .fi-header .nav-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, .16);
+}
+@media (max-width: 760px) {
+  body[data-page] .fi-header .nav-divider { display: none; }
+}
+
+/* ---------- कार्ड / पैनल ---------- */
+.card, .panel, .admin-card, .cits-card, .m-card, .v5-box, .v5-gauge, .v5-q, .v5-stage,
+.chapter-side, .notice, .answer-card, .example-box, .study-hero, .hero-stat {
+  border-radius: var(--fi-r);
+}
+.card, .panel, .admin-card, .cits-card, .m-card, .v5-box, .v5-gauge, .v5-q {
+  box-shadow: var(--fi-shadow);
+  transition: box-shadow .2s var(--fi-ease), transform .2s var(--fi-ease), border-color .2s var(--fi-ease);
+}
+.card:hover, .cits-card:hover, .m-card:hover, .v5-gauge:hover {
+  box-shadow: var(--fi-shadow-hi);
+  transform: translateY(-2px);
+}
+
+/* ---------- बटन: एक जैसा आधुनिक रूप ---------- */
+.btn, .v5-btn, .v5-nav, .lang-btn, .big a, .cits-btn {
+  border-radius: 999px;
+  min-height: 44px;
+  transition: transform .14s var(--fi-ease), box-shadow .18s var(--fi-ease), background .18s var(--fi-ease);
+}
+.btn:hover, .v5-btn:hover, .lang-btn:hover, .cits-btn:hover { transform: translateY(-1px); }
+.btn:active, .v5-btn:active, .lang-btn:active { transform: translateY(0) scale(.985); }
+.btn-lg { min-height: 52px; padding-inline: 22px; font-size: 16px; }
+
+/* मुख्य बटन (Login/Submit/Publish जैसे) को हल्की ग्रेडिएंट चमक */
+body[data-page] .btn:not(.btn-ghost):not(.btn-soft):not(.btn-outline) {
+  background-image: linear-gradient(165deg, color-mix(in srgb, var(--brand, #0c6e63) 100%, white 6%), var(--brand, #0c6e63));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .18) inset, 0 8px 18px color-mix(in srgb, var(--brand, #0c6e63) 30%, transparent);
+}
+body[data-page] .btn:not(.btn-ghost):not(.btn-soft):not(.btn-outline):hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .22) inset, 0 12px 24px color-mix(in srgb, var(--brand, #0c6e63) 38%, transparent);
+}
+
+/* इनपुट फ़ील्ड: फ़ोकस पर साफ़ हरी रिंग, आराम से पढ़ने लायक */
+body[data-page] .input:focus,
+body[data-page] .select:focus {
+  border-color: var(--brand, #0c6e63);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand, #0c6e63) 16%, transparent);
+}
+
+/* ---------- टेबल ---------- */
+.tbl, table.v5-tbl, .tbl-wrap table { border-radius: 14px; overflow: hidden; }
+.tbl thead th, table.v5-tbl th, .tbl-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--accent, var(--brand, #0d6b5f)) 9%, var(--surface, #fff));
+  font-size: 12.5px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.tbl tbody tr:nth-child(even), .tbl-wrap tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--fg, #13201a) 3.5%, transparent);
+}
+
+/* ---------- हेडिंग को साफ़ पहचान ---------- */
+.chapter-article h2, .study-wrap h2, .admin-section-head h2, .page h2 {
+  scroll-margin-top: 84px;
+}
+.chapter-article h2::before, .admin-section-head h2::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: .95em;
+  border-radius: 999px;
+  margin-right: 10px;
+  vertical-align: -.08em;
+  background: linear-gradient(180deg, var(--accent, var(--brand, #0d6b5f)), color-mix(in srgb, var(--accent, var(--brand, #0d6b5f)) 45%, var(--trace, #2f6bff)));
+}
+
+/* ---------- अध्याय साइडबार मोबाइल में सुलभ ---------- */
+@media (max-width: 900px) {
+  .chapter-layout { display: block; }
+  .chapter-side {
+    position: static;
+    max-height: none;
+    margin: 0 0 16px;
+    padding: 12px;
+    border-radius: var(--fi-r);
+  }
+  .chapter-nav-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 6px; }
+  .chapter-nav-list a { min-height: 42px; display: flex; align-items: center; }
+}
+
+/* ---------- scroll progress + back to top ---------- */
+#fi-progress {
+  position: fixed;
+  inset: 0 auto auto 0;
+  height: 3px;
+  width: 0;
+  z-index: 999;
+  background: linear-gradient(90deg, var(--accent, #0d6b5f), var(--trace, #2f6bff));
+  transition: width .08s linear;
+}
+#fi-top {
+  position: fixed;
+  right: 14px;
+  bottom: 84px;
+  z-index: 900;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line, rgba(0, 0, 0, .14));
+  background: var(--surface, #fff);
+  color: var(--fg, #13201a);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--fi-shadow);
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .2s var(--fi-ease), transform .2s var(--fi-ease);
+}
+#fi-top.show { opacity: 1; transform: none; pointer-events: auto; }
+
+/* ---------- हल्का reveal (केवल जब JS मौजूद हो) ---------- */
+.fi-reveal { opacity: 0; transform: translateY(14px); transition: opacity .45s var(--fi-ease), transform .45s var(--fi-ease); }
+.fi-reveal.fi-in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .fi-reveal { opacity: 1; transform: none; transition: none; }
+  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* ---------- छपाई ---------- */
+@media print {
+  #fi-progress, #fi-top, .fi-header, .chapter-side, .footer, footer { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card, .panel, .v5-box { box-shadow: none; border: 1px solid #bbb; }
+}
+
+/* ---------- appbar: छोटी स्क्रीन पर आइकन बटन कटें नहीं, ब्रांड ऊपर न चढ़े ----------
+   flex:none से थीम/भाषा/मेनू बटन अपनी पूरी चौड़ाई रखते हैं; बची जगह ब्रांड लेता है
+   और ellipsis से साफ़ कटता है — पहले वह सिकुड़ कर 🎨 को काट रहा था और नाम pill पर चढ़ता था। */
+body .appbar { gap: clamp(5px, 1.1vw, 12px); }
+body .appbar .logo,
+body .appbar .pill,
+body .appbar .header-action,
+body .appbar button.theme { flex: none; }
+body .appbar button.theme { padding: 0; }
+body .appbar .brand-stack { overflow: hidden; }
+body .appbar .brand-stack b,
+body .appbar .brand-stack small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 560px) {
+  body .appbar button.theme { width: 34px; height: 34px; border-radius: 11px; font-size: 16px; }
+  body .appbar .bell-btn { font-size: 15px; }
+}
+/* लोगो सिर्फ़ सजावट है (aria-hidden) — बहुत छोटी स्क्रीन पर उसकी जगह ब्रांड नाम लेता है */
+@media (max-width: 430px) {
+  body .appbar .logo { display: none; }
+}
